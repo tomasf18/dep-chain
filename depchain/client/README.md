@@ -1,0 +1,1 @@
+client library (append strings to blockchain API) and test client.
