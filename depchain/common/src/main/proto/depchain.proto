@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package ist.depchain;
+
+option java_package = "ist.depchain.common";
+option java_outer_classname = "DepchainProto";
+option java_multiple_files = true;
+
+// Network Layer
+
+message Envelope {
+    int32 sequence_number = 1;
+    string sender = 2; // e.g., "replica1", "replica2", ...
+    bytes payload = 3; // serialized message (e.g., Block, Vote, etc)
+    bytes signature = 4; // signature of the sender over the payload (client does not sign)
+}
+
+message Ack {
+    int32 sequence_number = 1; // matches the sequence number of the Envelope being acknowledged
+    string sender = 2; // who is sending the ack (e.g., "replica1", "replica2", ...)
+}
+
+// Client <-> Replica Messages
+
+message Command {
+    string type = 1; // e.g., "append", "read", etc.
+    string data = 2; // e.g., for "append", the string to append
+}
+
+message ClientRequest {
+    string client_id = 1;
+    int32 request_id = 2; // unique per client_id
+    Command command = 3; // e.g., "append", "read", etc.
+}
+
+message ClientResponse {
+    int32 request_id = 1; // matches the request_id of the ClientRequest
+    bool committed = 2;
+}
+
+// Replica <-> Replica Messages (HotStuff)
+
+message Block {
+    int32 id = 1;
+    int32 parent_id = 2; 
+    Command command = 3; // the command included in this block
+    int32 view = 4;
+}
+
+message QC {
+    int32 block_id = 1; // the block this QC certifies
+    int32 view = 2;
+    bytes aggregated_signature = 3; // signature aggregated from a quorum of replicas (threshold signature)
+}
+
+message Prepare {
+    int32 view = 1;
+    Block block = 2;
+    QC justify = 3; // QC for the parent block
+}
+
+message PreCommit {
+    int32 view = 1;
+    QC prepare_qc = 2; // QC for the Prepare phase
+}
+
+message Commit {
+    int32 view = 1;
+    QC precommit_qc = 2; // QC for the PreCommit phase
+}
+
+message Vote {
+    int32 view = 1;
+    int32 block_id = 2; 
+    bytes partial_signature = 3; // signature of the voting replica (not aggregated)
+}
+
+message NewView {
+    int32 new_view = 1;
+    QC high_qc = 2; // highest QC known to the replica
+}
