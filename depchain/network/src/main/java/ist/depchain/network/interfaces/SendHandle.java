@@ -1,5 +1,5 @@
-package ist.depchain.network;
+package ist.depchain.network.interfaces;
 
-interface SendHandle {
+public interface SendHandle {
     void cancel(); // handler for canceling the send retransmission task (used by StubbornLink)
 }

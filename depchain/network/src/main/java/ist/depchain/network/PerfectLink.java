@@ -3,8 +3,12 @@ package ist.depchain.network;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import ist.depchain.common.*;
 import com.google.protobuf.ByteString;
+
+import ist.depchain.common.*;
+import ist.depchain.network.interfaces.Link;
+import ist.depchain.network.interfaces.MessageHandler;
+import ist.depchain.network.interfaces.SendHandle;
 
 public class PerfectLink implements Link {
 
@@ -12,7 +16,8 @@ public class PerfectLink implements Link {
     private final Link stubbornLink;  // StubbornLink
     private final Link fairLossLink; // for sending ACKs, we can use the underlying fair loss link directly since ACKs are idempotent and don't require retransmission
     private Map<Long /*seqNum*/, SendHandle> pendingMessages = new ConcurrentHashMap<>(); // for tracking pending messages and their retransmission tasks
-    private Map<String /*sender*/, Long /*highest_seq_delivered*/> deliveredSeqNums = new ConcurrentHashMap<>(); // for tracking highest sequence number this processa has delivered from each sender
+    private Map<String /*sender*/, Long /*next_expected_seq_num*/> nextExpected = new ConcurrentHashMap<>(); // for tracking the next expected sequence number from each sender to detect duplicates and ensure in-order delivery
+    private Map<String /*sender*/, Map<Long /*seqNum*/, byte[] /*payload*/>> pendingDeliveries = new ConcurrentHashMap<>(); // for buffering out-of-order messages until they can be delivered in order
     private AtomicLong localSequenceCounter = new AtomicLong(0); // for generating unique sequence numbers for outgoing messages
 
     private MessageHandler handler; // upper layer's message handler (e.g., application layer, where the programmer defines how to process the received messages)

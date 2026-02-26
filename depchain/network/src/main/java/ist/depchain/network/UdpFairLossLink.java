@@ -5,6 +5,13 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.Arrays;
 
+import ist.depchain.network.utils.ArtificialFaultConfig;
+import ist.depchain.network.utils.ProcessConfig;
+import ist.depchain.network.utils.ProcessInfo;
+import ist.depchain.network.interfaces.Link;
+import ist.depchain.network.interfaces.MessageHandler;
+import ist.depchain.network.interfaces.SendHandle;
+
 public class UdpFairLossLink implements Link {
 
     private final DatagramSocket socket;

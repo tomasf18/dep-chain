@@ -5,6 +5,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import ist.depchain.network.interfaces.Link;
+import ist.depchain.network.interfaces.MessageHandler;
+import ist.depchain.network.interfaces.SendHandle;
+
 public class StubbornLink implements Link {
 
     private final Link underlyingLink;  // FairLossLink

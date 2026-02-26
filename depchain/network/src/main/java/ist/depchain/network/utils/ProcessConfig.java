@@ -1,4 +1,4 @@
-package ist.depchain.network;
+package ist.depchain.network.utils;
 
 import java.net.InetAddress;
 import java.util.Map;

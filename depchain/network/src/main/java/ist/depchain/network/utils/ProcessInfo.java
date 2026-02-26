@@ -1,4 +1,4 @@
-package ist.depchain.network;
+package ist.depchain.network.utils;
 
 public class ProcessInfo {
     private String id;
