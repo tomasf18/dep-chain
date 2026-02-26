@@ -98,7 +98,7 @@
       <configuration>
         <archive>
         <manifest>
-          <mainClass>ist.depchain.network.App</mainClass>
+          <mainClass>ist.depchain.network.Usage</mainClass>
         </manifest>
         </archive>
       </configuration>
@@ -108,7 +108,7 @@
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.6.3</version>
         <configuration>
-          <mainClass>ist.depchain.network.App</mainClass>
+          <mainClass>ist.depchain.network.Usage</mainClass>
         </configuration>
       </plugin>
     </plugins>
