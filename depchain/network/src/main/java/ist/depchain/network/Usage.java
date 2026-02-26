@@ -28,7 +28,7 @@ public class Usage {
             otherId, new ProcessInfo(otherId, otherHost, otherPort)
         ));
 
-        ArtificialFaultConfig faultConfig = new ArtificialFaultConfig(0.2, 0.9, 0);
+        ArtificialFaultConfig faultConfig = new ArtificialFaultConfig(0.4, 0, 0);
         Link fairLossLink = new UdpFairLossLink(selfInfo, config, faultConfig);
         Link stubbornLink = new StubbornLink(fairLossLink, 1000);
         Link perfectLink = new PerfectLink(selfId, stubbornLink, fairLossLink);

@@ -61,28 +61,45 @@ public class PerfectLink implements Link {
             }
 
             // NORMAL MESSAGE: process it if it's new, and send ACK back
-            String envSenderId = envelope.getSenderId();
             long seq = envelope.getSequenceNumber();
 
-            long lastDelivered = deliveredSeqNums.getOrDefault(envSenderId, -1L);
+            long nextExpectedSeq = nextExpected.getOrDefault(senderId, 1L);
 
-            if (seq <= lastDelivered) { // duplicate or old message, just ACK again 
-                // TODO: PROBLEM -> IF SENDING 5 MESSAGES FAST, AND THE LAST ONE GETS DELIVERED FIRST, THEN ALL THE PREVIOUS ONES WILL BE CONSIDERED DUPLICATE AND NOT DELIVERED TO THE UPPER LAYER. SOLUTION: CAN'T JUST COMPARE SEQ NUMBERS, NEED TO ALSO TRACK WHICH SEQ NUMS HAVE BEEN DELIVERED (E.G., USING A BITSET OR A SET OF SEQ NUMS)
-                // ALSO: CAREFUL WITH THE ORDER OF THE MESSAGES, IF THEY ARRIVE OUT OF ORDER, THEN THE "LAST DELIVERED SEQ NUM" MIGHT BE HIGHER THAN SOME NEW MESSAGE THAT JUST ARRIVED, CAUSING IT TO BE CONSIDERED DUPLICATE/OLD AND NOT DELIVERED TO THE UPPER LAYER. SOLUTION: CAN'T JUST TRACK HIGHEST SEQ NUM DELIVERED, NEED TO ALSO TRACK WHICH SEQ NUMS HAVE BEEN DELIVERED (E.G., USING A BITSET OR A SET OF SEQ NUMS)
-                // LATER, TRY TO FIX THIS BY IMPLEMENTING SOMETHING SIMILAR TO TCP
-                System.out.println("PerfectLink: Received duplicate/old message from " + envSenderId + " with seq " + seq + ", last delivered was " + lastDelivered);
-                sendAck(envSenderId, seq);
+            sendAck(senderId, seq);
+            
+            if (seq == nextExpectedSeq) {
+                // this is the expected message, can be delivered immediately
+                System.out.println("PerfectLink: Received expected message from " + senderId + " with seq " + seq);
+                nextExpected.put(senderId, seq + 1); // update next expected for this sender
+                
+                if (handler != null) { 
+                    handler.onReceive(senderId, envelope.getPayload().toByteArray()); // deliver to upper layer
+                }
+
+                // after delivering this message, check if we have buffered messages that can now be delivered
+                Map<Long, byte[]> buffered = pendingDeliveries.getOrDefault(senderId, new ConcurrentHashMap<>());
+                while (buffered.containsKey(nextExpected.get(senderId))) { // we have the next expected message buffered, can deliver it now
+                    long bufferedSeq = nextExpected.get(senderId);
+                    byte[] bufferedPayload = buffered.remove(bufferedSeq);
+                    System.out.println("PerfectLink: Now delivering previously buffered message from " + senderId + " with seq " + bufferedSeq);
+                    handler.onReceive(senderId, bufferedPayload);
+                    nextExpected.put(senderId, bufferedSeq + 1); // update next expected
+                    // already sent ACK for this buffered message when we first received it, so no need to send ACK again
+                }
+                return;
+            }             
+            
+            if (seq < nextExpectedSeq) { // duplicate or old message, just ACK again 
+                System.out.println("PerfectLink: Received duplicate/old message from " + senderId + " with seq " + seq + ", next expected was " + nextExpectedSeq);
                 return;
             }
 
-            System.out.println("PerfectLink: Received new message from " + envSenderId + " with seq " + seq + ", last delivered was " + lastDelivered);
-            deliveredSeqNums.put(envSenderId, seq);
-
-            if (handler != null) {
-                handler.onReceive(envSenderId, envelope.getPayload().toByteArray());
+            // out-of-order message, buffer it until we can deliver it in order
+            if (seq > nextExpectedSeq) {
+                System.out.println("PerfectLink: Received out-of-order message from " + senderId + " with seq " + seq + ", expected was " + nextExpectedSeq + ", buffering it");
+                pendingDeliveries.putIfAbsent(senderId, new ConcurrentHashMap<>());
+                pendingDeliveries.get(senderId).put(seq, envelope.getPayload().toByteArray());
             }
-
-            sendAck(envSenderId, seq);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -112,7 +129,7 @@ public class PerfectLink implements Link {
                 .setAck(ack)
                 .build();
 
-        fairLossLink.send(destinationId, ackEnvelope.toByteArray());
+        fairLossLink.send(destinationId, ackEnvelope.toByteArray()); // send only once
     }
 
     @Override
