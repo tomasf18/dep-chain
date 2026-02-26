@@ -1,0 +1,17 @@
+{
+  "faultConfig": {
+    "packetDropRate": 0.4,
+    "packetDuplicationRate": 0.0,
+    "packetDelayMs": 0
+  },
+  "processes": {
+    "p1": {
+      "host": "localhost",
+      "port": 5001
+    },
+    "p2": {
+      "host": "localhost",
+      "port": 5002
+    }
+  }
+}
