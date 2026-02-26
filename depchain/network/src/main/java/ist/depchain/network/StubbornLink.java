@@ -2,6 +2,7 @@ package ist.depchain.network;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 public class StubbornLink implements Link {
@@ -17,10 +18,12 @@ public class StubbornLink implements Link {
     }
 
     @Override
-    public void send(String destinationId, byte[] payload) {
-        scheduler.scheduleAtFixedRate(() -> {
+    public SendHandle send(String destinationId, byte[] payload) {
+        ScheduledFuture<?> future = scheduler.scheduleAtFixedRate(() -> {
+            System.out.println("StubbornLink: Sending/Retransmitting message to " + destinationId);
             underlyingLink.send(destinationId, payload);
         }, 0, resendPeriodMillis, TimeUnit.MILLISECONDS);
+        return () -> future.cancel(false);
     }
 
     @Override

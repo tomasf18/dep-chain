@@ -27,8 +27,8 @@ public class UdpFairLossLink implements Link {
 
 
     @Override
-    public void send(String destinationId, byte[] payload) {
-        if (Math.random() < faultConfig.getDropProbability()) { return; } // drop the packet
+    public SendHandle send(String destinationId, byte[] payload) {
+        if (Math.random() < faultConfig.getDropProbability()) { return null; } // drop the packet
         
         ProcessInfo destInfo = config.getProcesses().get(destinationId);
         if (destInfo == null) {
@@ -45,6 +45,8 @@ public class UdpFairLossLink implements Link {
         } catch (Exception e) {
             throw new RuntimeException("Failed to send packet", e);
         }
+
+        return null;
     }
 
     @Override

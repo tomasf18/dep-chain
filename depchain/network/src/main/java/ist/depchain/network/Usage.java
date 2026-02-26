@@ -22,14 +22,15 @@ public class Usage {
             otherId, new ProcessInfo(otherId, otherHost, otherPort)
         ));
 
-        ArtificialFaultConfig faultConfig = new ArtificialFaultConfig(0.8, 0, 0);
+        ArtificialFaultConfig faultConfig = new ArtificialFaultConfig(0.2, 0.9, 0);
         Link fairLossLink = new UdpFairLossLink(selfInfo, config, faultConfig);
         Link stubbornLink = new StubbornLink(fairLossLink, 1000);
+        Link perfectLink = new PerfectLink(selfId, stubbornLink, fairLossLink);
         MessageHandler handler = (sourceId, payload) -> {
             System.out.println("Received from " + sourceId + ": " + new String(payload));
         };
-        stubbornLink.registerReceiver(handler);
-        stubbornLink.start();
+        perfectLink.registerReceiver(handler);
+        perfectLink.start();
 
         // prompt to send messages
         try {
@@ -39,7 +40,7 @@ public class Usage {
                 if (line == null || line.equalsIgnoreCase("exit")) {
                     break;
                 }
-                stubbornLink.send(otherId, line.getBytes());
+                perfectLink.send(otherId, line.getBytes());
             }
         } catch (Exception e) {
             e.printStackTrace();
