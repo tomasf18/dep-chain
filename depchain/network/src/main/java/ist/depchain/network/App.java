@@ -23,7 +23,7 @@ public class App {
             otherId, new ProcessInfo(otherId, otherHost, otherPort)
         ));
 
-        ArtificialFaultConfig faultConfig = new ArtificialFaultConfig(0, 0, 0);
+        ArtificialFaultConfig faultConfig = new ArtificialFaultConfig(0, 0, 2000);
         Link link = new UdpFairLossLink(selfInfo, config, faultConfig);
         MessageHandler handler = (sourceId, payload) -> {
             System.out.println("Received from " + sourceId + ": " + new String(payload));

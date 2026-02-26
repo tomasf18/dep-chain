@@ -35,11 +35,12 @@ public class UdpFairLossLink implements Link {
             throw new IllegalArgumentException("Unknown destination: " + destinationId);
         } 
         try {
+            if (faultConfig.getMaxDelayMs() > 0) { Thread.sleep((long)(Math.random() * faultConfig.getMaxDelayMs())); } // random delay
+            
             DatagramPacket packet = new DatagramPacket(payload, payload.length, InetAddress.getByName(destInfo.getHost()), destInfo.getPort());
             socket.send(packet);
 
             if (Math.random() < faultConfig.getDuplicateProbability()) { socket.send(packet); } // send duplicate
-            if (faultConfig.getMaxDelayMs() > 0) { Thread.sleep((long)(Math.random() * faultConfig.getMaxDelayMs())); } // random delay
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to send packet", e);
