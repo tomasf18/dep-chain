@@ -1,7 +1,25 @@
 package ist.depchain.network;
 
 public class ProcessInfo {
-    String id;
-    String host;
-    int port;
+    private String id;
+    private String host;
+    private int port;
+
+    public ProcessInfo(String id, String host, int port) {
+        this.id = id;
+        this.host = host;
+        this.port = port;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public String getHost() {
+        return host;
+    }
+
+    public int getPort() {
+        return port;
+    }
 }
