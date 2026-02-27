@@ -69,7 +69,7 @@ public class PerfectLink implements Link {
             
             if (seq == nextExpectedSeq) {
                 // this is the expected message, can be delivered immediately
-                System.out.println("PerfectLink: Received expected message from " + senderId + " with seq " + seq);
+                //System.out.println("PerfectLink: Received expected message from " + senderId + " with seq " + seq);
                 nextExpected.put(senderId, seq + 1); // update next expected for this sender
                 
                 if (handler != null) { 
@@ -81,7 +81,7 @@ public class PerfectLink implements Link {
                 while (buffered.containsKey(nextExpected.get(senderId))) { // we have the next expected message buffered, can deliver it now
                     long bufferedSeq = nextExpected.get(senderId);
                     byte[] bufferedPayload = buffered.remove(bufferedSeq);
-                    System.out.println("PerfectLink: Now delivering previously buffered message from " + senderId + " with seq " + bufferedSeq);
+                    //System.out.println("PerfectLink: Now delivering previously buffered message from " + senderId + " with seq " + bufferedSeq);
                     handler.onReceive(senderId, bufferedPayload);
                     nextExpected.put(senderId, bufferedSeq + 1); // update next expected
                     // already sent ACK for this buffered message when we first received it, so no need to send ACK again
@@ -90,13 +90,13 @@ public class PerfectLink implements Link {
             }             
             
             if (seq < nextExpectedSeq) { // duplicate or old message, just ACK again 
-                System.out.println("PerfectLink: Received duplicate/old message from " + senderId + " with seq " + seq + ", next expected was " + nextExpectedSeq);
+                //System.out.println("PerfectLink: Received duplicate/old message from " + senderId + " with seq " + seq + ", next expected was " + nextExpectedSeq);
                 return;
             }
 
             // out-of-order message, buffer it until we can deliver it in order
             if (seq > nextExpectedSeq) {
-                System.out.println("PerfectLink: Received out-of-order message from " + senderId + " with seq " + seq + ", expected was " + nextExpectedSeq + ", buffering it");
+                //System.out.println("PerfectLink: Received out-of-order message from " + senderId + " with seq " + seq + ", expected was " + nextExpectedSeq + ", buffering it");
                 pendingDeliveries.putIfAbsent(senderId, new ConcurrentHashMap<>());
                 pendingDeliveries.get(senderId).put(seq, envelope.getPayload().toByteArray());
             }
@@ -113,7 +113,7 @@ public class PerfectLink implements Link {
         if (handle == null) return;
         
         handle.cancel();
-        System.out.println("PerfectLink: Received ACK for seq " + seq + " from " + ack.getOriginalSender() + ", stopped retransmission");
+        //System.out.println("PerfectLink: Received ACK for seq " + seq + " from " + ack.getOriginalSender() + ", stopped retransmission");
     }
 
     private void sendAck(String destinationId, long seq) {

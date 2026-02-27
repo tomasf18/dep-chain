@@ -1,8 +1,9 @@
 {
   "faultConfig": {
-    "packetDropRate": 0.4,
+    "packetDropRate": 0.01,
     "packetDuplicationRate": 0.0,
-    "packetDelayMs": 0
+    "packetDelayMs": 0,
+    "packetTamperRate": 0.01
   },
   "processes": {
     "p1": {

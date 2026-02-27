@@ -25,10 +25,14 @@ public class StubbornLink implements Link {
     public SendHandle send(String destinationId, byte[] payload) {
         long[] numberOfRetries = { 0 };
         ScheduledFuture<?> future = scheduler.scheduleAtFixedRate(() -> {
-            
-            if (numberOfRetries[0] == 0) { System.out.println("StubbornLink: Sending message to " + destinationId); } 
-            else { System.out.println("StubbornLink: Retrying to send message to " + destinationId + ", retry count: " + numberOfRetries[0]); }
-            
+
+            /*
+            if (numberOfRetries[0] == 0) {
+                System.out.println("StubbornLink: Sending message to " + destinationId); }
+            else {
+                System.out.println("StubbornLink: Retrying to send message to " + destinationId + ", retry count: " + numberOfRetries[0]); }
+             */
+
             underlyingLink.send(destinationId, payload);
             numberOfRetries[0]++;
             
