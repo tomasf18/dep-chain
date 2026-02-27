@@ -49,7 +49,7 @@ public class ClientApp {
             System.out.println("[INFO] Successfully terminated");
         }
         catch(Exception e){
-            System.out.println("Failed to load config file: " + e.getMessage());
+            System.out.println("[ERROR] Failed to load config file: " + e.getMessage());
         }
     }
 }

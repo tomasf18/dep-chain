@@ -65,7 +65,7 @@ public class DepChainClient {
                 System.out.println("[RECEIVED] Id of request: " + cltResponse.getRequestId());
                 System.out.println("[RECEIVED] State: " + cltResponse.getCommitted());
             }catch(Exception e) {
-                System.out.println("Error while processing request: " + e.getMessage());
+                System.out.println("[ERROR] Error while processing request: " + e.getMessage());
             }
         });
 
