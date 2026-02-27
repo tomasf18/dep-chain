@@ -12,6 +12,14 @@
     "p2": {
       "host": "localhost",
       "port": 5002
+    },
+    "p3": {
+      "host": "localhost",
+      "port": 5003
+    },
+    "p4": {
+      "host": "localhost",
+      "port": 5004
     }
   }
 }
