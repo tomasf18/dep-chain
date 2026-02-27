@@ -34,6 +34,16 @@
 
   <dependencies>
     <dependency>
+      <groupId>ist.depchain.network</groupId>
+      <artifactId>network</artifactId>
+      <version>1.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>ist.depchain.common</groupId>
+      <artifactId>common</artifactId>
+      <version>1.0.0</version>
+    </dependency>
+    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
       <scope>test</scope>
