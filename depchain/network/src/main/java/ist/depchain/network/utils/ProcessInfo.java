@@ -22,4 +22,9 @@ public class ProcessInfo {
     public int getPort() {
         return port;
     }
+
+    @Override
+    public String toString() {
+        return "ProcessInfo{id='" + id + "', host='" + host + "', port=" + port + "}";
+    }
 }
