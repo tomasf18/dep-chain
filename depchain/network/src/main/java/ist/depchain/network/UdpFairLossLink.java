@@ -5,8 +5,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.Arrays;
 
-import ist.depchain.network.utils.ArtificialFaultConfig;
-import ist.depchain.network.utils.ProcessConfig;
+import ist.depchain.network.utils.Config;
 import ist.depchain.network.utils.ProcessInfo;
 import ist.depchain.network.interfaces.Link;
 import ist.depchain.network.interfaces.MessageHandler;
@@ -15,39 +14,42 @@ import ist.depchain.network.interfaces.SendHandle;
 public class UdpFairLossLink implements Link {
 
     private final DatagramSocket socket;
-    private final ProcessConfig config;
+    private final Config config;
     private MessageHandler handler;
     private volatile boolean running = false;
 
-    // artificially introduce faults
-    private final ArtificialFaultConfig faultConfig;
-
-    public UdpFairLossLink(ProcessInfo selfInfo, ProcessConfig config, ArtificialFaultConfig faultConfig) {
+    public UdpFairLossLink(Config config) {
         this.config = config;
-        this.faultConfig = faultConfig;
         try {
-            this.socket = new DatagramSocket(selfInfo.getPort());
+            this.socket = new DatagramSocket(config.getSelfInfo().getPort());
         } catch (Exception e) {
             throw new RuntimeException("Failed to create socket", e);
         }
     }
 
-
     @Override
     public SendHandle send(String destinationId, byte[] payload) {
-        if (Math.random() < faultConfig.getDropProbability()) { return null; } // drop the packet
+        if (Math.random() < config.getDropProbability()) { return null; } // drop the packet
         
         ProcessInfo destInfo = config.getProcesses().get(destinationId);
         if (destInfo == null) {
             throw new IllegalArgumentException("Unknown destination: " + destinationId);
         } 
         try {
-            if (faultConfig.getMaxDelayMs() > 0) { Thread.sleep((long)(Math.random() * faultConfig.getMaxDelayMs())); } // random delay
-            
-            DatagramPacket packet = new DatagramPacket(payload, payload.length, InetAddress.getByName(destInfo.getHost()), destInfo.getPort());
+            if (config.getMaxDelayMs() > 0) { Thread.sleep((long)(Math.random() * config.getMaxDelayMs())); } // random delay
+
+            // Tamper with the payload
+            byte[] dataToSend = payload;
+            if (Math.random() < config.getTamperProbability()) {
+                dataToSend = Arrays.copyOf(payload, payload.length);
+                dataToSend[(int)(Math.random() * dataToSend.length)] ^= (byte) 0xFF; // flip all bits of a random byte
+                System.out.println("FairLossLink: TAMPERED packet to " + destinationId);
+            }
+
+            DatagramPacket packet = new DatagramPacket(dataToSend, dataToSend.length, InetAddress.getByName(destInfo.getHost()), destInfo.getPort());
             socket.send(packet);
 
-            if (Math.random() < faultConfig.getDuplicateProbability()) { socket.send(packet); } // send duplicate
+            if (Math.random() < config.getDuplicateProbability()) { socket.send(packet); } // send duplicate
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to send packet", e);
@@ -75,12 +77,12 @@ public class UdpFairLossLink implements Link {
             try {
                 socket.receive(packet);
                 byte[] payload = Arrays.copyOf(packet.getData(), packet.getLength());
-                String sourceId = config.resolveId(packet.getAddress().getHostAddress(), packet.getPort());
+                String sourceId = config.resolveProcessId(packet.getAddress().getHostAddress(), packet.getPort());
                 if (sourceId != null && handler != null) {
                     handler.onReceive(sourceId, payload);
                 }
             } catch (Exception e) {
-                // Log and ignore
+                System.err.println("Failed to receive packet: " + e.getMessage());
             }
         }
     }

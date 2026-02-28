@@ -1,17 +1,24 @@
 {
-  "faultConfig": {
-    "packetDropRate": 0.4,
-    "packetDuplicationRate": 0.0,
-    "packetDelayMs": 0
-  },
-  "processes": {
-    "p1": {
-      "host": "localhost",
-      "port": 5001
-    },
-    "p2": {
-      "host": "localhost",
-      "port": 5002
+  "networkConfig": {
+    "resendPeriodMillis": 1000,
+    "processes": {
+      "p1": {
+        "host": "localhost",
+        "port": 5001
+      },
+      "p2": {
+        "host": "localhost",
+        "port": 5002
+      }
     }
+  },
+  "faultConfig": {
+    "dropProbability": 0.3,
+    "duplicateProbability": 0.3,
+    "tamperProbability": 0.3,
+    "maxDelayMs": 200
+  },
+  "cryptoConfig": {
+    "signatureAlgorithm": "SHA256withECDSA"
   }
 }
