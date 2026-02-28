@@ -51,7 +51,7 @@ public class DepChainClient {
         byte[] payload = cltReq.toByteArray();
         for(String target : config.getProcesses().keySet()) {
             if(!target.equals(clientID)) {
-                perfectLink.send(target, payload);
+                perfectLink.send(target, payload); // TODO PROBLEM: each time send() is called, seq is incremented (will be solved with broadcast implementation)
             }
         }
     }

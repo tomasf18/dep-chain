@@ -57,19 +57,18 @@ message HotStuffMessage{
     int32 view_number = 2;    // [Line 3]  - m.viewNumber
     Block node = 3;           // [Line 4]  - m.node
     QC justify = 4;           // [Line 5]  - m.justify
-    bytes partial_sig = 5;    // [Line 9]  - m.partialSig
+    bytes partial_sig = 5;    // [Line 9]  - m.partialSig (optional)
 }
 
 message Block {
-    bytes hash = 1;           // Unique digest of block - Cryptographic Security reasons
-    bytes parent = 2;         // [Line 12] - b.parent
-    Command cmd = 3;          // [Line 13] - b.cmd, command included in this block
-    int32 height = 4;         // Tree height to check security rule
+    int32 id = 1;           // Unique digest of block - Cryptographic Security reasons
+    int32 parent_id = 2;    // [Line 12] - b.parent
+    Command cmd = 3;        // [Line 13] - b.cmd, command included in this block
 }
 
 message QC {
     HotStuffMessage.Type type = 1;   // [Line 16] - qc.type
     int32 view_number = 2;           // [Line 17] - qc.viewNumber
-    bytes node_hash = 3;             // [Line 18] - qc.node
+    int32 node_id = 3;               // [Line 18] - qc.node
     bytes sig = 4;                   // [Line 19] - qc.sig, signature aggregated from a quorum of replicas (threshold signature)
 }
