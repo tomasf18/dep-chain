@@ -70,16 +70,16 @@ public class Usage {
 
         Link fairLossLink = new UdpFairLossLink(config);
         Link stubbornLink = new StubbornLink(config, fairLossLink);
-        // Link perfectLink = new PerfectLink(config, stubbornLink, fairLossLink);
-        Link authenticatedPerfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink);
+        Link perfectLink = new PerfectLink(config, stubbornLink, fairLossLink);
+        // Link authenticatedPerfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink);
 
         // programmer decides how to handle incoming messages at app level
         MessageHandler handler = (sourceId, payload) -> {
             System.out.println("[" + config.getSelfId() + "] Received from " + sourceId + ": " + new String(payload));
         };
 
-        authenticatedPerfectLink.registerReceiver(handler);
-        authenticatedPerfectLink.start();
+        perfectLink.registerReceiver(handler);
+        perfectLink.start();
 
         System.out.println("[" + config.getSelfId() + "] Router started. Available processes: " +
                 String.join(", ", config.getProcesses().keySet()));
@@ -109,7 +109,7 @@ public class Usage {
                     continue;
                 }
 
-                authenticatedPerfectLink.send(targetId, message.getBytes());
+                perfectLink.send(targetId, message.getBytes());
                 System.out.println("Sent to " + targetId + ": " + message);
             }
         } catch (Exception e) {

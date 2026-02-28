@@ -2,10 +2,14 @@ package ist.depchain.client;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import ist.depchain.network.utils.ArtificialFaultConfig;
-import ist.depchain.network.utils.ProcessConfig;
+import ist.depchain.network.utils.Config;
+import ist.depchain.network.utils.ProcessInfo;
+
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Scanner;
 
 /**
@@ -23,13 +27,8 @@ public class ClientApp {
         String clientId = args[1];
         try {
             /* EXTRACT PROCESS CONFIGS */
-            String content = Files.readString(Paths.get(configFile));
-            JsonObject json = new Gson().fromJson(content, JsonObject.class);
-            ProcessConfig config =  new Gson().fromJson(json, ProcessConfig.class);
-
-            ArtificialFaultConfig faultConfig = new Gson().fromJson(json.get("faultConfig"), ArtificialFaultConfig.class);
-
-            DepChainClient client = new DepChainClient(clientId, config, faultConfig);
+            Config config = loadConfiguration(configFile, clientId);
+            DepChainClient client = new DepChainClient(config);
             client.start();
 
             System.out.println("[INFO] Successfully started");
@@ -51,5 +50,37 @@ public class ClientApp {
         catch(Exception e){
             System.out.println("[ERROR] Failed to load config file: " + e.getMessage());
         }
+    }
+
+    private static Config loadConfiguration(String configFile, String selfId) throws IOException {
+        String jsonContent = Files.readString(Paths.get(configFile));
+        Gson gson = new Gson();
+        JsonObject root = gson.fromJson(jsonContent, JsonObject.class);
+        JsonObject faultConfigNode = root.getAsJsonObject("faultConfig");
+        JsonObject cryptoConfigNode = root.getAsJsonObject("cryptoConfig");
+        JsonObject networkConfigNode = root.getAsJsonObject("networkConfig");
+        JsonObject processesNode = networkConfigNode.getAsJsonObject("processes");
+
+        Map<String, ProcessInfo> processes = new HashMap<>();
+        for (String processId : processesNode.keySet()) {
+            JsonObject processJson = processesNode.getAsJsonObject(processId);
+            ProcessInfo info = new ProcessInfo(
+                    processId,
+                    processJson.get("host").getAsString(),
+                    processJson.get("port").getAsInt()
+            );
+            processes.put(processId, info);
+        }
+
+        return new Config(
+                selfId,
+                processes,
+                networkConfigNode.get("resendPeriodMillis").getAsInt(),
+                faultConfigNode.get("dropProbability").getAsDouble(),
+                faultConfigNode.get("duplicateProbability").getAsDouble(),
+                faultConfigNode.get("tamperProbability").getAsDouble(),
+                faultConfigNode.get("maxDelayMs").getAsInt(),
+                cryptoConfigNode.get("signatureAlgorithm").getAsString()
+        );
     }
 }

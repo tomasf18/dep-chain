@@ -9,13 +9,21 @@
       "p2": {
         "host": "localhost",
         "port": 5002
+      },
+      "p3": {
+        "host": "localhost",
+        "port": 5003
+      },
+      "p4": {
+        "host": "localhost",
+        "port": 5004
       }
     }
   },
   "faultConfig": {
-    "dropProbability": 0.0,
+    "dropProbability": 0.2,
     "duplicateProbability": 0.3,
-    "tamperProbability": 0.1,
+    "tamperProbability": 0.0,
     "maxDelayMs": 200
   },
   "cryptoConfig": {
