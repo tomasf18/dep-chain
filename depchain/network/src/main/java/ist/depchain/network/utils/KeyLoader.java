@@ -1,20 +1,24 @@
 package ist.depchain.network.utils;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
 public class KeyLoader {
+    
+    private KeyLoader() {
+    }
 
-    private static final String KEYSTORE = "keystore"; // default
-
-    public static PrivateKey loadPrivateKey(String processId) throws Exception {
-        String pem = Files.readString(Paths.get(KEYSTORE, processId, "private.pem"))
+    public static PrivateKey loadPrivateKey(Config config) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+        String pem = Files.readString(Paths.get(config.getSelfPrivateKeyPathString()))
                 .replace("-----BEGIN EC PRIVATE KEY-----", "")
                 .replace("-----END EC PRIVATE KEY-----", "")
                 .replace("-----BEGIN PRIVATE KEY-----", "")
@@ -24,8 +28,8 @@ public class KeyLoader {
         return KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(der));
     }
 
-    public static PublicKey loadPublicKey(String processId, String peerId) throws Exception {
-        String pem = Files.readString(Paths.get(KEYSTORE, processId, "trusted", peerId + ".pem"))
+    public static PublicKey loadPublicKey(Config config, String peerId) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+        String pem = Files.readString(Paths.get(config.getTrustedProcessKeyPathString(peerId)))
                 .replace("-----BEGIN PUBLIC KEY-----", "")
                 .replace("-----END PUBLIC KEY-----", "")
                 .replaceAll("\\s", "");

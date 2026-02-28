@@ -6,24 +6,25 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.google.protobuf.ByteString;
 
 import ist.depchain.common.*;
+import ist.depchain.network.utils.Config;
 import ist.depchain.network.interfaces.Link;
 import ist.depchain.network.interfaces.MessageHandler;
 import ist.depchain.network.interfaces.SendHandle;
 
 public class PerfectLink implements Link {
 
-    private String selfId; 
-    private final Link stubbornLink;  // StubbornLink
+    private final Config config;
+    private final Link stubbornLink;  
     private final Link fairLossLink; // for sending ACKs, we can use the underlying fair loss link directly since ACKs are idempotent and don't require retransmission
     private Map<Long /*seqNum*/, SendHandle> pendingMessages = new ConcurrentHashMap<>(); // for tracking pending messages and their retransmission tasks
     private Map<String /*sender*/, Long /*next_expected_seq_num*/> nextExpected = new ConcurrentHashMap<>(); // for tracking the next expected sequence number from each sender to detect duplicates and ensure in-order delivery
     private Map<String /*sender*/, Map<Long /*seqNum*/, byte[] /*payload*/>> pendingDeliveries = new ConcurrentHashMap<>(); // for buffering out-of-order messages until they can be delivered in order
     private AtomicLong localSequenceCounter = new AtomicLong(0); // for generating unique sequence numbers for outgoing messages
 
-    private MessageHandler handler; // upper layer's message handler (e.g., application layer, where the programmer defines how to process the received messages)
+    private MessageHandler handler; // upper layer's message handler (e.g., application layer, authenticated perfect link layer, etc.)
 
-    public PerfectLink(String selfId, Link stubbornLink, Link fairLossLink) {
-        this.selfId = selfId;
+    public PerfectLink(Config config, Link stubbornLink, Link fairLossLink) {
+        this.config = config;
         this.stubbornLink = stubbornLink;
         this.fairLossLink = fairLossLink;
         stubbornLink.registerReceiver(this::handleIncomingMessage);
@@ -31,21 +32,16 @@ public class PerfectLink implements Link {
 
     @Override
     public SendHandle send(String destinationId, byte[] payload) {
-
         long seq = localSequenceCounter.incrementAndGet();
 
         Envelope envelope = Envelope.newBuilder()
-            .setSenderId(selfId)
+            .setSenderId(config.getSelfId())
             .setSequenceNumber(seq)
             .setPayload(ByteString.copyFrom(payload))
             .build();
 
-        byte[] bytes = envelope.toByteArray();
-
-        SendHandle handle = stubbornLink.send(destinationId, bytes);
-
+        SendHandle handle = stubbornLink.send(destinationId, envelope.toByteArray());
         pendingMessages.putIfAbsent(seq, handle);
-
         return handle;
     }
 
@@ -55,14 +51,12 @@ public class PerfectLink implements Link {
 
             // ACK: stop retransmission of the acknowledged message
             if (envelope.hasAck()) {
-                Ack ack = envelope.getAck();
-                handleAck(ack);
+                handleAck(envelope.getAck());
                 return;
             }
 
             // NORMAL MESSAGE: process it if it's new, and send ACK back
             long seq = envelope.getSequenceNumber();
-
             long nextExpectedSeq = nextExpected.getOrDefault(senderId, 1L);
 
             sendAck(senderId, seq);
@@ -73,18 +67,17 @@ public class PerfectLink implements Link {
                 nextExpected.put(senderId, seq + 1); // update next expected for this sender
                 
                 if (handler != null) { 
-                    handler.onReceive(senderId, envelope.getPayload().toByteArray()); // deliver to upper layer
+                    handler.onReceive(senderId, envelope.getPayload().toByteArray()); // deliver to upper layer (e.g., application layer, authenticated perfect link layer, etc.)
                 }
 
                 // after delivering this message, check if we have buffered messages that can now be delivered
                 Map<Long, byte[]> buffered = pendingDeliveries.getOrDefault(senderId, new ConcurrentHashMap<>());
-                while (buffered.containsKey(nextExpected.get(senderId))) { // we have the next expected message buffered, can deliver it now
-                    long bufferedSeq = nextExpected.get(senderId);
-                    byte[] bufferedPayload = buffered.remove(bufferedSeq);
-                    //System.out.println("PerfectLink: Now delivering previously buffered message from " + senderId + " with seq " + bufferedSeq);
-                    handler.onReceive(senderId, bufferedPayload);
-                    nextExpected.put(senderId, bufferedSeq + 1); // update next expected
-                    // already sent ACK for this buffered message when we first received it, so no need to send ACK again
+                long next = nextExpected.get(senderId);
+                while (buffered.containsKey(next)) {
+                    byte[] bufferedPayload = buffered.remove(next);
+                    //System.out.println("PerfectLink: Delivering buffered message from " + senderId + " seq=" + next);
+                    if (handler != null) handler.onReceive(senderId, bufferedPayload);
+                    nextExpected.put(senderId, next + 1);
                 }
                 return;
             }             
@@ -108,23 +101,20 @@ public class PerfectLink implements Link {
 
     private void handleAck(Ack ack) {
         long seq = ack.getOriginalSequenceNumber();
-        
         SendHandle handle = pendingMessages.remove(seq);
         if (handle == null) return;
-        
         handle.cancel();
         //System.out.println("PerfectLink: Received ACK for seq " + seq + " from " + ack.getOriginalSender() + ", stopped retransmission");
     }
 
     private void sendAck(String destinationId, long seq) {
-
         Ack ack = Ack.newBuilder()
                 .setOriginalSender(destinationId)
                 .setOriginalSequenceNumber(seq)
                 .build();
-
+                
         Envelope ackEnvelope = Envelope.newBuilder()
-                .setSenderId(selfId)
+                .setSenderId(config.getSelfId())
                 .setSequenceNumber(0) // ACK messages don't need own seq
                 .setAck(ack)
                 .build();
