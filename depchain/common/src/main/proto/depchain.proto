@@ -39,36 +39,38 @@ message ClientRequest {
 }
 
 message ClientResponse {
-    int32 request_id = 1; // matches the request_id of the ClientRequest
-    bool committed = 2;
+    string client_id = 1;
+    int32 request_id = 2; // matches the request_id of the ClientRequest
+    bool committed = 3;
+    bytes block_id = 4;
 }
 
 // Replica <-> Replica Messages (HotStuff)
 
 message HotStuffMessage{
-    enum Type{
-      NEW_VIEW = 0;
-      PREPARE = 1;
-      PRE_COMMIT = 2;
-      COMMIT = 3;
-      DECIDE = 4;
+    enum Type{                // [Pag 6, Data Structures, Messages]
+        NEW_VIEW = 0;
+        PREPARE = 1;
+        PRE_COMMIT = 2;
+        COMMIT = 3;
+        DECIDE = 4;
     }
     Type type = 1;            // [Line 2]  - m.type
     int32 view_number = 2;    // [Line 3]  - m.viewNumber
-    Block node = 3;           // [Line 4]  - m.node
+    Block block = 3;          // [Line 4]  - m.node
     QC justify = 4;           // [Line 5]  - m.justify
     bytes partial_sig = 5;    // [Line 9]  - m.partialSig (optional)
 }
 
 message Block {
-    int32 id = 1;           // Unique digest of block - Cryptographic Security reasons
-    int32 parent_id = 2;    // [Line 12] - b.parent
-    Command cmd = 3;        // [Line 13] - b.cmd, command included in this block
+    bytes id = 1;          // Unique digest of block - Cryptographic Security reasons
+    bytes parent_id = 2;   // [Line 12] - b.parent
+    Command cmd = 3;       // [Line 13] - b.cmd, command included in this block
 }
 
 message QC {
     HotStuffMessage.Type type = 1;   // [Line 16] - qc.type
     int32 view_number = 2;           // [Line 17] - qc.viewNumber
-    int32 node_id = 3;               // [Line 18] - qc.node
-    bytes sig = 4;                   // [Line 19] - qc.sig, signature aggregated from a quorum of replicas (threshold signature)
+    bytes block_id = 3;              // [Line 18] - qc.node
+    bytes threshold_sig = 4;         // [Line 19] - qc.sig, signature aggregated from a quorum of replicas (threshold signature)
 }
