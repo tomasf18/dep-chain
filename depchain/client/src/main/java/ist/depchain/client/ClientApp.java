@@ -17,14 +17,14 @@ import java.util.Scanner;
  */
 public class ClientApp {
     public static void main(String[] args) {
-        if (args.length < 2) {
-            System.out.println("Usage: mvn exec:java -Dexec.args=\"<configFile> <clientId>\"");
-            System.out.println("Example: mvn exec:java -Dexec.args=\"config.json client1\"");
+        if (args.length < 1) {
+            System.out.println("Usage: mvn exec:java -Dexec.args=\"<configFile>\"");
+            System.out.println("Example: mvn exec:java -Dexec.args=\"config.json\"");
             return;
         }
 
         String configFile = args[0];
-        String clientId = args[1];
+        String clientId = "client";
         try {
             /* EXTRACT PROCESS CONFIGS */
             Config config = loadConfiguration(configFile, clientId);

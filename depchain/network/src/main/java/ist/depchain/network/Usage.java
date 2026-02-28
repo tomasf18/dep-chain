@@ -11,6 +11,9 @@ import com.google.gson.JsonObject;
 
 import ist.depchain.network.utils.Config;
 import ist.depchain.network.utils.ProcessInfo;
+import ist.depchain.network.abstractions.AuthenticatedPerfectLink;
+import ist.depchain.network.abstractions.StubbornLink;
+import ist.depchain.network.abstractions.UdpFairLossLink;
 import ist.depchain.network.interfaces.Link;
 import ist.depchain.network.interfaces.MessageHandler;
 
@@ -45,6 +48,7 @@ public class Usage {
 
         Map<String, ProcessInfo> processes = new HashMap<>();
         for (String processId : processesNode.keySet()) {
+            if (processId.equals("client")) { continue; } // skip client config if present
             JsonObject processJson = processesNode.getAsJsonObject(processId);
             ProcessInfo info = new ProcessInfo(
                     processId,
@@ -70,16 +74,16 @@ public class Usage {
 
         Link fairLossLink = new UdpFairLossLink(config);
         Link stubbornLink = new StubbornLink(config, fairLossLink);
-        Link perfectLink = new PerfectLink(config, stubbornLink, fairLossLink);
-        // Link authenticatedPerfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink);
+        // Link perfectLink = new PerfectLink(config, stubbornLink, fairLossLink);
+        Link authenticatedPerfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink);
 
         // programmer decides how to handle incoming messages at app level
         MessageHandler handler = (sourceId, payload) -> {
             System.out.println("[" + config.getSelfId() + "] Received from " + sourceId + ": " + new String(payload));
         };
 
-        perfectLink.registerReceiver(handler);
-        perfectLink.start();
+        authenticatedPerfectLink.registerReceiver(handler);
+        authenticatedPerfectLink.start();
 
         System.out.println("[" + config.getSelfId() + "] Router started. Available processes: " +
                 String.join(", ", config.getProcesses().keySet()));
@@ -109,7 +113,7 @@ public class Usage {
                     continue;
                 }
 
-                perfectLink.send(targetId, message.getBytes());
+                authenticatedPerfectLink.send(targetId, message.getBytes());
                 System.out.println("Sent to " + targetId + ": " + message);
             }
         } catch (Exception e) {

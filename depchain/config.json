@@ -2,6 +2,10 @@
   "networkConfig": {
     "resendPeriodMillis": 1000,
     "processes": {
+      "client": {
+        "host": "localhost",
+        "port": 5000
+      },
       "p1": {
         "host": "localhost",
         "port": 5001
@@ -9,14 +13,6 @@
       "p2": {
         "host": "localhost",
         "port": 5002
-      },
-      "p3": {
-        "host": "localhost",
-        "port": 5003
-      },
-      "p4": {
-        "host": "localhost",
-        "port": 5004
       }
     }
   },

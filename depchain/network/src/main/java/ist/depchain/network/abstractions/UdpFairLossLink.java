@@ -1,4 +1,4 @@
-package ist.depchain.network;
+package ist.depchain.network.abstractions;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
