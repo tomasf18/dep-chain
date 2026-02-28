@@ -13,8 +13,15 @@ import ist.depchain.common.Command;
 
      private final BlockStorage storage;
 
-     public BasicHotStuffUtils() {
-         storage = new BlockStorage();
+     public static final QC genesisQC = QC.newBuilder()
+             .setType(Type.DECIDE)
+             .setViewNumber(0)
+             .setNodeId(0)
+             .setSig(ByteString.EMPTY)
+             .build();
+
+     public BasicHotStuffUtils(BlockStorage storage) {
+         this.storage = storage;
      }
 
      /* MESSAGES */
