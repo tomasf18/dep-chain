@@ -45,42 +45,30 @@ message ClientResponse {
 
 // Replica <-> Replica Messages (HotStuff)
 
+message HotStuffMessage{
+    enum Type{
+      NEW_VIEW = 0;
+      PREPARE = 1;
+      PRE_COMMIT = 2;
+      COMMIT = 3;
+      DECIDE = 4;
+    }
+    Type type = 1;            // [Line 2]  - m.type
+    int32 view_number = 2;    // [Line 3]  - m.viewNumber
+    Block node = 3;           // [Line 4]  - m.node
+    QC justify = 4;           // [Line 5]  - m.justify
+    bytes partial_sig = 5;    // [Line 9]  - m.partialSig (optional)
+}
+
 message Block {
-    int32 id = 1;
-    int32 parent_id = 2; 
-    Command command = 3; // the command included in this block
-    int32 view = 4;
+    int32 id = 1;           // Unique digest of block - Cryptographic Security reasons
+    int32 parent_id = 2;    // [Line 12] - b.parent
+    Command cmd = 3;        // [Line 13] - b.cmd, command included in this block
 }
 
 message QC {
-    int32 block_id = 1; // the block this QC certifies
-    int32 view = 2;
-    bytes aggregated_signature = 3; // signature aggregated from a quorum of replicas (threshold signature)
-}
-
-message Prepare {
-    int32 view = 1;
-    Block block = 2;
-    QC justify = 3; // QC for the parent block
-}
-
-message PreCommit {
-    int32 view = 1;
-    QC prepare_qc = 2; // QC for the Prepare phase
-}
-
-message Commit {
-    int32 view = 1;
-    QC precommit_qc = 2; // QC for the PreCommit phase
-}
-
-message Vote {
-    int32 view = 1;
-    int32 block_id = 2; 
-    bytes partial_signature = 3; // signature of the voting replica (not aggregated)
-}
-
-message NewView {
-    int32 new_view = 1;
-    QC high_qc = 2; // highest QC known to the replica
+    HotStuffMessage.Type type = 1;   // [Line 16] - qc.type
+    int32 view_number = 2;           // [Line 17] - qc.viewNumber
+    int32 node_id = 3;               // [Line 18] - qc.node
+    bytes sig = 4;                   // [Line 19] - qc.sig, signature aggregated from a quorum of replicas (threshold signature)
 }

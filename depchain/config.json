@@ -2,6 +2,10 @@
   "networkConfig": {
     "resendPeriodMillis": 1000,
     "processes": {
+      "client": {
+        "host": "localhost",
+        "port": 5000
+      },
       "p1": {
         "host": "localhost",
         "port": 5001
@@ -13,9 +17,9 @@
     }
   },
   "faultConfig": {
-    "dropProbability": 0.0,
+    "dropProbability": 0.2,
     "duplicateProbability": 0.3,
-    "tamperProbability": 0.1,
+    "tamperProbability": 0.0,
     "maxDelayMs": 200
   },
   "cryptoConfig": {

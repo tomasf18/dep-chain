@@ -1,4 +1,4 @@
-package ist.depchain.network.utils;
+package ist.depchain.network.crypto;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -17,8 +17,8 @@ public class KeyLoader {
     private KeyLoader() {
     }
 
-    public static PrivateKey loadPrivateKey(Config config) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
-        String pem = Files.readString(Paths.get(config.getSelfPrivateKeyPathString()))
+    public static PrivateKey loadPrivateKey(String keyPath) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+        String pem = Files.readString(Paths.get(keyPath))
                 .replace("-----BEGIN EC PRIVATE KEY-----", "")
                 .replace("-----END EC PRIVATE KEY-----", "")
                 .replace("-----BEGIN PRIVATE KEY-----", "")
@@ -28,8 +28,8 @@ public class KeyLoader {
         return KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(der));
     }
 
-    public static PublicKey loadPublicKey(Config config, String peerId) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
-        String pem = Files.readString(Paths.get(config.getTrustedProcessKeyPathString(peerId)))
+    public static PublicKey loadPublicKey(String keyPath) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+        String pem = Files.readString(Paths.get(keyPath))
                 .replace("-----BEGIN PUBLIC KEY-----", "")
                 .replace("-----END PUBLIC KEY-----", "")
                 .replaceAll("\\s", "");

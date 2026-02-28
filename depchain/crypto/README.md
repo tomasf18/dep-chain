@@ -1,1 +1,0 @@
-signature utils, key management, threshold-sig adapters (interface only at first) -> see repo teachers shared.

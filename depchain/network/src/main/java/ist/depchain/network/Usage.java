@@ -11,6 +11,9 @@ import com.google.gson.JsonObject;
 
 import ist.depchain.network.utils.Config;
 import ist.depchain.network.utils.ProcessInfo;
+import ist.depchain.network.abstractions.AuthenticatedPerfectLink;
+import ist.depchain.network.abstractions.StubbornLink;
+import ist.depchain.network.abstractions.UdpFairLossLink;
 import ist.depchain.network.interfaces.Link;
 import ist.depchain.network.interfaces.MessageHandler;
 
@@ -45,6 +48,7 @@ public class Usage {
 
         Map<String, ProcessInfo> processes = new HashMap<>();
         for (String processId : processesNode.keySet()) {
+            if (processId.equals("client")) { continue; } // skip client config if present
             JsonObject processJson = processesNode.getAsJsonObject(processId);
             ProcessInfo info = new ProcessInfo(
                     processId,

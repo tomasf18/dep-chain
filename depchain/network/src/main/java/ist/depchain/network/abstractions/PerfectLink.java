@@ -1,4 +1,4 @@
-package ist.depchain.network;
+package ist.depchain.network.abstractions;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

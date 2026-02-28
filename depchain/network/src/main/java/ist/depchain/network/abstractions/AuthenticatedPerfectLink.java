@@ -1,12 +1,12 @@
-package ist.depchain.network;
+package ist.depchain.network.abstractions;
 
 import ist.depchain.network.utils.Config;
 import ist.depchain.common.Ack;
 import ist.depchain.common.Envelope;
+import ist.depchain.network.crypto.Crypto;
 import ist.depchain.network.interfaces.Link;
 import ist.depchain.network.interfaces.MessageHandler;
 import ist.depchain.network.interfaces.SendHandle;
-import ist.depchain.network.utils.Crypto;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -142,7 +142,7 @@ public class AuthenticatedPerfectLink implements Link {
     // builds envelope WITHOUT signature, serialize, signs the bytes, rebuild envelope WITH signature -> signature covers all fields
     private Envelope signEnvelope(Envelope.Builder builder) throws Exception {
         byte[] unsignedBytes = builder.build().toByteArray(); // sign over unsigned bytes
-        byte[] signature = Crypto.sign(config, unsignedBytes);
+        byte[] signature = Crypto.sign(unsignedBytes, config.getSelfPrivateKeyPathString(), config.getSignatureAlgorithm());
         return builder.setSignature(ByteString.copyFrom(signature)).build();
     }
     
@@ -155,7 +155,7 @@ public class AuthenticatedPerfectLink implements Link {
         }
         // strip signature to get the bytes that were originally signed
         Envelope unsigned = envelope.toBuilder().clearSignature().build();
-        return Crypto.verify(config, envelope.getSenderId(), unsigned.toByteArray(), receivedSig);
+        return Crypto.verify(unsigned.toByteArray(), receivedSig, config.getTrustedProcessKeyPathString(envelope.getSenderId()), config.getSignatureAlgorithm());
     }
 
     @Override
