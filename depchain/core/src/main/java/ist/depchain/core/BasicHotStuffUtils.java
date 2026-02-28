@@ -8,11 +8,15 @@ import ist.depchain.common.QC;
 import ist.depchain.common.Command;
 
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
 
 public class BasicHotStuffUtils {
+
+    private final BlockStorage storage;
+
+    public BasicHotStuffUtils() {
+        storage = new BlockStorage();
+    }
+
     /* MESSAGES */
 
     // [Line 1-6] - Create base HotStuff Message
@@ -44,7 +48,7 @@ public class BasicHotStuffUtils {
                 .setParent(parent.getHash())
                 .setCmd(cmd)
                 .setHash(ByteString.copyFrom(hash))
-                .setHeight(parent.getHeight())
+                .setHeight(parent.getHeight() + 1)
                 .build();
     }
 
@@ -61,6 +65,44 @@ public class BasicHotStuffUtils {
                 .build();
     }
 
-    /*  */
+    /* MATCHING & SAFETY FUNCTIONS */
+
+    // [Line 21-22] - Verify if Message is the same
+    public boolean matchingMSG(HotStuffMessage m, Type t, int v) {
+        return m.getType() == t && m.getViewNumber() == v;
+    }
+
+    // [Line 23-24] - Verify if QC coincides with the expected type and view number
+    public boolean matchingQC(QC qc, Type t, int v){
+        return qc.getType() == t && qc.getViewNumber() == v;
+    }
+
+    // [Line 26-27] - Check if node is safe
+    public boolean safeNode(Block node, QC qc, QC lockedQC){
+        //[Line 26]
+        boolean extendsLocked = extendsFrom(node, lockedQC.getNodeHash());
+
+        //[Line 27]
+        boolean viewIsHigher = qc.getViewNumber() > lockedQC.getViewNumber();
+
+        return extendsLocked || viewIsHigher;
+    }
+
+    /* HELPER FUNCTIONS */
+
+    // [NEW FUNCTION] - Verify if "node" has antecessor "targethash"
+    public boolean extendsFrom(Block node, ByteString targetHash){
+        if(node.getHash().equals(targetHash)){return true;}
+
+        ByteString currentParentHash = node.getParent();
+        while(currentParentHash != null && !currentParentHash.isEmpty()){
+            if(currentParentHash.equals(targetHash)){return true;}
+
+            Block parent = storage.getBlock(currentParentHash);
+            if(parent == null){break;}
+            currentParentHash = parent.getParent();
+        }
+        return false;
+    }
 
 }
