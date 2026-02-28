@@ -13,9 +13,9 @@
     }
   },
   "faultConfig": {
-    "dropProbability": 0.3,
+    "dropProbability": 0.0,
     "duplicateProbability": 0.3,
-    "tamperProbability": 0.3,
+    "tamperProbability": 0.1,
     "maxDelayMs": 200
   },
   "cryptoConfig": {

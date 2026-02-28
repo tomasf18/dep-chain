@@ -38,7 +38,7 @@ public class UdpFairLossLink implements Link {
         try {
             if (config.getMaxDelayMs() > 0) { Thread.sleep((long)(Math.random() * config.getMaxDelayMs())); } // random delay
 
-            // Tamper with the payload
+            // tamper with the payload
             byte[] dataToSend = payload;
             if (Math.random() < config.getTamperProbability()) {
                 dataToSend = Arrays.copyOf(payload, payload.length);
