@@ -1,7 +1,9 @@
 package ist.depchain.core;
 
 import com.google.protobuf.ByteString;
+import ist.depchain.common.*;
 import ist.depchain.common.Block;
+import ist.depchain.common.ClientResponse;
 import ist.depchain.common.Command;
 import ist.depchain.common.HotStuffMessage;
 import ist.depchain.common.QC;
@@ -33,14 +35,16 @@ public class BasicHotStuffProtocol {
         this.utils = new BasicHotStuffUtils(this.storage);
     }
 
+    // TODO - DECIDE LEADER NEEDS FIX
     public String getLeader(int view){
         Object[] servers = serverContext.getConfig().getBlockChainServers().keySet().toArray();
         return (String)servers[view];
     }
 
+    // TODO - ISLEADER NEEDS FIX, THIS IS JUST FOR TESTING PURPOSES
     public boolean isLeader(){
         String id = serverContext.getConfig().getSelfId();
-        return getLeader(curView).equals(id);
+        return getLeader(curView % serverContext.getConfig().getBlockChainServers().size()).equals(id);
     }
 
     /** PREPARE PHASE FOR LEADER **/
@@ -48,7 +52,7 @@ public class BasicHotStuffProtocol {
         int view = m.getViewNumber();
         newViewMsgs.computeIfAbsent(view, k -> new HashSet<>()).add(m);
 
-        if(newViewMsgs.size() >= (n-f) && isLeader()){
+        if(newViewMsgs.get(view).size() >= (n-f) && isLeader()){
             QC highQC = newViewMsgs.get(view).stream()
                     .map(HotStuffMessage::getJustify)
                     .max(Comparator.comparingInt(QC::getViewNumber))
@@ -112,7 +116,7 @@ public class BasicHotStuffProtocol {
             HotStuffMessage preCommitMsg = utils.msg(HotStuffMessage.Type.PRE_COMMIT, curView, null, prepareQC);
             broadcast(preCommitMsg);
 
-            voteCollector.get(HotStuffMessage.Type.PRE_COMMIT).remove(blockId);
+            voteCollector.get(HotStuffMessage.Type.PREPARE).remove(blockId);
         }
     }
 
@@ -175,6 +179,38 @@ public class BasicHotStuffProtocol {
         System.out.println("[REPLICA] - Voted COMMIT for view " + curView);
     }
 
+    /** DECIDE PHASE FOR LEADER **/
+    public void onReceiveCommitVote(String sourceId, HotStuffMessage vote){
+        if(!utils.matchingMSG(vote, HotStuffMessage.Type.COMMIT, curView))
+            return;
+
+        voteCollector.putIfAbsent(HotStuffMessage.Type.COMMIT, new HashMap<>());
+        ByteString blockId = vote.getBlock().getId();
+        Set<HotStuffMessage> votes = voteCollector.get(HotStuffMessage.Type.COMMIT)
+                .computeIfAbsent(blockId, k -> new HashSet<>());
+        votes.add(vote);
+
+        if(votes.size() >= (n-f) && isLeader()){
+            byte[] aggregatedSig = new byte[0];
+            QC commitQC = utils.createQC(votes, aggregatedSig);
+
+            HotStuffMessage decideMSG = utils.msg(HotStuffMessage.Type.DECIDE, curView, null, commitQC);
+            broadcast(decideMSG);
+            voteCollector.get(HotStuffMessage.Type.COMMIT).remove(blockId);
+        }
+    }
+
+    /** DECIDE PHASE FOR REPLICA **/
+    public void onReceiveDecide(HotStuffMessage m){
+        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.COMMIT, curView))
+            return;
+
+        Block commitedBlock = storage.getBlock(m.getJustify().getBlockId());
+        executeBlock(commitedBlock);
+
+        startNextView();
+    }
+
     /** HELPER FUNCTIONS **/
     public void broadcast(HotStuffMessage m){
         Set<String> destinations = serverContext.getConfig().getBlockChainServers().keySet();
@@ -183,5 +219,33 @@ public class BasicHotStuffProtocol {
 
     public void addClientCmd(Command cmd){
         this.commandMempool.add(cmd);
+    }
+
+    public void executeBlock(Block block){
+        System.out.println("[REPLICA] - Executing block " + block.getId());
+
+        ist.depchain.common.ClientResponse response = ClientResponse.newBuilder()
+                //.setClientId(block.getCommand().getClientId()) TODO - NEEDS CLIENT ID
+                //.setRequestId(block.getCommand().getRequestId()) TODO - NEEDS REQUEST ID
+                .setCommitted(true)
+                .setBlockId(block.getId())
+                .build();
+
+        //serverContext.getPerfectLink().send(block.getCommand().getClientId(), response.toByteArray()); //TODO - NEED TO KNOW CLIENT ID
+    }
+
+    public synchronized void startNextView(){
+        curView++;
+
+        voteCollector.clear();
+
+        String nextLeader = getLeader(curView);
+
+        HotStuffMessage newViewMSG = utils.msg(HotStuffMessage.Type.NEW_VIEW, curView - 1, null, prepareQC);
+
+        System.out.println("[VIEW CHANGE] - Moving to view " + curView + " with leader " + nextLeader);
+
+        byte[] payload = newViewMSG.toByteArray();
+        serverContext.getPerfectLink().send(nextLeader, payload);
     }
 }
