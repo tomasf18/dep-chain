@@ -1,13 +1,21 @@
-package ist.depchain.network.utils;
+package ist.depchain.common.utils;
 
 import java.net.InetAddress;
 import java.nio.file.Path;
 import java.util.Map;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 public class Config {
 
     // network configuration
     private String selfId;
+    private int N; // total number of processes
+    private int f; // maximum number of faulty processes
     private Map<String, ProcessInfo> processes;
     private int resendPeriodMillis; 
 
@@ -21,11 +29,13 @@ public class Config {
     private String signatureAlgorithm;
     private String keysDirectory = "keystore"; // default directory for keys
 
-    public Config(String selfId, Map<String, ProcessInfo> processes, int resendPeriodMillis,
+    public Config(String selfId, int N, int f, Map<String, ProcessInfo> processes, int resendPeriodMillis,
                   double dropProbability, double duplicateProbability,
                   double tamperProbability, int maxDelayMs,
                   String signatureAlgorithm) {
         this.selfId = selfId;
+        this.N = N;
+        this.f = f;
         this.processes = processes;
         this.resendPeriodMillis = resendPeriodMillis;
         this.dropProbability = dropProbability;
@@ -35,9 +45,51 @@ public class Config {
         this.signatureAlgorithm = signatureAlgorithm;
     }
 
+    public static Config loadConfiguration(String configFile, String selfId) throws IOException {
+        String jsonContent = Files.readString(Paths.get(configFile));
+        Gson gson = new Gson();
+        JsonObject root = gson.fromJson(jsonContent, JsonObject.class);
+        JsonObject faultConfigNode = root.getAsJsonObject("faultConfig");
+        JsonObject cryptoConfigNode = root.getAsJsonObject("cryptoConfig");
+        JsonObject networkConfigNode = root.getAsJsonObject("networkConfig");
+        JsonObject processesNode = networkConfigNode.getAsJsonObject("processes");
+
+        Map<String, ProcessInfo> processes = new HashMap<>();
+        for (String processId : processesNode.keySet()) {
+            JsonObject processJson = processesNode.getAsJsonObject(processId);
+            ProcessInfo info = new ProcessInfo(
+                    processId,
+                    processJson.get("host").getAsString(),
+                    processJson.get("port").getAsInt()
+            );
+            processes.put(processId, info);
+        }
+
+        return new Config(
+                selfId,
+                networkConfigNode.get("N").getAsInt(),
+                networkConfigNode.get("f").getAsInt(),
+                processes,
+                networkConfigNode.get("resendPeriodMillis").getAsInt(),
+                faultConfigNode.get("dropProbability").getAsDouble(),
+                faultConfigNode.get("duplicateProbability").getAsDouble(),
+                faultConfigNode.get("tamperProbability").getAsDouble(),
+                faultConfigNode.get("maxDelayMs").getAsInt(),
+                cryptoConfigNode.get("signatureAlgorithm").getAsString()
+        );
+    }
+
     // ===== network config =====
     public String getSelfId() {
         return selfId;
+    }
+
+    public int getN() {
+        return N;
+    }
+
+    public int getF() {
+        return f;
     }
 
     public ProcessInfo getSelfInfo() {

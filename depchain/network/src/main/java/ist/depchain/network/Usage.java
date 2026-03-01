@@ -1,16 +1,6 @@
 package ist.depchain.network;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
-
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-
-import ist.depchain.network.utils.Config;
-import ist.depchain.network.utils.ProcessInfo;
+import ist.depchain.common.utils.Config;
 import ist.depchain.network.abstractions.AuthenticatedPerfectLink;
 import ist.depchain.network.abstractions.StubbornLink;
 import ist.depchain.network.abstractions.UdpFairLossLink;
@@ -29,45 +19,13 @@ public class Usage {
         String selfId = args[1];
 
         try {
-            Config config = loadConfiguration(configFile, selfId);
+            Config config = Config.loadConfiguration(configFile, selfId);
+            config.getProcesses().keySet().removeIf(k -> k.startsWith("client")); // remove client nodes
             startRouter(config);
         } catch (Exception e) {
             System.err.println("Failed to load configuration: " + e.getMessage());
             e.printStackTrace();
         }
-    }
-
-    private static Config loadConfiguration(String configFile, String selfId) throws IOException {
-        String jsonContent = Files.readString(Paths.get(configFile));
-        Gson gson = new Gson();
-        JsonObject root = gson.fromJson(jsonContent, JsonObject.class);
-        JsonObject faultConfigNode = root.getAsJsonObject("faultConfig");
-        JsonObject cryptoConfigNode = root.getAsJsonObject("cryptoConfig");
-        JsonObject networkConfigNode = root.getAsJsonObject("networkConfig");
-        JsonObject processesNode = networkConfigNode.getAsJsonObject("processes");
-
-        Map<String, ProcessInfo> processes = new HashMap<>();
-        for (String processId : processesNode.keySet()) {
-            if (processId.equals("client")) { continue; } // skip client config if present
-            JsonObject processJson = processesNode.getAsJsonObject(processId);
-            ProcessInfo info = new ProcessInfo(
-                    processId,
-                    processJson.get("host").getAsString(),
-                    processJson.get("port").getAsInt()
-            );
-            processes.put(processId, info);
-        }
-
-        return new Config(
-                selfId,
-                processes,
-                networkConfigNode.get("resendPeriodMillis").getAsInt(),
-                faultConfigNode.get("dropProbability").getAsDouble(),
-                faultConfigNode.get("duplicateProbability").getAsDouble(),
-                faultConfigNode.get("tamperProbability").getAsDouble(),
-                faultConfigNode.get("maxDelayMs").getAsInt(),
-                cryptoConfigNode.get("signatureAlgorithm").getAsString()
-        );
     }
 
     private static void startRouter(Config config) throws Exception {

@@ -4,9 +4,12 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
-import ist.depchain.network.utils.Config;
-import ist.depchain.network.utils.ProcessInfo;
+import ist.depchain.common.utils.Config;
+import ist.depchain.common.utils.ProcessInfo;
 import ist.depchain.network.interfaces.Link;
 import ist.depchain.network.interfaces.MessageHandler;
 import ist.depchain.network.interfaces.SendHandle;
@@ -56,6 +59,16 @@ public class UdpFairLossLink implements Link {
         }
 
         return null;
+    }
+
+    @Override
+    public Map<String, SendHandle> broadcast(List<String> destinationIds, byte[] payload) {
+        Map<String, SendHandle> handlesPerDestination = new HashMap<>();
+        for (String dest : destinationIds) {
+            SendHandle handle = send(dest, payload);
+            handlesPerDestination.put(dest, handle);
+        }
+        return handlesPerDestination;
     }
 
     @Override

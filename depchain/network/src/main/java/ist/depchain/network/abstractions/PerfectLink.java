@@ -1,12 +1,13 @@
 package ist.depchain.network.abstractions;
 
 import java.util.Map;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import com.google.protobuf.ByteString;
 
 import ist.depchain.common.*;
-import ist.depchain.network.utils.Config;
+import ist.depchain.common.utils.Config;
 import ist.depchain.network.interfaces.Link;
 import ist.depchain.network.interfaces.MessageHandler;
 import ist.depchain.network.interfaces.SendHandle;
@@ -17,6 +18,7 @@ public class PerfectLink implements Link {
     private final Link stubbornLink;  
     private final Link fairLossLink; // for sending ACKs, we can use the underlying fair loss link directly since ACKs are idempotent and don't require retransmission
     private Map<Long /*seqNum*/, SendHandle> pendingMessages = new ConcurrentHashMap<>(); // for tracking pending messages and their retransmission tasks
+    private Map<Long /*seqNum*/, Map<String /*destination*/, SendHandle>> pendingBroadcasts = new ConcurrentHashMap<>(); // for tracking pending broadcast messages and their retransmission tasks
     private Map<String /*sender*/, Long /*next_expected_seq_num*/> nextExpected = new ConcurrentHashMap<>(); // for tracking the next expected sequence number from each sender to detect duplicates and ensure in-order delivery
     private Map<String /*sender*/, Map<Long /*seqNum*/, byte[] /*payload*/>> pendingDeliveries = new ConcurrentHashMap<>(); // for buffering out-of-order messages until they can be delivered in order
     private AtomicLong localSequenceCounter = new AtomicLong(0); // for generating unique sequence numbers for outgoing messages
@@ -43,6 +45,26 @@ public class PerfectLink implements Link {
         SendHandle handle = stubbornLink.send(destinationId, envelope.toByteArray());
         pendingMessages.putIfAbsent(seq, handle);
         return handle;
+    }
+
+    @Override
+    public Map<String, SendHandle> broadcast(List<String> destinationIds, byte[] payload) {
+        long seq = localSequenceCounter.incrementAndGet();
+
+        Envelope envelope = Envelope.newBuilder()
+            .setSenderId(config.getSelfId())
+            .setSequenceNumber(seq)
+            .setPayload(ByteString.copyFrom(payload))
+            .build();
+
+        Map<String, SendHandle> handlesPerDestination = new ConcurrentHashMap<>();
+        for (String dest : destinationIds) {
+            SendHandle handle = stubbornLink.send(dest, envelope.toByteArray());
+            handlesPerDestination.put(dest, handle);
+        }
+
+        pendingBroadcasts.putIfAbsent(seq, handlesPerDestination);
+        return handlesPerDestination;
     }
 
     private void handleIncomingMessage(String senderId, byte[] data) {
@@ -79,6 +101,23 @@ public class PerfectLink implements Link {
                     if (handler != null) handler.onReceive(senderId, bufferedPayload);
                     nextExpected.put(senderId, next + 1);
                 }
+
+                // TODO: this serves just to test the client, remove later
+
+//                 message ClientResponse {
+//     string client_id = 1;
+//     int32 request_id = 2; // matches the request_id of the ClientRequest
+//     bool committed = 3;
+//     bytes block_id = 4;
+// }
+                if (senderId.equals("client")) {
+                    ClientResponse response = ClientResponse.newBuilder()
+                                                        .setClientId(config.getSelfId())
+                                                        .setRequestId(Integer.parseInt(new String(envelope.getPayload().toByteArray())))
+                                                        .setCommitted(true)
+                                                        .build();
+                    send(senderId, response.toByteArray()); // send response back to client
+                }
                 return;
             }             
             
@@ -102,9 +141,30 @@ public class PerfectLink implements Link {
     private void handleAck(Ack ack) {
         long seq = ack.getOriginalSequenceNumber();
         SendHandle handle = pendingMessages.remove(seq);
-        if (handle == null) return;
+        
+        if (handle == null) {
+            // this ACK is for a broadcast message
+            handleBroadcastAck(seq, ack.getOriginalSender());
+            return;
+        }
+        
+        // this ACK is for a unicast message
         handle.cancel();
         //System.out.println("PerfectLink: Received ACK for seq " + seq + " from " + ack.getOriginalSender() + ", stopped retransmission");
+    }
+
+    private void handleBroadcastAck(long seq, String sender) {
+        Map<String, SendHandle> broadcastHandles = pendingBroadcasts.get(seq);
+        if (broadcastHandles != null) {
+            SendHandle broadcastHandle = broadcastHandles.remove(sender);
+            if (broadcastHandle != null) {
+                broadcastHandle.cancel();
+                //System.out.println("PerfectLink: Received ACK for broadcast seq " + seq + " from " + sender + ", stopped retransmission to that destination");
+            }
+            if (broadcastHandles.isEmpty()) {
+                pendingBroadcasts.remove(seq);
+            }
+        }
     }
 
     private void sendAck(String destinationId, long seq) {

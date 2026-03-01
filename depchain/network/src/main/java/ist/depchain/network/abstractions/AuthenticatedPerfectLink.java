@@ -1,8 +1,8 @@
 package ist.depchain.network.abstractions;
 
-import ist.depchain.network.utils.Config;
 import ist.depchain.common.Ack;
 import ist.depchain.common.Envelope;
+import ist.depchain.common.utils.Config;
 import ist.depchain.network.crypto.Crypto;
 import ist.depchain.network.interfaces.Link;
 import ist.depchain.network.interfaces.MessageHandler;
@@ -11,6 +11,7 @@ import ist.depchain.network.interfaces.SendHandle;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -21,6 +22,7 @@ public class AuthenticatedPerfectLink implements Link {
     private final Link stubbornLink;
     private final Link fairLossLink;
     private Map<Long, SendHandle> pendingMessages = new ConcurrentHashMap<>();
+    private Map<Long, Map<String, SendHandle>> pendingBroadcasts = new ConcurrentHashMap<>(); 
     private Map<String, Long> nextExpected = new ConcurrentHashMap<>();
     private Map<String, Map<Long, byte[]>> pendingDeliveries = new ConcurrentHashMap<>();
     private AtomicLong localSequenceCounter = new AtomicLong(0);
@@ -53,6 +55,31 @@ public class AuthenticatedPerfectLink implements Link {
         SendHandle handle = stubbornLink.send(destinationId, envelope.toByteArray());
         pendingMessages.putIfAbsent(seq, handle);
         return handle;
+    }
+
+    @Override
+    public Map<String, SendHandle> broadcast(List<String> destinationIds, byte[] payload) {
+        long seq = localSequenceCounter.incrementAndGet();
+        
+        Envelope.Builder builder = Envelope.newBuilder()
+        .setSenderId(config.getSelfId())
+        .setSequenceNumber(seq)
+        .setPayload(ByteString.copyFrom(payload));
+
+        Envelope envelope;
+        try {
+            envelope = signEnvelope(builder);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to sign envelope", e);
+        }
+
+        Map<String, SendHandle> handlesPerDestination = new ConcurrentHashMap<>();
+        for (String dest : destinationIds) {
+            SendHandle handle = stubbornLink.send(dest, envelope.toByteArray());
+            handlesPerDestination.put(dest, handle);
+        }
+        pendingBroadcasts.putIfAbsent(seq, handlesPerDestination);
+        return handlesPerDestination;
     }
     
     // --- Receive ---
@@ -115,9 +142,30 @@ public class AuthenticatedPerfectLink implements Link {
     private void handleAck(Ack ack) {
         long seq = ack.getOriginalSequenceNumber();
         SendHandle handle = pendingMessages.remove(seq);
-        if (handle == null) return;
+        
+        if (handle == null) {
+            // this ACK is for a broadcast message
+            handleBroadcastAck(seq, ack.getOriginalSender());
+            return;
+        }
+        
+        // this ACK is for a unicast message
         handle.cancel();
-        //System.out.println("PerfectLink: ACK received for seq=" + seq + ", stopped retransmission");
+        //System.out.println("PerfectLink: Received ACK for seq " + seq + " from " + ack.getOriginalSender() + ", stopped retransmission");
+    }
+
+    private void handleBroadcastAck(long seq, String sender) {
+        Map<String, SendHandle> broadcastHandles = pendingBroadcasts.get(seq);
+        if (broadcastHandles != null) {
+            SendHandle broadcastHandle = broadcastHandles.remove(sender);
+            if (broadcastHandle != null) {
+                broadcastHandle.cancel();
+                //System.out.println("PerfectLink: Received ACK for broadcast seq " + seq + " from " + sender + ", stopped retransmission to that destination");
+            }
+            if (broadcastHandles.isEmpty()) {
+                pendingBroadcasts.remove(seq);
+            }
+        }
     }
 
     private void sendAck(String destinationId, long seq) {
