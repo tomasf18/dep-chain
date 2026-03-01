@@ -1,7 +1,7 @@
 package ist.depchain.network.abstractions;
 
 import java.util.Map;
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import com.google.protobuf.ByteString;
@@ -58,24 +58,32 @@ public class PerfectLink implements Link {
     }
 
     @Override
-    public Map<String, SendHandle> broadcast(List<String> destinationIds, byte[] payload) {
+    public Map<String, SendHandle> broadcast(Set<String> destinationIds, byte[] payload) {
         long seq = localSequenceCounter.incrementAndGet();
-
-        Envelope envelope;
-        Envelope.Builder envelopBuilder = Envelope.newBuilder()
+        System.out.println("PerfectLink: Broadcasting message with seq " + seq + " to destinations: " + destinationIds);
+        Envelope.Builder envelopeBuilder = Envelope.newBuilder()
             .setSenderId(config.getSelfId())
             .setSequenceNumber(seq)
             .setPayload(ByteString.copyFrom(payload));
-
-        if (authenticator != null && authenticator.shouldAuthenticate(config.getSelfId())) {
-            envelope = authenticator.signMessage(envelopBuilder);
-        } else {
-            envelope = envelopBuilder.build();
-        }
-
+            
         Map<String, SendHandle> handlesPerDestination = new ConcurrentHashMap<>();
+        Envelope signedEnvelope = null; // signed envelope for authenticated destinations
+        
         for (String dest : destinationIds) {
-            SendHandle handle = stubbornLink.send(dest, envelope.toByteArray());
+            byte[] envelopeBytes;
+            
+            if (authenticator != null && authenticator.shouldAuthenticate(dest)) {
+                // sign once and reuse for all authenticated destinations
+                if (signedEnvelope == null) {
+                    signedEnvelope = authenticator.signMessage(envelopeBuilder);
+                }
+                envelopeBytes = signedEnvelope.toByteArray();
+            } else {
+                // send unsigned envelope for non-authenticated destinations
+                envelopeBytes = envelopeBuilder.build().toByteArray();
+            }
+            System.out.println("PerfectLink: Broadcasting message to " + dest + " with seq " + seq);
+            SendHandle handle = stubbornLink.send(dest, envelopeBytes);
             handlesPerDestination.put(dest, handle);
         }
 
@@ -91,11 +99,13 @@ public class PerfectLink implements Link {
             if (authenticator != null && authenticator.shouldAuthenticate(senderId) && !authenticator.verifyMessage(envelope)) {
                 System.err.println("PerfectLink: Received message with invalid signature from " + senderId + ", discarding it");
                 return;
+            } else if (authenticator != null && authenticator.shouldAuthenticate(senderId)) {
+                System.out.println("Signature successfully verified ");
             }
 
             // ACK: stop retransmission of the acknowledged message
             if (envelope.hasAck()) {
-                handleAck(envelope.getAck());
+                handleAck(senderId, envelope.getAck());
                 return;
             }
 
@@ -143,19 +153,19 @@ public class PerfectLink implements Link {
         }
     }
 
-    private void handleAck(Ack ack) {
+    private void handleAck(String senderId, Ack ack) {
         long seq = ack.getOriginalSequenceNumber();
         SendHandle handle = pendingMessages.remove(seq);
         
         if (handle == null) {
             // this ACK is for a broadcast message
-            handleBroadcastAck(seq, ack.getOriginalSender());
+            handleBroadcastAck(seq, senderId);
             return;
         }
         
         // this ACK is for a unicast message
         handle.cancel();
-        //System.out.println("PerfectLink: Received ACK for seq " + seq + " from " + ack.getOriginalSender() + ", stopped retransmission");
+        //System.out.println("PerfectLink: Received ACK for seq " + seq + " from " + senderId + ", stopped retransmission");
     }
 
     private void handleBroadcastAck(long seq, String sender) {

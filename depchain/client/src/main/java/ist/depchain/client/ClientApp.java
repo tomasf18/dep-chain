@@ -25,10 +25,10 @@ public class ClientApp {
             Scanner in = new Scanner(System.in);
             while (true) {
                 System.out.println("\n === === === === === === === === ===");
-                System.out.println("[" + config.getSelfId() + "] Select an action (or 'exit' to quit):");
-                System.out.println("Enter '1' to: Append to log");
-                System.out.println("=== === === === === === === === ===");
-                System.out.print("> \n");
+                System.out.println("  [" + config.getSelfId() + "] Select an action (or 'exit' to quit):");
+                System.out.println("  Enter '1' to: Append to log");
+                System.out.println(" === === === === === === === === ===");
+                System.out.print("> ");
                 String line = in.nextLine();
 
                 switch (line) {

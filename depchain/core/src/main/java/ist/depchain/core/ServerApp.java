@@ -16,6 +16,8 @@ public class ServerApp {
         try {
             Config config = Config.loadConfiguration(configFile, selfId);
             ServerContext server = new ServerContext(config);
+            HotStuffCoordinator hotStuffCoordinator = new HotStuffCoordinator(server);
+            MessageHandler messageHandler = new MessageHandler(server);
             server.start();
         } catch (Exception e) {
             System.err.println("Failed to load configuration: " + e.getMessage());

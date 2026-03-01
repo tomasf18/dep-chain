@@ -32,6 +32,6 @@ public class ClientLibrary {
         byte[] payload = clientRequest.toByteArray();
         Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
         clientContext.getPendingRequests().put(reqId, 0); // initialize ack count
-        clientContext.getPerfectLink().broadcast(destinations.stream().toList(), payload);
+        clientContext.getPerfectLink().broadcast(destinations, payload);
     }
 }

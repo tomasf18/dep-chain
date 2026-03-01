@@ -46,7 +46,7 @@ public class ClientContext {
                 int ackCount = pendingRequests.get(reqId) + 1;
                 pendingRequests.put(reqId, ackCount);
                 if (ackCount >= responsesThreshold) {
-                    System.out.println("[COMMITTED] Request " + reqId + " is considered committed with " + ackCount + " acks | Block ID: " + clientResponse.getBlockId());
+                    System.out.println("[COMMITTED] Request " + reqId + " is considered committed with " + ackCount + " acks | Block ID: " + clientResponse.getBlockId().toStringUtf8());
                     pendingRequests.remove(reqId); // clean up
                 } else {
                     System.out.println("[PENDING] Request " + reqId + " has " + ackCount + "/" + responsesThreshold + " acks, waiting for more...");

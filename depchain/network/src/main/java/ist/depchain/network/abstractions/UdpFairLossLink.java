@@ -4,7 +4,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.Arrays;
-import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -62,7 +62,7 @@ public class UdpFairLossLink implements Link {
     }
 
     @Override
-    public Map<String, SendHandle> broadcast(List<String> destinationIds, byte[] payload) {
+    public Map<String, SendHandle> broadcast(Set<String> destinationIds, byte[] payload) {
         Map<String, SendHandle> handlesPerDestination = new HashMap<>();
         for (String dest : destinationIds) {
             SendHandle handle = send(dest, payload);
