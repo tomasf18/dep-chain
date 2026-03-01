@@ -4,8 +4,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
 
-import ist.depchain.network.utils.Config;
+import ist.depchain.common.utils.Config;
 import ist.depchain.network.interfaces.Link;
 import ist.depchain.network.interfaces.MessageHandler;
 import ist.depchain.network.interfaces.SendHandle;
@@ -39,6 +42,16 @@ public class StubbornLink implements Link {
             
         }, 0, config.getResendPeriodMillis(), TimeUnit.MILLISECONDS);
         return () -> future.cancel(false);
+    }
+
+    @Override
+    public Map<String, SendHandle> broadcast(Set<String> destinationIds, byte[] payload) {
+        Map<String, SendHandle> handlesPerDestination = new HashMap<>();
+        for (String dest : destinationIds) {
+            SendHandle handle = send(dest, payload);
+            handlesPerDestination.put(dest, handle);
+        }
+        return handlesPerDestination;
     }
 
     @Override

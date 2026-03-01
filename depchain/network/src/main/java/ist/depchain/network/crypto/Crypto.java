@@ -3,21 +3,29 @@ package ist.depchain.network.crypto;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
+import java.security.NoSuchAlgorithmException;
+import java.security.InvalidKeyException;
+import java.security.SignatureException;
 
 public class Crypto {
 
     private Crypto() {
     }
 
-    public static byte[] sign(byte[] data, String keyPath, String signatureAlgorithm) throws Exception {
-        PrivateKey privateKey = KeyLoader.loadPrivateKey(keyPath);
-        if (privateKey == null) {
-            throw new Exception("Crypto: No private key found for key path " + keyPath);
+    public static byte[] sign(byte[] data, String keyPath, String signatureAlgorithm) {
+        try {
+            PrivateKey privateKey = KeyLoader.loadPrivateKey(keyPath);
+            if (privateKey == null) {
+                throw new IllegalArgumentException("Crypto: No private key found for key path " + keyPath);
+            }
+            Signature sig = Signature.getInstance(signatureAlgorithm);
+            sig.initSign(privateKey);
+            sig.update(data);
+            return sig.sign();
+        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+            System.out.println("Crypto: Exception during signing with key path " + keyPath + ": " + e.getMessage());
+            return null;
         }
-        Signature sig = Signature.getInstance(signatureAlgorithm);
-        sig.initSign(privateKey);
-        sig.update(data);
-        return sig.sign();
     }
 
     public static boolean verify(byte[] data, byte[] signature, String keyPath, String signatureAlgorithm) {
@@ -31,7 +39,7 @@ public class Crypto {
             sig.initVerify(signerPublicKey);
             sig.update(data);
             return sig.verify(signature);
-        } catch (Exception e) {
+        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
             System.out.println("Crypto: Exception during signature verification for key path " + keyPath + ": " + e.getMessage());
             return false;
         }

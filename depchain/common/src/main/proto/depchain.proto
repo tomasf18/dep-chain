@@ -13,7 +13,7 @@ message Envelope {
     uint64 sequence_number = 2; // unique per sender
 
     oneof content {
-        bytes payload = 3; // serialized message (e.g., Block, Vote, etc)
+        bytes payload = 3; // serialized message (e.g., ClientRequest, HotStuffMessage, etc.)
         Ack ack = 4; 
     }
 
@@ -65,7 +65,7 @@ message HotStuffMessage{
 message Block {
     bytes id = 1;          // Unique digest of block - Cryptographic Security reasons
     bytes parent_id = 2;   // [Line 12] - b.parent
-    Command cmd = 3;       // [Line 13] - b.cmd, command included in this block
+    Command command = 3;       // [Line 13] - b.cmd, command included in this block
 }
 
 message QC {

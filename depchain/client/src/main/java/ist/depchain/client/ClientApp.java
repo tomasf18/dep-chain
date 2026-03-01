@@ -1,86 +1,56 @@
 package ist.depchain.client;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import ist.depchain.network.utils.Config;
-import ist.depchain.network.utils.ProcessInfo;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
+import ist.depchain.common.utils.Config;
 import java.util.Scanner;
 
-/**
- * Hello world!
- */
 public class ClientApp {
     public static void main(String[] args) {
-        if (args.length < 1) {
-            System.out.println("Usage: mvn exec:java -Dexec.args=\"<configFile>\"");
-            System.out.println("Example: mvn exec:java -Dexec.args=\"config.json\"");
+        if (args.length < 2) {
+            System.out.println("Usage: mvn exec:java -Dexec.args=\"<configFile> <clientId>\"");
+            System.out.println("Example: mvn exec:java -Dexec.args=\"config.json client1\"");
             return;
         }
 
         String configFile = args[0];
-        String clientId = "client";
+        String clientId = args[1];
+        
         try {
-            /* EXTRACT PROCESS CONFIGS */
-            Config config = loadConfiguration(configFile, clientId);
-            DepChainClient client = new DepChainClient(config);
+            Config config = Config.loadConfiguration(configFile, clientId);
+            ClientContext client = new ClientContext(config);
+            ClientLibrary clientLib = new ClientLibrary(client);
             client.start();
 
             System.out.println("[INFO] Successfully started");
-            System.out.println("[INFO] Write message to append or 'exit' to terminate");
 
             Scanner in = new Scanner(System.in);
             while (true) {
-                System.out.println(">> ");
+                System.out.println("\n === === === === === === === === ===");
+                System.out.println("  [" + config.getSelfId() + "] Select an action (or 'exit' to quit):");
+                System.out.println("  Enter '1' to: Append to log");
+                System.out.println(" === === === === === === === === ===");
+                System.out.print("> ");
                 String line = in.nextLine();
 
-                if (line.equalsIgnoreCase("exit")) {break;}
-                if(!line.isBlank()){client.append(line);}
+                switch (line) {
+                    case "1":
+                        System.out.print("Enter message to append: ");
+                        String message = in.nextLine();
+                        clientLib.append(message);
+                        break;
+                    case "exit":
+                        System.out.println("[INFO] Exiting...");
+                        client.stop();
+                        in.close();
+                        System.out.println("[INFO] Successfully terminated");
+                        return;
+                
+                    default:
+                        break;
+                }
             }
-
-            client.stop();
-            in.close();
-            System.out.println("[INFO] Successfully terminated");
         }
         catch(Exception e){
             System.out.println("[ERROR] Failed to load config file: " + e.getMessage());
         }
-    }
-
-    private static Config loadConfiguration(String configFile, String selfId) throws IOException {
-        String jsonContent = Files.readString(Paths.get(configFile));
-        Gson gson = new Gson();
-        JsonObject root = gson.fromJson(jsonContent, JsonObject.class);
-        JsonObject faultConfigNode = root.getAsJsonObject("faultConfig");
-        JsonObject cryptoConfigNode = root.getAsJsonObject("cryptoConfig");
-        JsonObject networkConfigNode = root.getAsJsonObject("networkConfig");
-        JsonObject processesNode = networkConfigNode.getAsJsonObject("processes");
-
-        Map<String, ProcessInfo> processes = new HashMap<>();
-        for (String processId : processesNode.keySet()) {
-            JsonObject processJson = processesNode.getAsJsonObject(processId);
-            ProcessInfo info = new ProcessInfo(
-                    processId,
-                    processJson.get("host").getAsString(),
-                    processJson.get("port").getAsInt()
-            );
-            processes.put(processId, info);
-        }
-
-        return new Config(
-                selfId,
-                processes,
-                networkConfigNode.get("resendPeriodMillis").getAsInt(),
-                faultConfigNode.get("dropProbability").getAsDouble(),
-                faultConfigNode.get("duplicateProbability").getAsDouble(),
-                faultConfigNode.get("tamperProbability").getAsDouble(),
-                faultConfigNode.get("maxDelayMs").getAsInt(),
-                cryptoConfigNode.get("signatureAlgorithm").getAsString()
-        );
     }
 }
