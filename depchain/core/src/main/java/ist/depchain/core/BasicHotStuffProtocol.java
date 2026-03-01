@@ -69,7 +69,6 @@ public class BasicHotStuffProtocol {
         }
     }
 
-
     /** PREPARE PHASE FOR REPLICA **/
     public void onReceivePrepare(HotStuffMessage m){
         if(!utils.matchingMSG(m, HotStuffMessage.Type.PREPARE, curView))
@@ -92,6 +91,47 @@ public class BasicHotStuffProtocol {
 
             System.out.println("[REPLICA] - Voted PREPARE for Block: " + node.getId().toStringUtf8());
         }
+    }
+
+    /** PRE-COMMIT PHASE FOR LEADER **/
+    public void onReceivePrepareVote(String sourceId, HotStuffMessage vote){
+        if(!utils.matchingMSG(vote, HotStuffMessage.Type.PREPARE, curView))
+            return;
+
+        voteCollector.putIfAbsent(HotStuffMessage.Type.PREPARE, new HashMap<>());
+        ByteString blockId = vote.getBlock().getId();
+
+        Set<HotStuffMessage> votes =  voteCollector.get(HotStuffMessage.Type.PREPARE)
+                .computeIfAbsent(blockId, k -> new HashSet<>());
+        votes.add(vote);
+
+        if(votes.size() >= (n-f) && isLeader()){
+            byte[] aggregatedSig = new byte[0]; //TODO - Replace with real crypto later
+            this.prepareQC = utils.createQC(votes, aggregatedSig);
+
+            HotStuffMessage preCommitMsg = utils.msg(HotStuffMessage.Type.PRE_COMMIT, curView, null, prepareQC);
+            broadcast(preCommitMsg);
+
+            voteCollector.get(HotStuffMessage.Type.PRE_COMMIT).remove(blockId);
+        }
+    }
+
+    /** PRE-COMMIT PHASE FOR REPLICA **/
+    public void onReceivePreCommitMsg(HotStuffMessage m){
+        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PREPARE, curView))
+            return;
+
+        this.prepareQC = m.getJustify();
+
+        Block node = storage.getBlock(prepareQC.getBlockId());
+
+        byte[] dummySig = new byte[0]; //TODO - Replace with realy crypto later
+        HotStuffMessage vote = utils.voteMsg(HotStuffMessage.Type.PRE_COMMIT, curView, node, prepareQC,  dummySig);
+
+        String leaderId = getLeader(curView);
+        serverContext.getPerfectLink().send(leaderId, vote.toByteArray());
+
+        System.out.println("[REPLICA] - Voted PRE-COMMIT for view " + curView);
     }
 
     /** HELPER FUNCTIONS **/
