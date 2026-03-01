@@ -13,7 +13,7 @@ message Envelope {
     uint64 sequence_number = 2; // unique per sender
 
     oneof content {
-        bytes payload = 3; // serialized message (e.g., Block, Vote, etc)
+        bytes payload = 3; // serialized message (e.g., ClientRequest, HotStuffMessage, etc.)
         Ack ack = 4; 
     }
 

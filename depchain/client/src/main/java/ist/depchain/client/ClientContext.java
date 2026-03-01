@@ -5,7 +5,6 @@ import ist.depchain.network.abstractions.StubbornLink;
 import ist.depchain.network.abstractions.UdpFairLossLink;
 /* protobuf classes */
 import ist.depchain.common.ClientResponse;
-import ist.depchain.common.Envelope;
 import ist.depchain.common.utils.Config;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,14 +20,14 @@ public class ClientContext {
 
     private final AtomicInteger requestId = new AtomicInteger(0);
     private Map<Integer, Integer> pendingRequests = new HashMap<>(); // requestId -> ack count
-    private int ackThreshold; // number of acks required to consider a request committed
+    private int responsesThreshold; // number of acks required to consider a request committed
 
     public ClientContext(Config config) {
         this.config = config;
         fairLossLink = new UdpFairLossLink(config);
         stubbornLink = new StubbornLink(config, fairLossLink);
         perfectLink = new PerfectLink(config, stubbornLink, fairLossLink);
-        this.ackThreshold = config.getF() + 1; 
+        this.responsesThreshold = config.getF() + 1; 
     }
     
     public void start() {
@@ -38,23 +37,19 @@ public class ClientContext {
 
     private void handleIncomingResponse(String sourceId, byte[] data) {
         try {
-            Envelope envelope = Envelope.parseFrom(data);
-            if (envelope.hasAck()) {
-                // handleAck(envelope.getAck());
-                return;
-            }
-            ClientResponse cltResponse = ClientResponse.parseFrom(data);
+            ClientResponse clientResponse = ClientResponse.parseFrom(data);
 
-            System.out.println("[RECEIVED] Response from: " + sourceId);
-            System.out.println("[RECEIVED] Id of request: " + cltResponse.getRequestId());
+            System.out.println("[RECEIVED] Response from: " + sourceId + " for request Id: " + clientResponse.getRequestId() + " | Committed: " + clientResponse.getCommitted());
 
-            int reqId = cltResponse.getRequestId();
-            if (pendingRequests.containsKey(reqId) && cltResponse.getCommitted()) {
+            int reqId = clientResponse.getRequestId();
+            if (pendingRequests.containsKey(reqId) && clientResponse.getCommitted()) {
                 int ackCount = pendingRequests.get(reqId) + 1;
                 pendingRequests.put(reqId, ackCount);
-                if (ackCount >= ackThreshold) {
-                    System.out.println("[COMMITTED] Request " + reqId + " is considered committed with " + ackCount + " acks.");
+                if (ackCount >= responsesThreshold) {
+                    System.out.println("[COMMITTED] Request " + reqId + " is considered committed with " + ackCount + " acks | Block ID: " + clientResponse.getBlockId());
                     pendingRequests.remove(reqId); // clean up
+                } else {
+                    System.out.println("[PENDING] Request " + reqId + " has " + ackCount + "/" + responsesThreshold + " acks, waiting for more...");
                 }
             }
         } catch(Exception e) {

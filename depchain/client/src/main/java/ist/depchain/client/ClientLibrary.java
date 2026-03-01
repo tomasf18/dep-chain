@@ -13,22 +13,23 @@ public class ClientLibrary {
     }
 
     public void append(String data){
+        String commandType = "append";
         int reqId = clientContext.getRequestId().incrementAndGet();
 
-        Command cmd = Command.newBuilder()
-                .setType("append")
+        Command command = Command.newBuilder()
+                .setType(commandType)
                 .setData(data)
                 .build();
 
-        ClientRequest cltReq = ClientRequest.newBuilder()
+        ClientRequest clientRequest = ClientRequest.newBuilder()
                                             .setClientId(clientContext.getConfig().getSelfId())
                                             .setRequestId(reqId)
-                                            .setCommand(cmd)
+                                            .setCommand(command)
                                             .build();
 
-        System.out.println("[SENT] Client " + clientContext.getConfig().getSelfId() + " Request Id: " + reqId + " Data: " + data);
+        System.out.println("[SENT] Client " + clientContext.getConfig().getSelfId() + " | Request Id: " + reqId + " | Data: " + data);
 
-        byte[] payload = cltReq.toByteArray();
+        byte[] payload = clientRequest.toByteArray();
         Set<String> destinations = clientContext.getConfig().getProcesses().keySet();
         destinations.remove(clientContext.getConfig().getSelfId()); // don't send to self
         clientContext.getPendingRequests().put(reqId, 0); // initialize ack count

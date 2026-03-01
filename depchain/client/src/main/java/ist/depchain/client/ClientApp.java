@@ -24,16 +24,30 @@ public class ClientApp {
 
             Scanner in = new Scanner(System.in);
             while (true) {
-                System.out.print(">> ");
+                System.out.println("\n === === === === === === === === ===");
+                System.out.println("[" + config.getSelfId() + "] Select an action (or 'exit' to quit):");
+                System.out.println("Enter '1' to: Append to log");
+                System.out.println("=== === === === === === === === ===");
+                System.out.print("> \n");
                 String line = in.nextLine();
 
-                if (line.equalsIgnoreCase("exit")) {break;}
-                if(!line.isBlank()){clientLib.append(line);}
+                switch (line) {
+                    case "1":
+                        System.out.print("Enter message to append: ");
+                        String message = in.nextLine();
+                        clientLib.append(message);
+                        break;
+                    case "exit":
+                        System.out.println("[INFO] Exiting...");
+                        client.stop();
+                        in.close();
+                        System.out.println("[INFO] Successfully terminated");
+                        return;
+                
+                    default:
+                        break;
+                }
             }
-
-            client.stop();
-            in.close();
-            System.out.println("[INFO] Successfully terminated");
         }
         catch(Exception e){
             System.out.println("[ERROR] Failed to load config file: " + e.getMessage());

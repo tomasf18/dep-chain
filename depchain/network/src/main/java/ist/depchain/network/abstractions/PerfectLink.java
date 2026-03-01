@@ -101,23 +101,6 @@ public class PerfectLink implements Link {
                     if (handler != null) handler.onReceive(senderId, bufferedPayload);
                     nextExpected.put(senderId, next + 1);
                 }
-
-                // TODO: this serves just to test the client, remove later
-
-//                 message ClientResponse {
-//     string client_id = 1;
-//     int32 request_id = 2; // matches the request_id of the ClientRequest
-//     bool committed = 3;
-//     bytes block_id = 4;
-// }
-                if (senderId.equals("client")) {
-                    ClientResponse response = ClientResponse.newBuilder()
-                                                        .setClientId(config.getSelfId())
-                                                        .setRequestId(Integer.parseInt(new String(envelope.getPayload().toByteArray())))
-                                                        .setCommitted(true)
-                                                        .build();
-                    send(senderId, response.toByteArray()); // send response back to client
-                }
                 return;
             }             
             
