@@ -1,3 +1,4 @@
+package ist.depchain.core.hotstuff;
 // package ist.depchain.core;
 
 // import com.google.protobuf.ByteString;

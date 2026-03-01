@@ -4,23 +4,23 @@
     "f": 1,
     "resendPeriodMillis": 1000,
     "processes": {
-      "client": {
+      "client1": {
         "host": "localhost",
         "port": 5000
       },
-      "p1": {
+      "s1": {
         "host": "localhost",
         "port": 5001
       },
-      "p2": {
+      "s2": {
         "host": "localhost",
         "port": 5002
       },
-      "p3": {
+      "s3": {
         "host": "localhost",
         "port": 5003
       },
-      "p4": {
+      "s4": {
         "host": "localhost",
         "port": 5004
       }

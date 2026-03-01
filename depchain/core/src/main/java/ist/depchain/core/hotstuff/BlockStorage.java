@@ -1,3 +1,4 @@
+package ist.depchain.core.hotstuff;
 // package ist.depchain.core;
 
 // import ist.depchain.common.Block;

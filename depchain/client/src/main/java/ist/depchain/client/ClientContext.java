@@ -26,7 +26,7 @@ public class ClientContext {
         this.config = config;
         fairLossLink = new UdpFairLossLink(config);
         stubbornLink = new StubbornLink(config, fairLossLink);
-        perfectLink = new PerfectLink(config, stubbornLink, fairLossLink);
+        perfectLink = new PerfectLink(config, stubbornLink, fairLossLink, null);
         this.responsesThreshold = config.getF() + 1; 
     }
     

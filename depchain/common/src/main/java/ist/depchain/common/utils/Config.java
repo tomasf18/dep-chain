@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.stream.Collectors;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -16,7 +17,9 @@ public class Config {
     private String selfId;
     private int N; // total number of processes
     private int f; // maximum number of faulty processes
-    private Map<String, ProcessInfo> processes;
+    private final Map<String, ProcessInfo> processes;
+    private final Map<String, ProcessInfo> clients; // derived map of client processes
+    private final Map<String, ProcessInfo> blockChainServers; // derived map of blockchain server processes
     private int resendPeriodMillis; 
 
     // fault injection configuration
@@ -37,6 +40,12 @@ public class Config {
         this.N = N;
         this.f = f;
         this.processes = processes;
+        this.clients = processes.entrySet().stream()
+                .filter(e -> e.getKey().startsWith("client"))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        this.blockChainServers = processes.entrySet().stream()
+                .filter(e -> e.getKey().startsWith("s"))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         this.resendPeriodMillis = resendPeriodMillis;
         this.dropProbability = dropProbability;
         this.duplicateProbability = duplicateProbability;
@@ -98,6 +107,14 @@ public class Config {
 
     public Map<String, ProcessInfo> getProcesses() {
         return processes;
+    }
+
+    public Map<String, ProcessInfo> getClients() {
+        return clients;
+    }
+
+    public Map<String, ProcessInfo> getBlockChainServers() {
+        return blockChainServers;
     }
 
     public int getResendPeriodMillis() {

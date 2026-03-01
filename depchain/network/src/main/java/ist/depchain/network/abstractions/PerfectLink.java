@@ -6,11 +6,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import com.google.protobuf.ByteString;
 
-import ist.depchain.common.*;
+import ist.depchain.common.Ack;
+import ist.depchain.common.Envelope;
 import ist.depchain.common.utils.Config;
 import ist.depchain.network.interfaces.Link;
 import ist.depchain.network.interfaces.MessageHandler;
 import ist.depchain.network.interfaces.SendHandle;
+import ist.depchain.network.interfaces.MessageAuthenticator;
 
 public class PerfectLink implements Link {
 
@@ -23,12 +25,14 @@ public class PerfectLink implements Link {
     private Map<String /*sender*/, Map<Long /*seqNum*/, byte[] /*payload*/>> pendingDeliveries = new ConcurrentHashMap<>(); // for buffering out-of-order messages until they can be delivered in order
     private AtomicLong localSequenceCounter = new AtomicLong(0); // for generating unique sequence numbers for outgoing messages
 
+    private final MessageAuthenticator authenticator; // to integrate APL features
     private MessageHandler handler; // upper layer's message handler (e.g., application layer, authenticated perfect link layer, etc.)
 
-    public PerfectLink(Config config, Link stubbornLink, Link fairLossLink) {
+    public PerfectLink(Config config, Link stubbornLink, Link fairLossLink, MessageAuthenticator authenticator) {
         this.config = config;
         this.stubbornLink = stubbornLink;
         this.fairLossLink = fairLossLink;
+        this.authenticator = authenticator;
         stubbornLink.registerReceiver(this::handleIncomingMessage);
     }
 
@@ -36,11 +40,17 @@ public class PerfectLink implements Link {
     public SendHandle send(String destinationId, byte[] payload) {
         long seq = localSequenceCounter.incrementAndGet();
 
-        Envelope envelope = Envelope.newBuilder()
+        Envelope envelope;
+        Envelope.Builder envelopeBuilder = Envelope.newBuilder()
             .setSenderId(config.getSelfId())
             .setSequenceNumber(seq)
-            .setPayload(ByteString.copyFrom(payload))
-            .build();
+            .setPayload(ByteString.copyFrom(payload));
+
+        if (authenticator != null && authenticator.shouldAuthenticate(destinationId)) {
+            envelope = authenticator.signMessage(envelopeBuilder);
+        } else {
+            envelope = envelopeBuilder.build();
+        }
 
         SendHandle handle = stubbornLink.send(destinationId, envelope.toByteArray());
         pendingMessages.putIfAbsent(seq, handle);
@@ -51,11 +61,17 @@ public class PerfectLink implements Link {
     public Map<String, SendHandle> broadcast(List<String> destinationIds, byte[] payload) {
         long seq = localSequenceCounter.incrementAndGet();
 
-        Envelope envelope = Envelope.newBuilder()
+        Envelope envelope;
+        Envelope.Builder envelopBuilder = Envelope.newBuilder()
             .setSenderId(config.getSelfId())
             .setSequenceNumber(seq)
-            .setPayload(ByteString.copyFrom(payload))
-            .build();
+            .setPayload(ByteString.copyFrom(payload));
+
+        if (authenticator != null && authenticator.shouldAuthenticate(config.getSelfId())) {
+            envelope = authenticator.signMessage(envelopBuilder);
+        } else {
+            envelope = envelopBuilder.build();
+        }
 
         Map<String, SendHandle> handlesPerDestination = new ConcurrentHashMap<>();
         for (String dest : destinationIds) {
@@ -70,6 +86,12 @@ public class PerfectLink implements Link {
     private void handleIncomingMessage(String senderId, byte[] data) {
         try {
             Envelope envelope = Envelope.parseFrom(data);
+
+            // ACKs are signed too, so verify before processing
+            if (authenticator != null && authenticator.shouldAuthenticate(senderId) && !authenticator.verifyMessage(envelope)) {
+                System.err.println("PerfectLink: Received message with invalid signature from " + senderId + ", discarding it");
+                return;
+            }
 
             // ACK: stop retransmission of the acknowledged message
             if (envelope.hasAck()) {
@@ -156,13 +178,19 @@ public class PerfectLink implements Link {
                 .setOriginalSequenceNumber(seq)
                 .build();
                 
-        Envelope ackEnvelope = Envelope.newBuilder()
+        Envelope envelope;
+        Envelope.Builder envelopeBuilder = Envelope.newBuilder()
                 .setSenderId(config.getSelfId())
                 .setSequenceNumber(0) // ACK messages don't need own seq
-                .setAck(ack)
-                .build();
+                .setAck(ack);
 
-        fairLossLink.send(destinationId, ackEnvelope.toByteArray()); // send only once
+        if (authenticator != null && authenticator.shouldAuthenticate(destinationId)) {
+            envelope = authenticator.signMessage(envelopeBuilder);
+        } else {            
+            envelope = envelopeBuilder.build();
+        }
+
+        fairLossLink.send(destinationId, envelope.toByteArray()); // send only once
     }
 
     @Override

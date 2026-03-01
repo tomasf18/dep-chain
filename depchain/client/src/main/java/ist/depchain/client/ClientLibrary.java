@@ -30,8 +30,7 @@ public class ClientLibrary {
         System.out.println("[SENT] Client " + clientContext.getConfig().getSelfId() + " | Request Id: " + reqId + " | Data: " + data);
 
         byte[] payload = clientRequest.toByteArray();
-        Set<String> destinations = clientContext.getConfig().getProcesses().keySet();
-        destinations.remove(clientContext.getConfig().getSelfId()); // don't send to self
+        Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
         clientContext.getPendingRequests().put(reqId, 0); // initialize ack count
         clientContext.getPerfectLink().broadcast(destinations.stream().toList(), payload);
     }

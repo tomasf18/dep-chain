@@ -13,27 +13,35 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
 public class KeyLoader {
-    
+
     private KeyLoader() {
     }
 
-    public static PrivateKey loadPrivateKey(String keyPath) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
-        String pem = Files.readString(Paths.get(keyPath))
-                .replace("-----BEGIN EC PRIVATE KEY-----", "")
-                .replace("-----END EC PRIVATE KEY-----", "")
-                .replace("-----BEGIN PRIVATE KEY-----", "")
-                .replace("-----END PRIVATE KEY-----", "")
-                .replaceAll("\\s", "");
-        byte[] der = Base64.getDecoder().decode(pem);
-        return KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(der));
+    public static PrivateKey loadPrivateKey(String keyPath) {
+        try {
+            String pem = Files.readString(Paths.get(keyPath))
+                    .replace("-----BEGIN EC PRIVATE KEY-----", "")
+                    .replace("-----END EC PRIVATE KEY-----", "")
+                    .replace("-----BEGIN PRIVATE KEY-----", "")
+                    .replace("-----END PRIVATE KEY-----", "")
+                    .replaceAll("\\s", "");
+            byte[] der = Base64.getDecoder().decode(pem);
+            return KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(der));
+        } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e) {
+            return null;
+        }
     }
 
-    public static PublicKey loadPublicKey(String keyPath) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
-        String pem = Files.readString(Paths.get(keyPath))
-                .replace("-----BEGIN PUBLIC KEY-----", "")
-                .replace("-----END PUBLIC KEY-----", "")
-                .replaceAll("\\s", "");
-        byte[] der = Base64.getDecoder().decode(pem);
-        return KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(der));
+    public static PublicKey loadPublicKey(String keyPath) {
+        try {
+            String pem = Files.readString(Paths.get(keyPath))
+                    .replace("-----BEGIN PUBLIC KEY-----", "")
+                    .replace("-----END PUBLIC KEY-----", "")
+                    .replaceAll("\\s", "");
+            byte[] der = Base64.getDecoder().decode(pem);
+            return KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(der));
+        } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e) {
+            return null;
+        }
     }
 }
