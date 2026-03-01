@@ -125,13 +125,54 @@ public class BasicHotStuffProtocol {
 
         Block node = storage.getBlock(prepareQC.getBlockId());
 
-        byte[] dummySig = new byte[0]; //TODO - Replace with realy crypto later
+        byte[] dummySig = new byte[0]; //TODO - Replace with real crypto later
         HotStuffMessage vote = utils.voteMsg(HotStuffMessage.Type.PRE_COMMIT, curView, node, prepareQC,  dummySig);
 
         String leaderId = getLeader(curView);
         serverContext.getPerfectLink().send(leaderId, vote.toByteArray());
 
         System.out.println("[REPLICA] - Voted PRE-COMMIT for view " + curView);
+    }
+
+    /** COMMIT PHASE FOR LEADER **/
+    public void onReceivePreCommitVote(String sourceId, HotStuffMessage vote){
+        if(!utils.matchingMSG(vote, HotStuffMessage.Type.PRE_COMMIT, curView))
+            return;
+
+        voteCollector.putIfAbsent(HotStuffMessage.Type.PRE_COMMIT, new HashMap<>());
+        ByteString blockId = vote.getBlock().getId();
+
+        Set<HotStuffMessage> votes = voteCollector.get(HotStuffMessage.Type.PRE_COMMIT)
+                .computeIfAbsent(blockId, k -> new HashSet<>());
+        votes.add(vote);
+
+        if(votes.size() >= (n-f) && isLeader()){
+            byte[] aggregatedSig = new byte[0]; //TODO - Replace with real crypto later
+            QC preCommitQC = utils.createQC(votes, aggregatedSig);
+
+            HotStuffMessage commitMsg = utils.msg(HotStuffMessage.Type.COMMIT, curView, null, preCommitQC);
+            broadcast(commitMsg);
+
+            voteCollector.get(HotStuffMessage.Type.COMMIT).remove(blockId);
+        }
+    }
+
+    /** COMMIT PHASE FOR REPLICA **/
+    public void onReceiveCommit(HotStuffMessage m){
+        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PRE_COMMIT, curView))
+            return;
+
+        this.lockedQC = m.getJustify();
+
+        System.out.println("[REPLICA] - Locked QC for view " + curView);
+
+        Block node = storage.getBlock(lockedQC.getBlockId());
+        byte[] dummySig = new byte[0]; //TODO - Replace with real crypto later
+        HotStuffMessage vote = utils.voteMsg(HotStuffMessage.Type.COMMIT, curView, node, lockedQC, dummySig);
+
+        String leaderId = getLeader(curView);
+        serverContext.getPerfectLink().send(leaderId, vote.toByteArray());
+        System.out.println("[REPLICA] - Voted COMMIT for view " + curView);
     }
 
     /** HELPER FUNCTIONS **/
