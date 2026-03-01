@@ -1,8 +1,7 @@
 package ist.depchain.core;
 
-import ist.depchain.common.HotStuffMessage;
-import ist.depchain.common.HotStuffMessage.Type;
 import ist.depchain.common.QC;
+import ist.depchain.core.hotstuff.*;
 
 import java.util.Collection;
 import java.util.Comparator;
