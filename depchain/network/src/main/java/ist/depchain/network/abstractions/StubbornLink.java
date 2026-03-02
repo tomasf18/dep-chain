@@ -33,7 +33,7 @@ public class StubbornLink implements Link {
             fairLossLink.send(destinationId, payload);
             numberOfRetries[0]++;
         }, 0, config.getResendPeriodMillis(), TimeUnit.MILLISECONDS);
-        return () -> future.cancel(true);
+        return () -> future.cancel(false);
     }
 
     @Override
