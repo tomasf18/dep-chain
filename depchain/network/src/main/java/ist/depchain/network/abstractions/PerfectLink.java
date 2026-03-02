@@ -11,7 +11,6 @@ import ist.depchain.common.Envelope;
 import ist.depchain.common.utils.Config;
 import ist.depchain.network.interfaces.Link;
 import ist.depchain.network.interfaces.MessageHandler;
-import ist.depchain.network.interfaces.MessageAuthenticator;
 import ist.depchain.network.interfaces.SendHandle;
 
 public class PerfectLink implements Link {
@@ -19,31 +18,26 @@ public class PerfectLink implements Link {
     private final Config config;
     private final Link stubbornLink;
     private final Link fairLossLink;
-    private final MessageAuthenticator authenticator;
 
     private MessageHandler handler;
 
-    private final AtomicLong localSequenceCounter = new AtomicLong(0);
+    // Per-destination outgoing sequence counters — prevents gaps when mixing
+    // unicasts and broadcasts (a unicast to s2 must not create a gap for s3).
+    private final Map<String, AtomicLong> outSeq = new ConcurrentHashMap<>();
 
-    // retransmission tracking
-    private final Map<Long, SendHandle> pendingMessages = new ConcurrentHashMap<>();
-    private final Map<Long, Map<String, SendHandle>> pendingBroadcasts = new ConcurrentHashMap<>();
+    // Per-destination pending retransmission handles: dest → seq → handle
+    private final Map<String, Map<Long, SendHandle>> pending = new ConcurrentHashMap<>();
 
     // ordering
     private final Map<String, Long> nextExpected = new ConcurrentHashMap<>();
     private final Map<String, Map<Long, byte[]>> pendingDeliveries = new ConcurrentHashMap<>();
 
-    public PerfectLink(Config config,
-                       Link stubbornLink,
-                       Link fairLossLink,
-                       MessageAuthenticator authenticator) {
-
+    public PerfectLink(Config config, Link stubbornLink, Link fairLossLink) {
         this.config = config;
         this.stubbornLink = stubbornLink;
         this.fairLossLink = fairLossLink;
-        this.authenticator = authenticator;
 
-        stubbornLink.registerReceiver(this::handleIncomingMessage);
+        stubbornLink.registerReceiver(this::ingest);
     }
 
     // ============================================================
@@ -53,23 +47,17 @@ public class PerfectLink implements Link {
     @Override
     public SendHandle send(String destinationId, byte[] payload) {
 
-        long seq = localSequenceCounter.incrementAndGet();
+        long seq = outSeq.computeIfAbsent(destinationId, k -> new AtomicLong(0))
+                         .incrementAndGet();
 
-        Envelope.Builder builder = Envelope.newBuilder()
+        Envelope envelope = Envelope.newBuilder()
                 .setSenderId(config.getSelfId())
                 .setSequenceNumber(seq)
-                .setPayload(ByteString.copyFrom(payload));
-
-        Envelope envelope;
-
-        if (authenticator != null && authenticator.shouldAuthenticate(destinationId)) {
-            envelope = authenticator.encrypt(destinationId, builder);
-        } else {
-            envelope = builder.build();
-        }
+                .setPayload(ByteString.copyFrom(payload))
+                .build();
 
         SendHandle handle = stubbornLink.send(destinationId, envelope.toByteArray());
-        pendingMessages.put(seq, handle);
+        pending.computeIfAbsent(destinationId, k -> new ConcurrentHashMap<>()).put(seq, handle);
 
         return handle;
     }
@@ -80,31 +68,10 @@ public class PerfectLink implements Link {
 
     @Override
     public Map<String, SendHandle> broadcast(Set<String> destinationIds, byte[] payload) {
-
-        long seq = localSequenceCounter.incrementAndGet();
-
         Map<String, SendHandle> handles = new ConcurrentHashMap<>();
-
         for (String dest : destinationIds) {
-
-            Envelope.Builder builder = Envelope.newBuilder()
-                    .setSenderId(config.getSelfId())
-                    .setSequenceNumber(seq)
-                    .setPayload(ByteString.copyFrom(payload));
-
-            Envelope envelope;
-
-            if (authenticator != null && authenticator.shouldAuthenticate(dest)) {
-                envelope = authenticator.encrypt(dest, builder);
-            } else {
-                envelope = builder.build();
-            }
-
-            SendHandle handle = stubbornLink.send(dest, envelope.toByteArray());
-            handles.put(dest, handle);
+            handles.put(dest, send(dest, payload));
         }
-
-        pendingBroadcasts.put(seq, handles);
         return handles;
     }
 
@@ -112,21 +79,10 @@ public class PerfectLink implements Link {
     // RECEIVE
     // ============================================================
 
-    private void handleIncomingMessage(String senderId, byte[] data) {
+    void ingest(String senderId, byte[] data) {
 
         try {
             Envelope envelope = Envelope.parseFrom(data);
-
-            if (authenticator != null && authenticator.shouldAuthenticate(senderId)) {
-
-                Envelope processed = authenticator.decrypt(envelope);
-
-                if (processed == null) {
-                    return; // discard (invalid or handshake)
-                }
-
-                envelope = processed;
-            }
 
             // ACK?
             if (envelope.hasAck()) {
@@ -193,30 +149,13 @@ public class PerfectLink implements Link {
 
         long seq = ack.getOriginalSequenceNumber();
 
-        SendHandle handle = pendingMessages.remove(seq);
+        // senderId is the ACK sender = the original receiver of our message.
+        // pending[senderId][seq] is the retransmission handle for that message.
+        Map<Long, SendHandle> destPending = pending.get(senderId);
+        if (destPending == null) return;
 
-        if (handle != null) {
-            handle.cancel();
-            return;
-        }
-
-        handleBroadcastAck(seq, senderId);
-    }
-
-    private void handleBroadcastAck(long seq, String sender) {
-
-        Map<String, SendHandle> map = pendingBroadcasts.get(seq);
-        if (map == null) return;
-
-        SendHandle handle = map.remove(sender);
-
-        if (handle != null) {
-            handle.cancel();
-        }
-
-        if (map.isEmpty()) {
-            pendingBroadcasts.remove(seq);
-        }
+        SendHandle handle = destPending.remove(seq);
+        if (handle != null) handle.cancel();
     }
 
     private void sendAck(String destinationId, long seq) {

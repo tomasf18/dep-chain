@@ -9,13 +9,14 @@ import ist.depchain.network.interfaces.Link;
 
 import javax.crypto.*;
 import javax.crypto.spec.*;
-import java.io.ByteArrayOutputStream;
 import java.security.*;
 import java.security.spec.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Authenticator implements MessageAuthenticator {
+
+    private static final int HMAC_TAG_LEN = 32; // HmacSHA256 output length in bytes
 
     private final Config config;
     private final Link fairLossLink;
@@ -76,20 +77,27 @@ public class Authenticator implements MessageAuthenticator {
         return config.getBlockChainServers().containsKey(peerId);
     }
 
+    /**
+     * Appends an HMAC-SHA256 tag to the payload (no encryption).
+     */
     @Override
     public Envelope encrypt(String destinationId, Envelope.Builder builder) {
 
         SecretKey key = sessionKeys.get(destinationId);
         try {
-            byte[] encrypted = encrypt(builder.getPayload().toByteArray(), key);
+            byte[] signed = sign(builder.getPayload().toByteArray(), key);
             return builder
-                    .setPayload(ByteString.copyFrom(encrypted))
+                    .setPayload(ByteString.copyFrom(signed))
                     .build();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
+    /**
+     * Verifies the HMAC-SHA256 tag and strips it, returning the original payload.
+     * Returns null on handshake messages, missing session key, or tag mismatch.
+     */
     @Override
     public Envelope decrypt(Envelope envelope) {
 
@@ -97,7 +105,7 @@ public class Authenticator implements MessageAuthenticator {
 
         if (envelope.hasHandshake()) {
             processHandshake(senderId, envelope.getHandshake());
-            return null; // handshake nunca sobe para PerfectLink
+            return null; // handshake messages never propagate to PerfectLink
         }
 
         SecretKey sessionKey = sessionKeys.get(senderId);
@@ -107,30 +115,27 @@ public class Authenticator implements MessageAuthenticator {
         }
 
         try {
+            byte[] tagged = envelope.getPayload().toByteArray();
 
-            byte[] encrypted = envelope.getPayload().toByteArray();
-
-            if (encrypted.length < 12) {
-                return null; // inválido
+            if (tagged.length <= HMAC_TAG_LEN) {
+                return null; // invalid — no room for payload
             }
 
-            byte[] iv = Arrays.copyOfRange(encrypted, 0, 12);
-            byte[] ciphertext = Arrays.copyOfRange(encrypted, 12, encrypted.length);
+            byte[] plaintext = Arrays.copyOfRange(tagged, 0, tagged.length - HMAC_TAG_LEN);
+            byte[] receivedTag = Arrays.copyOfRange(tagged, tagged.length - HMAC_TAG_LEN, tagged.length);
 
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(sessionKey);
+            byte[] expectedTag = mac.doFinal(plaintext);
 
-            GCMParameterSpec spec = new GCMParameterSpec(128, iv);
-            cipher.init(Cipher.DECRYPT_MODE, sessionKey, spec);
-
-            byte[] plaintext = cipher.doFinal(ciphertext);
+            if (!MessageDigest.isEqual(expectedTag, receivedTag)) {
+                System.out.println("Message likely tampered with.");
+                return null;
+            }
 
             return Envelope.newBuilder(envelope)
                     .setPayload(ByteString.copyFrom(plaintext))
                     .build();
-
-        } catch (AEADBadTagException e) {
-            System.out.println("Message likely tampered with.");
-            return null;
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -174,14 +179,13 @@ public class Authenticator implements MessageAuthenticator {
             byte[] sharedSecret = ka.generateSecret();
 
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] keyBytes = digest.digest(sharedSecret);
+            byte[] keyBytes = digest.digest(sharedSecret); // 32 bytes
 
-            SecretKey sessionKey = new SecretKeySpec(keyBytes, 0, 16, "AES");
+            SecretKey sessionKey = new SecretKeySpec(keyBytes, "HmacSHA256");
 
             sessionKeys.put(peerId, sessionKey);
 
-            // Se ainda não tínhamos sessão, respondemos com a nossa chave pública
-            // para que o outro lado também consiga derivar a sessão
+            // If we didn't initiate, reply so the peer can derive the same session key
             if (!handshake.getIsReply()) {
                 initiateHandshake(peerId, true);
             }
@@ -191,30 +195,30 @@ public class Authenticator implements MessageAuthenticator {
         }
     }
 
-    private byte[] encrypt(byte[] plaintext, SecretKey key) throws Exception {
-        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-
-        byte[] iv = new byte[12];
-        new SecureRandom().nextBytes(iv);
-
-        GCMParameterSpec spec = new GCMParameterSpec(128, iv);
-        cipher.init(Cipher.ENCRYPT_MODE, key, spec);
-
-        byte[] ciphertext = cipher.doFinal(plaintext);
-
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        output.write(iv);
-        output.write(ciphertext);
-        return output.toByteArray();
+    /**
+     * Signs {@code payload} and returns {@code payload || HMAC-SHA256 tag}.
+     * Called by AuthenticatedPerfectLink before handing bytes to PerfectLink.
+     */
+    public byte[] signPayload(String destinationId, byte[] payload) {
+        SecretKey key = sessionKeys.get(destinationId);
+        try {
+            return sign(payload, key);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    private byte[] decrypt(byte[] input, SecretKey key) throws Exception {
-        byte[] iv = Arrays.copyOfRange(input, 0, 12);
-        byte[] ciphertext = Arrays.copyOfRange(input, 12, input.length);
+    /**
+     * Computes HMAC-SHA256 over {@code plaintext} and returns {@code plaintext || tag}.
+     */
+    private byte[] sign(byte[] plaintext, SecretKey key) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(key);
+        byte[] tag = mac.doFinal(plaintext);
 
-        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-        cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(128, iv));
-
-        return cipher.doFinal(ciphertext);
+        byte[] output = new byte[plaintext.length + tag.length];
+        System.arraycopy(plaintext, 0, output, 0, plaintext.length);
+        System.arraycopy(tag, 0, output, plaintext.length, tag.length);
+        return output;
     }
 }
