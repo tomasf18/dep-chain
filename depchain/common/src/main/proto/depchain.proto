@@ -8,16 +8,19 @@ option java_multiple_files = true;
 
 // Network Layer
 
+message Handshake {
+    bytes ecdhPublicKey = 1;
+}
+
 message Envelope {
     string sender_id = 1; // e.g., "replica1", "replica2", ...
     uint64 sequence_number = 2; // unique per sender
 
     oneof content {
         bytes payload = 3; // serialized message (e.g., ClientRequest, HotStuffMessage, etc.)
-        Ack ack = 4; 
+        Ack ack = 4;
+        Handshake handshake = 5;
     }
-
-    bytes signature = 5; // signature of the sender over the envelope (client does not sign)
 }
 
 message Ack {

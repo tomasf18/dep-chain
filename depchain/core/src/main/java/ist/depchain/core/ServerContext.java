@@ -17,7 +17,7 @@ public class ServerContext {
         this.config = config;
         fairLossLink = new UdpFairLossLink(config);
         stubbornLink = new StubbornLink(config, fairLossLink);
-        perfectLink = new PerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config));
+        perfectLink = new PerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config, fairLossLink));
     }
 
     public void start() throws Exception {
