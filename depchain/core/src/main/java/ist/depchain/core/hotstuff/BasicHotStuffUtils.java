@@ -17,8 +17,8 @@ import ist.depchain.common.Command;
      public static final QC genesisQC = QC.newBuilder()
              .setType(Type.DECIDE)
              .setViewNumber(0)
-             .setNodeId(0)
-             .setSig(ByteString.EMPTY)
+             .setBlockId(ByteString.EMPTY)
+             .setThresholdSig(ByteString.EMPTY)
              .build();
 
      public BasicHotStuffUtils(BlockStorage storage) {
@@ -28,11 +28,11 @@ import ist.depchain.common.Command;
      /* MESSAGES */
 
      // [Line 1-6] - Create base HotStuff Message
-     public HotStuffMessage msg(Type type, int viewNumber, Block node, QC justify) {
+     public HotStuffMessage msg(Type type, int viewNumber, Block block, QC justify) {
          return HotStuffMessage.newBuilder()
                  .setType(type)                // [Line 2]
                  .setViewNumber(viewNumber)    // [Line 3]
-                 .setNode(node)                // [Line 4]
+                 .setBlock(block)              // [Line 4]
                  .setJustify(justify)          // [Line 5]
                  .build();
      }
@@ -51,11 +51,11 @@ import ist.depchain.common.Command;
      /* TREE & QC */
 
      // [Line 11-14] - Create a new block (LEAF)
-     public Block createLeaf(Block parent, Command cmd, int id){
+     public Block createLeaf(Block parent, Command cmd, ByteString id){
          return Block.newBuilder()
                  .setParentId(parent.getId())
-                 .setCmd(cmd)
                  .setId(id)
+                 .setCommand(cmd)
                  .build();
      }
 
@@ -67,8 +67,8 @@ import ist.depchain.common.Command;
          return QC.newBuilder()
                  .setType(msg.getType())                     // [Line 16]
                  .setViewNumber(msg.getViewNumber())         // [Line 17]
-                 .setNodeId(msg.getNode().getId())       // [Line 18]
-                 .setSig(ByteString.copyFrom(combinedSig))   // [Line 19]
+                 .setBlockId(msg.getBlock().getId())          // [Line 18]
+                 .setThresholdSig(ByteString.copyFrom(combinedSig))   // [Line 19]
                  .build();
      }
 
@@ -89,7 +89,7 @@ import ist.depchain.common.Command;
          if(lockedQC == null || lockedQC.getViewNumber() == 0) return true;
 
          //[Line 26]
-         boolean extendsLocked = extendsFrom(node, lockedQC.getNodeId());
+         boolean extendsLocked = extendsFrom(node, lockedQC.getBlockId());
 
          //[Line 27]
          boolean viewIsHigher = qc.getViewNumber() > lockedQC.getViewNumber();
@@ -100,12 +100,12 @@ import ist.depchain.common.Command;
      /* HELPER FUNCTIONS */
 
      // [NEW FUNCTION] - Verify if "node" has antecessor "targethash"
-     public boolean extendsFrom(Block node, int targetId){
+     public boolean extendsFrom(Block node, ByteString targetId){
          if(node.getId() == targetId){return true;}
 
-         int currentParentId = node.getParentId();
-         while(currentParentId != 0){
-             if(currentParentId == targetId){return true;}
+         ByteString currentParentId = node.getParentId();
+         while(!currentParentId.isEmpty()){
+             if(currentParentId.equals(targetId)){return true;}
 
              Block parent = storage.getBlock(currentParentId);
              if(parent == null){break;}
