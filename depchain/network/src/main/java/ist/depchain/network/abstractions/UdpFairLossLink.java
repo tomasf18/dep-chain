@@ -41,14 +41,7 @@ public class UdpFairLossLink implements Link {
         try {
             if (config.getMaxDelayMs() > 0) { Thread.sleep((long)(Math.random() * config.getMaxDelayMs())); } // random delay
 
-            // tamper with the payload
-            byte[] dataToSend = payload;
-            if (Math.random() < config.getTamperProbability()) {
-                dataToSend = Arrays.copyOf(payload, payload.length);
-                dataToSend[(int)(Math.random() * dataToSend.length)] ^= (byte) 0xFF; // flip all bits of a random byte
-            }
-
-            DatagramPacket packet = new DatagramPacket(dataToSend, dataToSend.length, InetAddress.getByName(destInfo.getHost()), destInfo.getPort());
+            DatagramPacket packet = new DatagramPacket(payload, payload.length, InetAddress.getByName(destInfo.getHost()), destInfo.getPort());
             socket.send(packet);
 
             if (Math.random() < config.getDuplicateProbability()) { socket.send(packet); } // send duplicate

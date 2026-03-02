@@ -1,5 +1,6 @@
 package ist.depchain.network.abstractions;
 
+import com.google.protobuf.ByteString;
 import ist.depchain.common.Envelope;
 import ist.depchain.common.utils.Config;
 import ist.depchain.network.crypto.Authenticator;
@@ -10,6 +11,8 @@ import ist.depchain.network.interfaces.SendHandle;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Authenticated Perfect Link: composes PerfectLink (ordering, dedup, ACKs) with
@@ -27,13 +30,19 @@ import java.util.Set;
  */
 public class AuthenticatedPerfectLink implements Link {
 
+    private final Config config;
     private final PerfectLink pl;
     private final Authenticator authenticator;
+
+    // Per-destination outgoing sequence counter, kept in sync with PL's counter.
+    // Owned here so we can include the seq in the HMAC before calling pl.sendWithSeq().
+    private final Map<String, AtomicLong> outSeq = new ConcurrentHashMap<>();
 
     public AuthenticatedPerfectLink(Config config,
                                     StubbornLink stubbornLink,
                                     UdpFairLossLink fairLossLink,
                                     Authenticator authenticator) {
+        this.config = config;
         this.authenticator = authenticator;
         this.pl = new PerfectLink(config, stubbornLink, fairLossLink);
 
@@ -48,7 +57,10 @@ public class AuthenticatedPerfectLink implements Link {
     @Override
     public SendHandle send(String destinationId, byte[] payload) {
         if (authenticator.shouldAuthenticate(destinationId)) {
-            payload = authenticator.signPayload(destinationId, payload);
+            long seq = outSeq.computeIfAbsent(destinationId, k -> new AtomicLong(0))
+                             .incrementAndGet();
+            byte[] signed = authenticator.signPayload(destinationId, seq, payload);
+            return pl.sendWithSeq(destinationId, signed, seq);
         }
         return pl.send(destinationId, payload);
     }
@@ -81,6 +93,16 @@ public class AuthenticatedPerfectLink implements Link {
                 // ACKs are unauthenticated by design; pass through so PL can cancel retransmissions.
                 pl.ingest(senderId, data);
                 return;
+            }
+
+            // Simulate tampering of authenticated payload messages only.
+            // Applied fresh on each arrival so retransmissions are independent attempts.
+            if (envelope.hasPayload() && Math.random() < config.getTamperProbability()) {
+                byte[] payload = envelope.getPayload().toByteArray();
+                payload[(int) (Math.random() * payload.length)] ^= (byte) 0xFF;
+                envelope = Envelope.newBuilder(envelope)
+                        .setPayload(ByteString.copyFrom(payload))
+                        .build();
             }
 
             // authenticator.decrypt() processes handshakes as a side-effect (returns null)

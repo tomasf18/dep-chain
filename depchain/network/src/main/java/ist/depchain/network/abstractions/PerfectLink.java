@@ -46,9 +46,17 @@ public class PerfectLink implements Link {
 
     @Override
     public SendHandle send(String destinationId, byte[] payload) {
-
         long seq = outSeq.computeIfAbsent(destinationId, k -> new AtomicLong(0))
                          .incrementAndGet();
+        return sendWithSeq(destinationId, payload, seq);
+    }
+
+    /**
+     * Sends with a caller-supplied sequence number.
+     * Used by AuthenticatedPerfectLink so it can sign the payload with the seq
+     * before handing it here (freshness: HMAC covers seq || payload).
+     */
+    SendHandle sendWithSeq(String destinationId, byte[] payload, long seq) {
 
         Envelope envelope = Envelope.newBuilder()
                 .setSenderId(config.getSelfId())
