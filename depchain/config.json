@@ -27,8 +27,8 @@
     }
   },
   "faultConfig": {
-    "dropProbability": 0.2,
-    "duplicateProbability": 0.3,
+    "dropProbability": 0.0,
+    "duplicateProbability": 0.0,
     "tamperProbability": 0.0,
     "maxDelayMs": 200
   },

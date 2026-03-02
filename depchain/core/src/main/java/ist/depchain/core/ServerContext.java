@@ -25,6 +25,10 @@ public class ServerContext {
         // loop();
     }
 
+    public void stop() throws Exception {
+        perfectLink.stop();
+    }
+
     /* Getters */
     public Config getConfig() {
         return config;

@@ -165,6 +165,7 @@ public class PerfectLink implements Link {
     // ============================================================
 
     private void deliver(String senderId, byte[] payload) {
+        System.out.println("Delivering payload: " + new String(payload));
         if (handler != null) {
             handler.onReceive(senderId, payload);
         }

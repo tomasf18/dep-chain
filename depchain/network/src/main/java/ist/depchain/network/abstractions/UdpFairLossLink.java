@@ -46,7 +46,6 @@ public class UdpFairLossLink implements Link {
             if (Math.random() < config.getTamperProbability()) {
                 dataToSend = Arrays.copyOf(payload, payload.length);
                 dataToSend[(int)(Math.random() * dataToSend.length)] ^= (byte) 0xFF; // flip all bits of a random byte
-                System.out.println("FairLossLink: TAMPERED packet to " + destinationId);
             }
 
             DatagramPacket packet = new DatagramPacket(dataToSend, dataToSend.length, InetAddress.getByName(destInfo.getHost()), destInfo.getPort());

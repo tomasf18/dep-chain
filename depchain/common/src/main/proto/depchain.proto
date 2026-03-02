@@ -10,6 +10,7 @@ option java_multiple_files = true;
 
 message Handshake {
     bytes ecdhPublicKey = 1;
+    bool is_reply = 2;
 }
 
 message Envelope {

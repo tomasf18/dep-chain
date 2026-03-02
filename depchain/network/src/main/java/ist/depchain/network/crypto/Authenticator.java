@@ -31,9 +31,44 @@ public class Authenticator implements MessageAuthenticator {
             KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
             kpg.initialize(new ECGenParameterSpec("secp256r1"));
             this.myKeyPair = kpg.generateKeyPair();
+            handshakeAll();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void handshakeAll() {
+        Set<String> targets = new HashSet<>(config.getBlockChainServers().keySet());
+
+        Thread thread = new Thread(() -> {
+            Set<String> pending = new HashSet<>(targets);
+
+            while (!pending.isEmpty()) {
+                Iterator<String> it = pending.iterator();
+                while (it.hasNext()) {
+                    String peerId = it.next();
+                    if (sessionKeys.containsKey(peerId)) {
+                        it.remove();
+                    } else {
+                        initiateHandshake(peerId);
+                    }
+                }
+
+                if (!pending.isEmpty()) {
+                    try {
+                        Thread.sleep(2000); // retry every 2s for peers not yet up
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
+
+            System.out.println("All handshakes complete.");
+        });
+
+        thread.setDaemon(true);
+        thread.start();
     }
 
     @Override
@@ -45,12 +80,6 @@ public class Authenticator implements MessageAuthenticator {
     public Envelope encrypt(String destinationId, Envelope.Builder builder) {
 
         SecretKey key = sessionKeys.get(destinationId);
-
-        if (key == null) {
-            initiateHandshake(destinationId);
-            throw new RuntimeException("Session not established with " + destinationId);
-        }
-
         try {
             byte[] encrypted = encrypt(builder.getPayload().toByteArray(), key);
             return builder
@@ -74,7 +103,6 @@ public class Authenticator implements MessageAuthenticator {
         SecretKey sessionKey = sessionKeys.get(senderId);
 
         if (sessionKey == null) {
-            // ainda não há sessão → descartar (ou poderias iniciar handshake aqui)
             return null;
         }
 
@@ -101,7 +129,7 @@ public class Authenticator implements MessageAuthenticator {
                     .build();
 
         } catch (AEADBadTagException e) {
-            // GCM authentication failed (mensagem alterada ou chave errada)
+            System.out.println("Message likely tampered with.");
             return null;
 
         } catch (Exception e) {
@@ -111,8 +139,13 @@ public class Authenticator implements MessageAuthenticator {
     }
 
     private void initiateHandshake(String peerId) {
+        initiateHandshake(peerId, false);
+    }
+
+    private void initiateHandshake(String peerId, boolean isReply) {
         Handshake handshake = Handshake.newBuilder()
                 .setEcdhPublicKey(ByteString.copyFrom(myKeyPair.getPublic().getEncoded()))
+                .setIsReply(isReply)
                 .build();
 
         Envelope envelope = Envelope.newBuilder()
@@ -124,6 +157,11 @@ public class Authenticator implements MessageAuthenticator {
     }
 
     private void processHandshake(String peerId, Handshake handshake) {
+
+        if (sessionKeys.containsKey(peerId)) {
+            return;
+        }
+
         try {
             KeyFactory kf = KeyFactory.getInstance("EC");
             PublicKey peerPublic = kf.generatePublic(
@@ -141,6 +179,12 @@ public class Authenticator implements MessageAuthenticator {
             SecretKey sessionKey = new SecretKeySpec(keyBytes, 0, 16, "AES");
 
             sessionKeys.put(peerId, sessionKey);
+
+            // Se ainda não tínhamos sessão, respondemos com a nossa chave pública
+            // para que o outro lado também consiga derivar a sessão
+            if (!handshake.getIsReply()) {
+                initiateHandshake(peerId, true);
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
