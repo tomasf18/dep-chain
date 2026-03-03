@@ -48,8 +48,7 @@ public class BasicHotStuffProtocol {
         this.utils = new BasicHotStuffUtils(this.storage);
 
         try {
-            int threshold = this.f + 1;
-            this.tsign = new ThresholdSigEd25519(threshold, this.n);
+            this.tsign = new ThresholdSigEd25519(this.f, this.n);
             this.tsignParams = this.tsign.generate();
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize HotStuff Cryptography: " + e.getMessage(), e);
