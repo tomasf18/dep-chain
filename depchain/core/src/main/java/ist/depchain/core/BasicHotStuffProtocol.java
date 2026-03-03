@@ -3,56 +3,76 @@ package ist.depchain.core;
 import com.google.protobuf.ByteString;
 import ist.depchain.common.*;
 import ist.depchain.common.Block;
-import ist.depchain.common.ClientResponse;
 import ist.depchain.common.Command;
 import ist.depchain.common.HotStuffMessage;
 import ist.depchain.common.QC;
 import ist.depchain.core.hotstuff.*;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import com.weavechain.sig.ThresholdSigEd25519;
+import com.weavechain.sig.ThresholdSigEd25519Params;
+import com.weavechain.curve25519.EdwardsPoint;
+import com.weavechain.curve25519.Scalar;
 
 public class BasicHotStuffProtocol {
     private final BasicHotStuffUtils utils;
     private final BlockStorage storage;
     private final ServerContext serverContext;
+    private final AtomicInteger curView = new AtomicInteger(1);
     private int n, f;
-    private int curView = 1;
 
     // Safety State
     private QC lockedQC = BasicHotStuffUtils.genesisQC;  // [PHASE 3] - The latest QC that was locked
     private QC prepareQC = BasicHotStuffUtils.genesisQC; // [PHASE 1] - The latest prepare QC
 
     // Phase Tracking
-    private final Map<HotStuffMessage.Type, Map<ByteString, Set<HotStuffMessage>>> voteCollector = new HashMap<>();
-    private final Map<Integer, Set<HotStuffMessage>> newViewMsgs = new HashMap<>();
+    private final Map<HotStuffMessage.Type, Map<ByteString, Set<HotStuffMessage>>> voteCollector = new ConcurrentHashMap<>();
+    private final Map<Integer, Set<HotStuffMessage>> newViewMsgs = new ConcurrentHashMap<>();
     private final Queue<Command> commandMempool = new LinkedList<>();
 
-    public BasicHotStuffProtocol(ServerContext serverContext, int n, int f) {
+    // Threshold sign
+    private final ThresholdSigEd25519 tsign;
+    private final ThresholdSigEd25519Params tsignParams;
+    private final Map<ByteString, List<EdwardsPoint>> riCollector =  new ConcurrentHashMap<>();
+
+    public BasicHotStuffProtocol(ServerContext serverContext) {
         this.serverContext = serverContext;
-        this.n = n;
-        this.f = f;
+
+        this.n = serverContext.getConfig().getN();
+        this.f = serverContext.getConfig().getF();
+
         this.storage = new BlockStorage();
         this.utils = new BasicHotStuffUtils(this.storage);
+
+        try {
+            this.tsign = new ThresholdSigEd25519(this.f, this.n);
+            this.tsignParams = this.tsign.generate();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize HotStuff Cryptography: " + e.getMessage(), e);
+        }
     }
 
-    // TODO - DECIDE LEADER NEEDS FIX
     public String getLeader(int view){
-        Object[] servers = serverContext.getConfig().getBlockChainServers().keySet().toArray();
-        return (String)servers[view];
+        List<String> servers = new ArrayList<>(serverContext.getConfig().getBlockChainServers().keySet());
+        Collections.sort(servers);
+        return servers.get(view % servers.size());
     }
 
-    // TODO - ISLEADER NEEDS FIX, THIS IS JUST FOR TESTING PURPOSES
-    public boolean isLeader(){
+    public boolean amILeaderOfView(int view){
         String id = serverContext.getConfig().getSelfId();
-        return getLeader(curView % serverContext.getConfig().getBlockChainServers().size()).equals(id);
+        return getLeader(view).equals(id);
     }
 
     /** PREPARE PHASE FOR LEADER **/
     public void onReceiveNewView(HotStuffMessage m){
         int view = m.getViewNumber();
+        if(!amILeaderOfView(view)) {return;}
         newViewMsgs.computeIfAbsent(view, k -> new HashSet<>()).add(m);
 
-        if(newViewMsgs.get(view).size() >= (n-f) && isLeader()){
+        if(newViewMsgs.get(view).size() >= (n-f)){
             QC highQC = newViewMsgs.get(view).stream()
                     .map(HotStuffMessage::getJustify)
                     .max(Comparator.comparingInt(QC::getViewNumber))
@@ -66,7 +86,7 @@ public class BasicHotStuffProtocol {
             Block curProposal = utils.createLeaf(storage.getBlock(highQC.getBlockId()), command, newId);
             storage.putBlock(curProposal);
 
-            HotStuffMessage prepareMsg = utils.msg(HotStuffMessage.Type.PREPARE, curView, curProposal, highQC);
+            HotStuffMessage prepareMsg = utils.msg(HotStuffMessage.Type.PREPARE, curView.get(), curProposal, highQC);
             broadcast(prepareMsg);
 
             newViewMsgs.remove(view);
@@ -75,7 +95,7 @@ public class BasicHotStuffProtocol {
 
     /** PREPARE PHASE FOR REPLICA **/
     public void onReceivePrepare(HotStuffMessage m){
-        if(!utils.matchingMSG(m, HotStuffMessage.Type.PREPARE, curView))
+        if(!utils.matchingMSG(m, HotStuffMessage.Type.PREPARE, curView.get()))
             return;
 
         Block node = m.getBlock();
@@ -88,9 +108,9 @@ public class BasicHotStuffProtocol {
             storage.putBlock(node);
 
             byte[] dummySig = new byte[0]; //TODO - Replace with real crypto later
-            HotStuffMessage vote = utils.voteMsg(HotStuffMessage.Type.PREPARE, curView, node, justify, dummySig);
+            HotStuffMessage vote = utils.voteMsg(HotStuffMessage.Type.PREPARE, curView.get(), node, justify, dummySig);
 
-            String leaderId = getLeader(curView);
+            String leaderId = getLeader(curView.get());
             serverContext.getPerfectLink().send(leaderId, vote.toByteArray());
 
             System.out.println("[REPLICA] - Voted PREPARE for Block: " + node.getId().toStringUtf8());
@@ -99,7 +119,7 @@ public class BasicHotStuffProtocol {
 
     /** PRE-COMMIT PHASE FOR LEADER **/
     public void onReceivePrepareVote(String sourceId, HotStuffMessage vote){
-        if(!utils.matchingMSG(vote, HotStuffMessage.Type.PREPARE, curView))
+        if(!utils.matchingMSG(vote, HotStuffMessage.Type.PREPARE, curView.get()))
             return;
 
         voteCollector.putIfAbsent(HotStuffMessage.Type.PREPARE, new HashMap<>());
@@ -109,11 +129,11 @@ public class BasicHotStuffProtocol {
                 .computeIfAbsent(blockId, k -> new HashSet<>());
         votes.add(vote);
 
-        if(votes.size() >= (n-f) && isLeader()){
+        if(votes.size() >= (n-f) && amILeaderOfView(vote.getViewNumber())){
             byte[] aggregatedSig = new byte[0]; //TODO - Replace with real crypto later
             this.prepareQC = utils.createQC(votes, aggregatedSig);
 
-            HotStuffMessage preCommitMsg = utils.msg(HotStuffMessage.Type.PRE_COMMIT, curView, null, prepareQC);
+            HotStuffMessage preCommitMsg = utils.msg(HotStuffMessage.Type.PRE_COMMIT, curView.get(), null, prepareQC);
             broadcast(preCommitMsg);
 
             voteCollector.get(HotStuffMessage.Type.PREPARE).remove(blockId);
@@ -122,7 +142,7 @@ public class BasicHotStuffProtocol {
 
     /** PRE-COMMIT PHASE FOR REPLICA **/
     public void onReceivePreCommitMsg(HotStuffMessage m){
-        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PREPARE, curView))
+        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PREPARE, curView.get()))
             return;
 
         this.prepareQC = m.getJustify();
@@ -130,17 +150,17 @@ public class BasicHotStuffProtocol {
         Block node = storage.getBlock(prepareQC.getBlockId());
 
         byte[] dummySig = new byte[0]; //TODO - Replace with real crypto later
-        HotStuffMessage vote = utils.voteMsg(HotStuffMessage.Type.PRE_COMMIT, curView, node, prepareQC,  dummySig);
+        HotStuffMessage vote = utils.voteMsg(HotStuffMessage.Type.PRE_COMMIT, curView.get(), node, prepareQC,  dummySig);
 
-        String leaderId = getLeader(curView);
+        String leaderId = getLeader(curView.get());
         serverContext.getPerfectLink().send(leaderId, vote.toByteArray());
 
-        System.out.println("[REPLICA] - Voted PRE-COMMIT for view " + curView);
+        System.out.println("[REPLICA] - Voted PRE-COMMIT for view " + curView.get());
     }
 
     /** COMMIT PHASE FOR LEADER **/
     public void onReceivePreCommitVote(String sourceId, HotStuffMessage vote){
-        if(!utils.matchingMSG(vote, HotStuffMessage.Type.PRE_COMMIT, curView))
+        if(!utils.matchingMSG(vote, HotStuffMessage.Type.PRE_COMMIT, curView.get()))
             return;
 
         voteCollector.putIfAbsent(HotStuffMessage.Type.PRE_COMMIT, new HashMap<>());
@@ -150,11 +170,11 @@ public class BasicHotStuffProtocol {
                 .computeIfAbsent(blockId, k -> new HashSet<>());
         votes.add(vote);
 
-        if(votes.size() >= (n-f) && isLeader()){
+        if(votes.size() >= (n-f) && amILeaderOfView(vote.getViewNumber())){
             byte[] aggregatedSig = new byte[0]; //TODO - Replace with real crypto later
             QC preCommitQC = utils.createQC(votes, aggregatedSig);
 
-            HotStuffMessage commitMsg = utils.msg(HotStuffMessage.Type.COMMIT, curView, null, preCommitQC);
+            HotStuffMessage commitMsg = utils.msg(HotStuffMessage.Type.COMMIT, curView.get(), null, preCommitQC);
             broadcast(commitMsg);
 
             voteCollector.get(HotStuffMessage.Type.COMMIT).remove(blockId);
@@ -163,25 +183,25 @@ public class BasicHotStuffProtocol {
 
     /** COMMIT PHASE FOR REPLICA **/
     public void onReceiveCommit(HotStuffMessage m){
-        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PRE_COMMIT, curView))
+        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PRE_COMMIT, curView.get()))
             return;
 
         this.lockedQC = m.getJustify();
 
-        System.out.println("[REPLICA] - Locked QC for view " + curView);
+        System.out.println("[REPLICA] - Locked QC for view " + curView.get());
 
         Block node = storage.getBlock(lockedQC.getBlockId());
         byte[] dummySig = new byte[0]; //TODO - Replace with real crypto later
-        HotStuffMessage vote = utils.voteMsg(HotStuffMessage.Type.COMMIT, curView, node, lockedQC, dummySig);
+        HotStuffMessage vote = utils.voteMsg(HotStuffMessage.Type.COMMIT, curView.get(), node, lockedQC, dummySig);
 
-        String leaderId = getLeader(curView);
+        String leaderId = getLeader(curView.get());
         serverContext.getPerfectLink().send(leaderId, vote.toByteArray());
-        System.out.println("[REPLICA] - Voted COMMIT for view " + curView);
+        System.out.println("[REPLICA] - Voted COMMIT for view " + curView.get());
     }
 
     /** DECIDE PHASE FOR LEADER **/
     public void onReceiveCommitVote(String sourceId, HotStuffMessage vote){
-        if(!utils.matchingMSG(vote, HotStuffMessage.Type.COMMIT, curView))
+        if(!utils.matchingMSG(vote, HotStuffMessage.Type.COMMIT, curView.get()))
             return;
 
         voteCollector.putIfAbsent(HotStuffMessage.Type.COMMIT, new HashMap<>());
@@ -190,11 +210,11 @@ public class BasicHotStuffProtocol {
                 .computeIfAbsent(blockId, k -> new HashSet<>());
         votes.add(vote);
 
-        if(votes.size() >= (n-f) && isLeader()){
+        if(votes.size() >= (n-f) && amILeaderOfView(vote.getViewNumber())){
             byte[] aggregatedSig = new byte[0];
             QC commitQC = utils.createQC(votes, aggregatedSig);
 
-            HotStuffMessage decideMSG = utils.msg(HotStuffMessage.Type.DECIDE, curView, null, commitQC);
+            HotStuffMessage decideMSG = utils.msg(HotStuffMessage.Type.DECIDE, curView.get(), null, commitQC);
             broadcast(decideMSG);
             voteCollector.get(HotStuffMessage.Type.COMMIT).remove(blockId);
         }
@@ -202,11 +222,11 @@ public class BasicHotStuffProtocol {
 
     /** DECIDE PHASE FOR REPLICA **/
     public void onReceiveDecide(HotStuffMessage m){
-        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.COMMIT, curView))
+        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.COMMIT, curView.get()))
             return;
 
         Block commitedBlock = storage.getBlock(m.getJustify().getBlockId());
-        executeBlock(commitedBlock);
+        //executeBlock(commitedBlock); TODO - SOMEHOW SEND THE BLOCK TO BE EXECUTED
 
         startNextView();
     }
@@ -221,29 +241,15 @@ public class BasicHotStuffProtocol {
         this.commandMempool.add(cmd);
     }
 
-    public void executeBlock(Block block){
-        System.out.println("[REPLICA] - Executing block " + block.getId());
-
-        ist.depchain.common.ClientResponse response = ClientResponse.newBuilder()
-                //.setClientId(block.getCommand().getClientId()) TODO - NEEDS CLIENT ID
-                //.setRequestId(block.getCommand().getRequestId()) TODO - NEEDS REQUEST ID
-                .setCommitted(true)
-                .setBlockId(block.getId())
-                .build();
-
-        //serverContext.getPerfectLink().send(block.getCommand().getClientId(), response.toByteArray()); //TODO - NEED TO KNOW CLIENT ID
-    }
-
     public synchronized void startNextView(){
-        curView++;
-
+        int oldView = curView.get();
+        int newView = curView.incrementAndGet();
         voteCollector.clear();
 
-        String nextLeader = getLeader(curView);
+        HotStuffMessage newViewMSG = utils.msg(HotStuffMessage.Type.NEW_VIEW, oldView, null, prepareQC);
+        String nextLeader = getLeader(newView);
 
-        HotStuffMessage newViewMSG = utils.msg(HotStuffMessage.Type.NEW_VIEW, curView - 1, null, prepareQC);
-
-        System.out.println("[VIEW CHANGE] - Moving to view " + curView + " with leader " + nextLeader);
+        System.out.println("[VIEW CHANGE] - Moving to view " + newView + " with leader " + nextLeader);
 
         byte[] payload = newViewMSG.toByteArray();
         serverContext.getPerfectLink().send(nextLeader, payload);
