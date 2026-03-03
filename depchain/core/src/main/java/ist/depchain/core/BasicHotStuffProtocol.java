@@ -86,34 +86,14 @@ public class BasicHotStuffProtocol {
             Block curProposal = utils.createLeaf(storage.getBlock(highQC.getBlockId()), command, newId);
             storage.putBlock(curProposal);
 
-            HotStuffMessage prepareMsg = utils.msg(HotStuffMessage.Type.PREPARE, curView.get(), curProposal, highQC);
+            HotStuffMessage prepareMsg = utils.msg(HotStuffMessage.Type.PREPARE,
+                    curView.get(),
+                    curProposal,
+                    highQC);
+
             broadcast(prepareMsg);
 
             newViewMsgs.remove(view);
-        }
-    }
-
-    /** PREPARE PHASE FOR REPLICA **/
-    public void onReceivePrepare(HotStuffMessage m){
-        if(!utils.matchingMSG(m, HotStuffMessage.Type.PREPARE, curView.get()))
-            return;
-
-        Block node = m.getBlock();
-        QC justify = m.getJustify();
-
-        boolean extendsJustify = utils.extendsFrom(node, justify.getBlockId());
-        boolean safeNode = utils.safeNode(node, justify, lockedQC);
-
-        if(extendsJustify && safeNode){
-            storage.putBlock(node);
-
-            byte[] dummySig = new byte[0]; //TODO - Replace with real crypto later
-            HotStuffMessage vote = utils.voteMsg(HotStuffMessage.Type.PREPARE, curView.get(), node, justify, dummySig);
-
-            String leaderId = getLeader(curView.get());
-            serverContext.getPerfectLink().send(leaderId, vote.toByteArray());
-
-            System.out.println("[REPLICA] - Voted PREPARE for Block: " + node.getId().toStringUtf8());
         }
     }
 
@@ -140,24 +120,6 @@ public class BasicHotStuffProtocol {
         }
     }
 
-    /** PRE-COMMIT PHASE FOR REPLICA **/
-    public void onReceivePreCommitMsg(HotStuffMessage m){
-        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PREPARE, curView.get()))
-            return;
-
-        this.prepareQC = m.getJustify();
-
-        Block node = storage.getBlock(prepareQC.getBlockId());
-
-        byte[] dummySig = new byte[0]; //TODO - Replace with real crypto later
-        HotStuffMessage vote = utils.voteMsg(HotStuffMessage.Type.PRE_COMMIT, curView.get(), node, prepareQC,  dummySig);
-
-        String leaderId = getLeader(curView.get());
-        serverContext.getPerfectLink().send(leaderId, vote.toByteArray());
-
-        System.out.println("[REPLICA] - Voted PRE-COMMIT for view " + curView.get());
-    }
-
     /** COMMIT PHASE FOR LEADER **/
     public void onReceivePreCommitVote(String sourceId, HotStuffMessage vote){
         if(!utils.matchingMSG(vote, HotStuffMessage.Type.PRE_COMMIT, curView.get()))
@@ -181,24 +143,6 @@ public class BasicHotStuffProtocol {
         }
     }
 
-    /** COMMIT PHASE FOR REPLICA **/
-    public void onReceiveCommit(HotStuffMessage m){
-        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PRE_COMMIT, curView.get()))
-            return;
-
-        this.lockedQC = m.getJustify();
-
-        System.out.println("[REPLICA] - Locked QC for view " + curView.get());
-
-        Block node = storage.getBlock(lockedQC.getBlockId());
-        byte[] dummySig = new byte[0]; //TODO - Replace with real crypto later
-        HotStuffMessage vote = utils.voteMsg(HotStuffMessage.Type.COMMIT, curView.get(), node, lockedQC, dummySig);
-
-        String leaderId = getLeader(curView.get());
-        serverContext.getPerfectLink().send(leaderId, vote.toByteArray());
-        System.out.println("[REPLICA] - Voted COMMIT for view " + curView.get());
-    }
-
     /** DECIDE PHASE FOR LEADER **/
     public void onReceiveCommitVote(String sourceId, HotStuffMessage vote){
         if(!utils.matchingMSG(vote, HotStuffMessage.Type.COMMIT, curView.get()))
@@ -211,13 +155,59 @@ public class BasicHotStuffProtocol {
         votes.add(vote);
 
         if(votes.size() >= (n-f) && amILeaderOfView(vote.getViewNumber())){
-            byte[] aggregatedSig = new byte[0];
+            byte[] aggregatedSig = new byte[0]; // TODO - Replace with real crypto later
             QC commitQC = utils.createQC(votes, aggregatedSig);
 
             HotStuffMessage decideMSG = utils.msg(HotStuffMessage.Type.DECIDE, curView.get(), null, commitQC);
             broadcast(decideMSG);
             voteCollector.get(HotStuffMessage.Type.COMMIT).remove(blockId);
         }
+    }
+
+    /** PREPARE PHASE FOR REPLICA **/
+    public void onReceivePrepare(HotStuffMessage m){
+        if(!utils.matchingMSG(m, HotStuffMessage.Type.PREPARE, curView.get()))
+            return;
+
+        Block node = m.getBlock();
+        QC justify = m.getJustify();
+
+        boolean extendsJustify = utils.extendsFrom(node, justify.getBlockId());
+        boolean safeNode = utils.safeNode(node, justify, lockedQC);
+
+        if(extendsJustify && safeNode){
+            storage.putBlock(node);
+
+            sendVote(HotStuffMessage.Type.PREPARE, node, null);
+
+            System.out.println("[REPLICA] - Voted PREPARE for Block: " + node.getId().toStringUtf8());
+        }
+    }
+
+    /** PRE-COMMIT PHASE FOR REPLICA **/
+    public void onReceivePreCommit(HotStuffMessage m){
+        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PREPARE, curView.get()))
+            return;
+
+        this.prepareQC = m.getJustify();
+        Block node = storage.getBlock(prepareQC.getBlockId());
+        sendVote(HotStuffMessage.Type.PRE_COMMIT, node, prepareQC);
+
+        System.out.println("[REPLICA] - Voted PRE-COMMIT for view " + curView.get());
+    }
+
+    /** COMMIT PHASE FOR REPLICA **/
+    public void onReceiveCommit(HotStuffMessage m){
+        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PRE_COMMIT, curView.get()))
+            return;
+
+        this.lockedQC = m.getJustify();
+        System.out.println("[REPLICA] - Locked QC for view " + curView.get());
+
+        Block node = storage.getBlock(lockedQC.getBlockId());
+        sendVote(HotStuffMessage.Type.COMMIT, node, lockedQC);
+
+        System.out.println("[REPLICA] - Voted COMMIT for view " + curView.get());
     }
 
     /** DECIDE PHASE FOR REPLICA **/
@@ -232,15 +222,7 @@ public class BasicHotStuffProtocol {
     }
 
     /** HELPER FUNCTIONS **/
-    public void broadcast(HotStuffMessage m){
-        Set<String> destinations = serverContext.getConfig().getBlockChainServers().keySet();
-        serverContext.getPerfectLink().broadcast(destinations, m.toByteArray());
-    }
-
-    public void addClientCmd(Command cmd){
-        this.commandMempool.add(cmd);
-    }
-
+    // Method to start a new view
     public synchronized void startNextView(){
         int oldView = curView.get();
         int newView = curView.incrementAndGet();
@@ -253,5 +235,51 @@ public class BasicHotStuffProtocol {
 
         byte[] payload = newViewMSG.toByteArray();
         serverContext.getPerfectLink().send(nextLeader, payload);
+    }
+
+    // Hub of received messages
+    public void processMessage(String sourceId, HotStuffMessage m){
+        // Basic Validation - Is this a message for the current view
+        if(m.getViewNumber() < curView.get() && m.getType() != HotStuffMessage.Type.NEW_VIEW)
+            return;
+
+        boolean isVote = !m.getPartialSig().isEmpty();
+        HotStuffMessage.Type msgType = m.getType();
+        // ROUTE BY TYPE
+        switch (msgType) {
+            case NEW_VIEW:
+                onReceiveNewView(m);
+                break;
+            case PREPARE:
+                if(isVote) onReceivePrepareVote(sourceId, m);
+                else onReceivePrepare(m);
+                break;
+            case PRE_COMMIT:
+                if(isVote) onReceivePreCommitVote(sourceId, m);
+                else onReceivePreCommit(m);
+                break;
+            case COMMIT:
+                if(isVote) onReceiveCommitVote(sourceId, m);
+                else onReceiveCommit(m);
+                break;
+            case DECIDE:
+                if(!isVote) onReceiveDecide(m);
+                break;
+        }
+    }
+
+    // General send vote function for replicas
+    private void sendVote(HotStuffMessage.Type msgType, Block node, QC justify){
+        String leaderId = getLeader(curView.get());
+
+        byte[] partialSign = utils.getMsgDigest(msgType, curView.get(), node.getId());
+        HotStuffMessage vote = utils.voteMsg(msgType, curView.get(), node, justify, partialSign);
+
+        serverContext.getPerfectLink().send(leaderId, vote.toByteArray());
+    }
+
+    private void broadcast(HotStuffMessage m){
+        Set<String> destinations = serverContext.getConfig().getBlockChainServers().keySet();
+        serverContext.getPerfectLink().broadcast(destinations, m.toByteArray());
     }
 }
