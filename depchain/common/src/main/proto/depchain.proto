@@ -58,14 +58,14 @@ message HotStuffMessage{
     Type type = 1;            // [Line 2]  - m.type
     int32 view_number = 2;    // [Line 3]  - m.viewNumber
     Block block = 3;          // [Line 4]  - m.node
-    QC justify = 4;           // [Line 5]  - m.justify
-    bytes partial_sig = 5;    // [Line 9]  - m.partialSig (optional)
+    QC justify = 4;           // [Line 5]  - m.justify (optional)
+    bytes partial_sig = 5;    // [Line 9]  - m.partialSig (optional - sent only by replicas)
 }
 
 message Block {
     bytes id = 1;          // Unique digest of block - Cryptographic Security reasons
     bytes parent_id = 2;   // [Line 12] - b.parent
-    Command command = 3;       // [Line 13] - b.cmd, command included in this block
+    Command command = 3;   // [Line 13] - b.cmd, command included in this block
 }
 
 message QC {

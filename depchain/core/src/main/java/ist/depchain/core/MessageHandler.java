@@ -10,10 +10,14 @@ import java.util.HashSet;
 
 public class MessageHandler {
     private final ServerContext serverContext;
+    private final BasicHotStuffProtocol protocol;
+    private final HotStuffCoordinator coordinator;
 
-    public MessageHandler(ServerContext serverContext) {
+    public MessageHandler(ServerContext serverContext, HotStuffCoordinator coordinator) {
         this.serverContext = serverContext;
-        serverContext.getPerfectLink().registerReceiver(this::handleIncomingMessage); 
+        serverContext.getPerfectLink().registerReceiver(this::handleIncomingMessage);
+        this.coordinator = coordinator;
+        this.protocol = coordinator.getProtocol();
     }
 
     private void handleIncomingMessage(String sourceId, byte[] data) {
@@ -68,5 +72,25 @@ public class MessageHandler {
     private void handleHotStuffMessage(String sourceId, HotStuffMessage hotstuffMsg) {
         System.out.println("Received HotStuffMessage from " + sourceId + " with type: " + hotstuffMsg.getType());
         // TODO: Add actual handling logic for different HotStuff message types (e.g., Propose, Vote, etc.)
+        coordinator.restartTimer();
+        HotStuffMessage.Type type = hotstuffMsg.getType();
+        boolean isVote = hotstuffMsg.getPartialSig().isEmpty();
+
+        if(isVote) {
+            switch(type) {
+                case NEW_VIEW: protocol.onReceiveNewView(hotstuffMsg); break;
+                case PREPARE: protocol.onReceivePrepareVote(sourceId, hotstuffMsg); break;
+                case PRE_COMMIT: protocol.onReceivePreCommitVote(sourceId, hotstuffMsg); break;
+                case COMMIT: protocol.onReceiveCommitVote(sourceId, hotstuffMsg); break;
+            }
+        }
+        else{
+            switch (type) {
+                case PREPARE: protocol.onReceivePrepare(hotstuffMsg); break;
+                case PRE_COMMIT: protocol.onReceivePreCommitMsg(hotstuffMsg); break;
+                case COMMIT: protocol.onReceiveCommit(hotstuffMsg); break;
+                case DECIDE: protocol.onReceiveDecide(hotstuffMsg); break;
+            }
+        }
     }
 }

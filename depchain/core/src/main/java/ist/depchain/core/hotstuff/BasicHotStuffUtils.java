@@ -8,7 +8,8 @@ import ist.depchain.common.Block;
 import ist.depchain.common.QC;
 import ist.depchain.common.Command;
 
- import java.util.Collection;
+import java.nio.ByteBuffer;
+import java.util.Collection;
 
  public class BasicHotStuffUtils {
 
@@ -114,4 +115,11 @@ import ist.depchain.common.Command;
          return false;
      }
 
+     public byte[] getMsgDigest(Type type, int viewNumber, ByteString blockId) {
+         return ByteBuffer.allocate(4 + 4 + blockId.size())
+                 .putInt(type.getNumber())
+                 .putInt(viewNumber)
+                 .put(blockId.toByteArray())
+                 .array();
+     }
 }
