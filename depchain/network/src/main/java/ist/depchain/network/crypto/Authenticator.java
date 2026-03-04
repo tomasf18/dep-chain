@@ -81,7 +81,7 @@ public class Authenticator implements MessageAuthenticator {
      * Returns null on handshake messages, missing session key, or tag mismatch.
      */
     @Override
-    public Envelope verifyMessage(Envelope envelope) {
+    public Envelope verifyMessageAuthenticity(Envelope envelope) {
 
         String senderId = envelope.getSenderId();
 
@@ -98,7 +98,7 @@ public class Authenticator implements MessageAuthenticator {
 
         try {
             byte[] tagged = envelope.getPayload().toByteArray();
-            byte[] plaintext = Crypto.verify(envelope.getSequenceNumber(), tagged, sessionKey);
+            byte[] plaintext = Crypto.verifyAuthenticity(envelope.getSequenceNumber(), tagged, sessionKey);
             if (plaintext == null) return null;
 
             return Envelope.newBuilder(envelope)
@@ -116,10 +116,10 @@ public class Authenticator implements MessageAuthenticator {
      * The seq must match what will be placed in the Envelope header so the tag is
      * tied to both the content and its position in the message stream.
      */
-    public byte[] signPayload(String destinationId, long seq, byte[] payload) {
+    public byte[] authenticatePayload(String destinationId, long seq, byte[] payload) {
         SecretKey key = sessionKeys.get(destinationId);
         try {
-            return Crypto.sign(seq, payload, key);
+            return Crypto.authenticate(seq, payload, key);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

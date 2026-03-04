@@ -8,7 +8,7 @@ public class HotStuffCoordinator {
     private final BasicHotStuffProtocol protocol;
     private final ServerContext serverContext;
     private Timer viewTimer;
-    private static final long TIMEOUT_MS = 10000;
+    private static final long TIMEOUT_MS = 1000000;
 
     public HotStuffCoordinator(ServerContext serverContext) {
         this.serverContext = serverContext;

@@ -9,7 +9,7 @@ public class ServerApp {
     public static void main(String[] args) {
         if (args.length < 2) {
             System.out.println("Usage: mvn exec:java -Dexec.args='<configFile> <serverId>'");
-            System.out.println("Example: mvn exec:java -Dexec.args='config.json s1'");
+            System.out.println("Example: mvn exec:java -Dexec.args='../config.json s1'");
             return;
         }
 
@@ -20,7 +20,7 @@ public class ServerApp {
             Config config = Config.loadConfiguration(configFile, selfId);
             ServerContext server = new ServerContext(config);
             HotStuffCoordinator hotStuffCoordinator = new HotStuffCoordinator(server);
-            MessageHandler messageHandler = new MessageHandler(server, hotStuffCoordinator);
+            new MessageHandler(server, hotStuffCoordinator);
             server.start();
 
             System.out.println("[INFO] Successfully started");

@@ -17,7 +17,7 @@ public class Crypto {
      * {@code plaintext || tag}. The seq binds the tag to the message's
      * position in the stream, preventing replay under a different sequence number.
      */
-    public static byte[] sign(long seq, byte[] plaintext, SecretKey key) throws Exception {
+    public static byte[] authenticate(long seq, byte[] plaintext, SecretKey key) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(key);
         mac.update(longToBytes(seq));
@@ -33,7 +33,7 @@ public class Crypto {
      * Verifies the HMAC-SHA256 tag (bound to seq) in {@code tagged} and returns
      * the original plaintext, or null if the tag is missing or does not match.
      */
-    public static byte[] verify(long seq, byte[] tagged, SecretKey key) throws Exception {
+    public static byte[] verifyAuthenticity(long seq, byte[] tagged, SecretKey key) throws Exception {
         if (tagged.length <= HMAC_TAG_LEN) return null;
         byte[] plaintext = Arrays.copyOfRange(tagged, 0, tagged.length - HMAC_TAG_LEN);
         byte[] receivedTag = Arrays.copyOfRange(tagged, tagged.length - HMAC_TAG_LEN, tagged.length);

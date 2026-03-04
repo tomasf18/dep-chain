@@ -31,23 +31,16 @@ import java.util.concurrent.atomic.AtomicLong;
 public class AuthenticatedPerfectLink implements Link {
 
     private final Config config;
-    private final PerfectLink pl;
+    private final PerfectLink perfectLink;
     private final Authenticator authenticator;
 
-    // Per-destination outgoing sequence counter, kept in sync with PL's counter.
-    // Owned here so we can include the seq in the HMAC before calling pl.sendWithSeq().
-    private final Map<String, AtomicLong> outSeq = new ConcurrentHashMap<>();
-
-    public AuthenticatedPerfectLink(Config config,
-                                    StubbornLink stubbornLink,
-                                    UdpFairLossLink fairLossLink,
-                                    Authenticator authenticator) {
+    public AuthenticatedPerfectLink(Config config, StubbornLink stubbornLink, UdpFairLossLink fairLossLink, Authenticator authenticator) {
         this.config = config;
+        this.perfectLink = new PerfectLink(config, stubbornLink, fairLossLink);
         this.authenticator = authenticator;
-        this.pl = new PerfectLink(config, stubbornLink, fairLossLink);
 
         // Override the receiver that PerfectLink registered so APL intercepts first.
-        stubbornLink.registerReceiver(this::handleRaw);
+        stubbornLink.registerReceiver(this::handleIncomingMessage);
     }
 
     // ============================================================
@@ -57,21 +50,19 @@ public class AuthenticatedPerfectLink implements Link {
     @Override
     public SendHandle send(String destinationId, byte[] payload) {
         if (authenticator.shouldAuthenticate(destinationId)) {
-            long seq = outSeq.computeIfAbsent(destinationId, k -> new AtomicLong(0))
-                             .incrementAndGet();
-            byte[] signed = authenticator.signPayload(destinationId, seq, payload);
-            return pl.sendWithSeq(destinationId, signed, seq);
+            long seq = perfectLink.getOutgoingMessagesSeqNumbers().computeIfAbsent(destinationId, k -> new AtomicLong(0)).incrementAndGet();
+            byte[] signed = authenticator.authenticatePayload(destinationId, seq, payload);
+            return perfectLink.sendWithSeqNumber(destinationId, signed, seq);
         }
-        return pl.send(destinationId, payload);
+        return perfectLink.send(destinationId, payload);
     }
 
     @Override
     public Map<String, SendHandle> broadcast(Set<String> destinationIds, byte[] payload) {
-        // Each destination has its own per-dest seq counter in PL, so looping send()
-        // is safe — no gaps are created for other peers.
         Map<String, SendHandle> handles = new HashMap<>();
         for (String dest : destinationIds) {
-            handles.put(dest, send(dest, payload));
+            SendHandle handle = send(dest, payload);
+            handles.put(dest, handle);
         }
         return handles;
     }
@@ -80,10 +71,10 @@ public class AuthenticatedPerfectLink implements Link {
     // RECEIVE — intercepts before PerfectLink
     // ============================================================
 
-    private void handleRaw(String senderId, byte[] data) {
+    private void handleIncomingMessage(String senderId, byte[] data) {
         try {
             if (!authenticator.shouldAuthenticate(senderId)) {
-                pl.handleIncomingMessage(senderId, data);
+                perfectLink.handleIncomingMessage(senderId, data);
                 return;
             }
 
@@ -91,7 +82,7 @@ public class AuthenticatedPerfectLink implements Link {
 
             if (envelope.hasAck()) {
                 // ACKs are unauthenticated by design; pass through so PL can cancel retransmissions.
-                pl.handleIncomingMessage(senderId, data);
+                perfectLink.handleIncomingMessage(senderId, data);
                 return;
             }
 
@@ -107,12 +98,12 @@ public class AuthenticatedPerfectLink implements Link {
 
             // authenticator.decrypt() processes handshakes as a side-effect (returns null)
             // and verifies the HMAC tag for payload envelopes.
-            Envelope processed = authenticator.verifyMessage(envelope);
+            Envelope processed = authenticator.verifyMessageAuthenticity(envelope);
             if (processed == null) {
                 return; // handshake message or tampered payload — discard
             }
 
-            pl.handleIncomingMessage(senderId, processed.toByteArray());
+            perfectLink.handleIncomingMessage(senderId, processed.toByteArray());
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -125,16 +116,16 @@ public class AuthenticatedPerfectLink implements Link {
 
     @Override
     public void registerReceiver(MessageHandler handler) {
-        pl.registerReceiver(handler);
+        perfectLink.registerReceiver(handler);
     }
 
     @Override
     public void start() {
-        pl.start();
+        perfectLink.start();
     }
 
     @Override
     public void stop() {
-        pl.stop();
+        perfectLink.stop();
     }
 }
