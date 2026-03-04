@@ -30,16 +30,8 @@ public class StubbornLink implements Link {
         long[] numberOfRetries = { 0 };
         ScheduledFuture<?> future = scheduler.scheduleAtFixedRate(() -> {
 
-            /*
-            if (numberOfRetries[0] == 0) {
-                System.out.println("StubbornLink: Sending message to " + destinationId); }
-            else {
-                System.out.println("StubbornLink: Retrying to send message to " + destinationId + ", retry count: " + numberOfRetries[0]); }
-             */
-
             fairLossLink.send(destinationId, payload);
             numberOfRetries[0]++;
-            
         }, 0, config.getResendPeriodMillis(), TimeUnit.MILLISECONDS);
         return () -> future.cancel(false);
     }

@@ -4,6 +4,6 @@ import ist.depchain.common.Envelope;
 
 public interface MessageAuthenticator {
     boolean shouldAuthenticate(String peerId);
-    Envelope signMessage(Envelope.Builder builder);
-    boolean verifyMessage(Envelope envelope);
+    Envelope encrypt(String destinationId, Envelope.Builder builder);
+    Envelope decrypt(Envelope envelope);
 }
