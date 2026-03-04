@@ -19,25 +19,24 @@ public class PerfectLink implements Link {
     private final Link stubbornLink;
     private final Link fairLossLink;
 
-    private MessageHandler handler;
+    private MessageHandler handler; // upper layer's message handler (e.g., application layer, authenticated perfect link layer, etc.)
 
-    // Per-destination outgoing sequence counters — prevents gaps when mixing
-    // unicasts and broadcasts (a unicast to s2 must not create a gap for s3).
-    private final Map<String, AtomicLong> outSeq = new ConcurrentHashMap<>();
-
-    // Per-destination pending retransmission handles: dest → seq → handle
-    private final Map<String, Map<Long, SendHandle>> pending = new ConcurrentHashMap<>();
+    // per-destination outgoing sequence counters; prevents gaps when mixing unicasts and broadcasts (a unicast to s2 must not create a gap for s3).
+    private final Map<String, AtomicLong> outgoingMessagesSeqNumbers = new ConcurrentHashMap<>();
+    
+    // per-destination pending retransmission handles: dest -> seq -> handle
+    private final Map<String, Map<Long, SendHandle>> messagesAwaitingForAck = new ConcurrentHashMap<>();
 
     // ordering
-    private final Map<String, Long> nextExpected = new ConcurrentHashMap<>();
-    private final Map<String, Map<Long, byte[]>> pendingDeliveries = new ConcurrentHashMap<>();
-
+    private Map<String /*sender*/, Long /*next_expected_seq_num*/> nextExpected = new ConcurrentHashMap<>(); // for tracking the next expected sequence number from each sender to detect duplicates and ensure in-order delivery
+    private Map<String /*sender*/, Map<Long /*seqNum*/, byte[] /*payload*/>> pendingDeliveries = new ConcurrentHashMap<>(); // for buffering out-of-order messages until they can be delivered in order
+    
     public PerfectLink(Config config, Link stubbornLink, Link fairLossLink) {
         this.config = config;
         this.stubbornLink = stubbornLink;
         this.fairLossLink = fairLossLink;
 
-        stubbornLink.registerReceiver(this::ingest);
+        stubbornLink.registerReceiver(this::handleIncomingMessage);
     }
 
     // ============================================================
@@ -46,8 +45,7 @@ public class PerfectLink implements Link {
 
     @Override
     public SendHandle send(String destinationId, byte[] payload) {
-        long seq = outSeq.computeIfAbsent(destinationId, k -> new AtomicLong(0))
-                         .incrementAndGet();
+        long seq = outgoingMessagesSeqNumbers.computeIfAbsent(destinationId, k -> new AtomicLong(0)).incrementAndGet();
         return sendWithSeq(destinationId, payload, seq);
     }
 
@@ -65,7 +63,7 @@ public class PerfectLink implements Link {
                 .build();
 
         SendHandle handle = stubbornLink.send(destinationId, envelope.toByteArray());
-        pending.computeIfAbsent(destinationId, k -> new ConcurrentHashMap<>()).put(seq, handle);
+        messagesAwaitingForAck.computeIfAbsent(destinationId, k -> new ConcurrentHashMap<>()).put(seq, handle);
 
         return handle;
     }
@@ -77,8 +75,10 @@ public class PerfectLink implements Link {
     @Override
     public Map<String, SendHandle> broadcast(Set<String> destinationIds, byte[] payload) {
         Map<String, SendHandle> handles = new ConcurrentHashMap<>();
+        SendHandle handle = null;
         for (String dest : destinationIds) {
-            handles.put(dest, send(dest, payload));
+            handle = send(dest, payload);
+            handles.put(dest, handle);
         }
         return handles;
     }
@@ -87,12 +87,12 @@ public class PerfectLink implements Link {
     // RECEIVE
     // ============================================================
 
-    void ingest(String senderId, byte[] data) {
+    void handleIncomingMessage(String senderId, byte[] data) {
 
         try {
             Envelope envelope = Envelope.parseFrom(data);
 
-            // ACK?
+            // ACK: stop retransmission of the acknowledged message
             if (envelope.hasAck()) {
                 handleAck(senderId, envelope.getAck());
                 return;
@@ -104,20 +104,20 @@ public class PerfectLink implements Link {
             sendAck(senderId, seq);
 
             if (seq == expected) {
-
-                deliver(senderId, envelope.getPayload().toByteArray());
+                // this is the expected message, can be delivered immediately
+                deliverToUpperLayer(senderId, envelope.getPayload().toByteArray());
                 nextExpected.put(senderId, seq + 1);
 
-                deliverBuffered(senderId);
+                // after delivering this message, check if we have buffered messages that can now be delivered
+                deliverBufferedToUpperLayer(senderId);
 
             } else if (seq > expected) {
-
-                pendingDeliveries
-                        .computeIfAbsent(senderId, k -> new ConcurrentHashMap<>())
+                // out-of-order message, buffer it until we can deliver it in order
+                pendingDeliveries.computeIfAbsent(senderId, k -> new ConcurrentHashMap<>())
                         .put(seq, envelope.getPayload().toByteArray());
 
             }
-            // seq < expected → duplicate, ignore
+            // seq < expected -> duplicate, ignore
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -128,14 +128,14 @@ public class PerfectLink implements Link {
     // DELIVERY LOGIC
     // ============================================================
 
-    private void deliver(String senderId, byte[] payload) {
+    private void deliverToUpperLayer(String senderId, byte[] payload) {
         System.out.println("Delivering payload: " + new String(payload));
         if (handler != null) {
             handler.onReceive(senderId, payload);
         }
     }
 
-    private void deliverBuffered(String senderId) {
+    private void deliverBufferedToUpperLayer(String senderId) {
 
         Map<Long, byte[]> buffer = pendingDeliveries.get(senderId);
         if (buffer == null) return;
@@ -144,25 +144,22 @@ public class PerfectLink implements Link {
 
         while (buffer.containsKey(next)) {
             byte[] payload = buffer.remove(next);
-            deliver(senderId, payload);
+            deliverToUpperLayer(senderId, payload);
             nextExpected.put(senderId, ++next);
         }
     }
-
-    // ============================================================
-    // ACK HANDLING
-    // ============================================================
 
     private void handleAck(String senderId, Ack ack) {
 
         long seq = ack.getOriginalSequenceNumber();
 
-        // senderId is the ACK sender = the original receiver of our message.
-        // pending[senderId][seq] is the retransmission handle for that message.
-        Map<Long, SendHandle> destPending = pending.get(senderId);
-        if (destPending == null) return;
+        // senderId is the ACK sender = the original receiver of our message
+        // messagesAwaitingForAck[senderId][seq] is the retransmission handle for that message
+        Map<Long, SendHandle> messagesAwaitingForAckForDestination = messagesAwaitingForAck.get(senderId);
+        if (messagesAwaitingForAckForDestination == null) return;
 
-        SendHandle handle = destPending.remove(seq);
+        // cancel the retransmission task for this message, since it has been acknowledged
+        SendHandle handle = messagesAwaitingForAckForDestination.remove(seq);
         if (handle != null) handle.cancel();
     }
 
@@ -175,7 +172,7 @@ public class PerfectLink implements Link {
 
         Envelope envelope = Envelope.newBuilder()
                 .setSenderId(config.getSelfId())
-                .setSequenceNumber(0)
+                .setSequenceNumber(0) // ACK messages don't need own seq
                 .setAck(ack)
                 .build();
 

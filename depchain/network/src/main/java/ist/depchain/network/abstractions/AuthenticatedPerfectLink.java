@@ -19,14 +19,14 @@ import java.util.concurrent.atomic.AtomicLong;
  * an Authenticator (ECDH session key establishment + HMAC-SHA256 per-message auth).
  *
  * Layering:
- *   UdpFairLossLink → StubbornLink → [AuthenticatedPerfectLink intercepts here]
- *                                           → PerfectLink (pure ordering / ACK)
- *                                                 → application
+ *   UdpFairLossLink -> StubbornLink -> [AuthenticatedPerfectLink intercepts here]
+ *                                           -> PerfectLink (pure ordering / ACK)
+ *                                                 -> application
  *
- * Send path:  sign payload → PerfectLink.send()
- * Recv path:  parse Envelope → route handshakes to Authenticator
- *                             → pass ACKs through
- *                             → verify HMAC → PerfectLink.ingest()
+ * Send path:  sign payload -> PerfectLink.send()
+ * Recv path:  parse Envelope -> route handshakes to Authenticator
+ *                             -> pass ACKs through
+ *                             -> verify HMAC -> PerfectLink.handleIncomingMessage()
  */
 public class AuthenticatedPerfectLink implements Link {
 
@@ -83,7 +83,7 @@ public class AuthenticatedPerfectLink implements Link {
     private void handleRaw(String senderId, byte[] data) {
         try {
             if (!authenticator.shouldAuthenticate(senderId)) {
-                pl.ingest(senderId, data);
+                pl.handleIncomingMessage(senderId, data);
                 return;
             }
 
@@ -91,7 +91,7 @@ public class AuthenticatedPerfectLink implements Link {
 
             if (envelope.hasAck()) {
                 // ACKs are unauthenticated by design; pass through so PL can cancel retransmissions.
-                pl.ingest(senderId, data);
+                pl.handleIncomingMessage(senderId, data);
                 return;
             }
 
@@ -112,7 +112,7 @@ public class AuthenticatedPerfectLink implements Link {
                 return; // handshake message or tampered payload — discard
             }
 
-            pl.ingest(senderId, processed.toByteArray());
+            pl.handleIncomingMessage(senderId, processed.toByteArray());
 
         } catch (Exception e) {
             e.printStackTrace();
