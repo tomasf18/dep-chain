@@ -107,7 +107,7 @@ public class AuthenticatedPerfectLink implements Link {
 
             // authenticator.decrypt() processes handshakes as a side-effect (returns null)
             // and verifies the HMAC tag for payload envelopes.
-            Envelope processed = authenticator.decrypt(envelope);
+            Envelope processed = authenticator.verifyMessage(envelope);
             if (processed == null) {
                 return; // handshake message or tampered payload — discard
             }

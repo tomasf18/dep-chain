@@ -16,8 +16,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Authenticator implements MessageAuthenticator {
 
-    private static final int HMAC_TAG_LEN = 32; // HmacSHA256 output length in bytes
-
     private final Config config;
     private final Link fairLossLink;
 
@@ -78,29 +76,12 @@ public class Authenticator implements MessageAuthenticator {
     }
 
     /**
-     * Appends an HMAC-SHA256 tag over (seq || payload) to the payload.
-     * seq is taken from the builder so the tag is bound to the sequence number.
-     */
-    @Override
-    public Envelope encrypt(String destinationId, Envelope.Builder builder) {
-        SecretKey key = sessionKeys.get(destinationId);
-        try {
-            byte[] signed = sign(builder.getSequenceNumber(), builder.getPayload().toByteArray(), key);
-            return builder
-                    .setPayload(ByteString.copyFrom(signed))
-                    .build();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
      * Verifies the HMAC-SHA256 tag (bound to the envelope's sequence number) and
      * strips it, returning the original payload.
      * Returns null on handshake messages, missing session key, or tag mismatch.
      */
     @Override
-    public Envelope decrypt(Envelope envelope) {
+    public Envelope verifyMessage(Envelope envelope) {
 
         String senderId = envelope.getSenderId();
 
@@ -117,22 +98,8 @@ public class Authenticator implements MessageAuthenticator {
 
         try {
             byte[] tagged = envelope.getPayload().toByteArray();
-
-            if (tagged.length <= HMAC_TAG_LEN) {
-                return null; // invalid — no room for payload
-            }
-
-            byte[] plaintext = Arrays.copyOfRange(tagged, 0, tagged.length - HMAC_TAG_LEN);
-            byte[] receivedTag = Arrays.copyOfRange(tagged, tagged.length - HMAC_TAG_LEN, tagged.length);
-
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(sessionKey);
-            mac.update(longToBytes(envelope.getSequenceNumber())); // bind tag to seq for freshness
-            byte[] expectedTag = mac.doFinal(plaintext);
-
-            if (!MessageDigest.isEqual(expectedTag, receivedTag)) {
-                return null;
-            }
+            byte[] plaintext = Crypto.verify(envelope.getSequenceNumber(), tagged, sessionKey);
+            if (plaintext == null) return null;
 
             return Envelope.newBuilder(envelope)
                     .setPayload(ByteString.copyFrom(plaintext))
@@ -141,6 +108,20 @@ public class Authenticator implements MessageAuthenticator {
         } catch (Exception e) {
             e.printStackTrace();
             return null;
+        }
+    }
+
+    /**
+     * Signs {@code payload} bound to {@code seq} and returns {@code payload || HMAC(seq || payload)}.
+     * The seq must match what will be placed in the Envelope header so the tag is
+     * tied to both the content and its position in the message stream.
+     */
+    public byte[] signPayload(String destinationId, long seq, byte[] payload) {
+        SecretKey key = sessionKeys.get(destinationId);
+        try {
+            return Crypto.sign(seq, payload, key);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -196,43 +177,4 @@ public class Authenticator implements MessageAuthenticator {
         }
     }
 
-    /**
-     * Signs {@code payload} bound to {@code seq} and returns {@code payload || HMAC(seq || payload)}.
-     * The seq must match what will be placed in the Envelope header so the tag is
-     * tied to both the content and its position in the message stream.
-     */
-    public byte[] signPayload(String destinationId, long seq, byte[] payload) {
-        SecretKey key = sessionKeys.get(destinationId);
-        try {
-            return sign(seq, payload, key);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Computes HMAC-SHA256 over (seq_bytes || plaintext) and returns
-     * {@code plaintext || tag}.  The seq binds the tag to the message's
-     * position in the stream, preventing replay under a different sequence number.
-     */
-    private byte[] sign(long seq, byte[] plaintext, SecretKey key) throws Exception {
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(key);
-        mac.update(longToBytes(seq));
-        byte[] tag = mac.doFinal(plaintext);
-
-        byte[] output = new byte[plaintext.length + tag.length];
-        System.arraycopy(plaintext, 0, output, 0, plaintext.length);
-        System.arraycopy(tag, 0, output, plaintext.length, tag.length);
-        return output;
-    }
-
-    private static byte[] longToBytes(long v) {
-        byte[] b = new byte[8];
-        for (int i = 7; i >= 0; i--) {
-            b[i] = (byte) (v & 0xFF);
-            v >>>= 8;
-        }
-        return b;
-    }
 }
