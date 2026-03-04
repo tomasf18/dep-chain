@@ -21,11 +21,11 @@ public class PerfectLink implements Link {
 
     private MessageHandler handler;
 
-    // Per-destination outgoing sequence counters — prevents gaps when mixing
+    // Per-destination outgoing sequence counters - prevents gaps when mixing
     // unicasts and broadcasts (a unicast to s2 must not create a gap for s3).
     private final Map<String, AtomicLong> outSeq = new ConcurrentHashMap<>();
 
-    // Per-destination pending retransmission handles: dest → seq → handle
+    // Per-destination pending retransmission handles: dest -> seq -> handle
     private final Map<String, Map<Long, SendHandle>> pending = new ConcurrentHashMap<>();
 
     // ordering
@@ -117,7 +117,6 @@ public class PerfectLink implements Link {
                         .put(seq, envelope.getPayload().toByteArray());
 
             }
-            // seq < expected → duplicate, ignore
 
         } catch (Exception e) {
             e.printStackTrace();

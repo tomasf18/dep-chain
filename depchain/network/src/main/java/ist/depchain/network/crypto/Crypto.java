@@ -1,47 +1,56 @@
 package ist.depchain.network.crypto;
 
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.Signature;
-import java.security.NoSuchAlgorithmException;
-import java.security.InvalidKeyException;
-import java.security.SignatureException;
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
+import java.security.MessageDigest;
+import java.util.Arrays;
 
 public class Crypto {
+
+    static final int HMAC_TAG_LEN = 32; // HmacSHA256 output length in bytes
 
     private Crypto() {
     }
 
-    public static byte[] sign(byte[] data, String keyPath, String signatureAlgorithm) {
-        try {
-            PrivateKey privateKey = KeyLoader.loadPrivateKey(keyPath);
-            if (privateKey == null) {
-                throw new IllegalArgumentException("Crypto: No private key found for key path " + keyPath);
-            }
-            Signature sig = Signature.getInstance(signatureAlgorithm);
-            sig.initSign(privateKey);
-            sig.update(data);
-            return sig.sign();
-        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
-            System.out.println("Crypto: Exception during signing with key path " + keyPath + ": " + e.getMessage());
-            return null;
-        }
+    /**
+     * Computes HMAC-SHA256 over (seq_bytes || plaintext) and returns
+     * {@code plaintext || tag}. The seq binds the tag to the message's
+     * position in the stream, preventing replay under a different sequence number.
+     */
+    public static byte[] sign(long seq, byte[] plaintext, SecretKey key) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(key);
+        mac.update(longToBytes(seq));
+        byte[] tag = mac.doFinal(plaintext);
+
+        byte[] output = new byte[plaintext.length + tag.length];
+        System.arraycopy(plaintext, 0, output, 0, plaintext.length);
+        System.arraycopy(tag, 0, output, plaintext.length, tag.length);
+        return output;
     }
 
-    public static boolean verify(byte[] data, byte[] signature, String keyPath, String signatureAlgorithm) {
-        try {
-            PublicKey signerPublicKey = KeyLoader.loadPublicKey(keyPath);
-            if (signerPublicKey == null) {
-                System.err.println("Crypto: No public key found for key path " + keyPath);
-                return false;
-            }
-            Signature sig = Signature.getInstance(signatureAlgorithm);
-            sig.initVerify(signerPublicKey);
-            sig.update(data);
-            return sig.verify(signature);
-        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
-            System.out.println("Crypto: Exception during signature verification for key path " + keyPath + ": " + e.getMessage());
-            return false;
+    /**
+     * Verifies the HMAC-SHA256 tag (bound to seq) in {@code tagged} and returns
+     * the original plaintext, or null if the tag is missing or does not match.
+     */
+    public static byte[] verify(long seq, byte[] tagged, SecretKey key) throws Exception {
+        if (tagged.length <= HMAC_TAG_LEN) return null;
+        byte[] plaintext = Arrays.copyOfRange(tagged, 0, tagged.length - HMAC_TAG_LEN);
+        byte[] receivedTag = Arrays.copyOfRange(tagged, tagged.length - HMAC_TAG_LEN, tagged.length);
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(key);
+        mac.update(longToBytes(seq));
+        byte[] expectedTag = mac.doFinal(plaintext);
+        if (!MessageDigest.isEqual(expectedTag, receivedTag)) return null;
+        return plaintext;
+    }
+
+    private static byte[] longToBytes(long v) {
+        byte[] b = new byte[8];
+        for (int i = 7; i >= 0; i--) {
+            b[i] = (byte) (v & 0xFF);
+            v >>>= 8;
         }
+        return b;
     }
 }
