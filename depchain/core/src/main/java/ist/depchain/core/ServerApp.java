@@ -32,6 +32,8 @@ public class ServerApp {
                 System.out.print("> ");
                 String line = in.nextLine().strip();
 
+                if (line.isEmpty()) continue;
+
                 if (line.equals("exit")) {
                     System.out.println("[INFO] Exiting...");
                     server.stop();
