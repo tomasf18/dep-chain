@@ -14,11 +14,14 @@ public class ServerContext {
     private final StubbornLink stubbornLink;
     private final Link perfectLink;
 
+    private BlockChain blockChain;
+
     public ServerContext(Config config) {
         this.config = config;
         fairLossLink = new UdpFairLossLink(config);
         stubbornLink = new StubbornLink(config, fairLossLink);
         perfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config, fairLossLink));
+        blockChain = new BlockChain();
     }
 
     public void start() throws Exception {
@@ -36,6 +39,10 @@ public class ServerContext {
 
     public Link getPerfectLink() {
         return perfectLink;
+    }
+
+    public BlockChain getBlockChain() {
+        return blockChain;
     }
 
 }

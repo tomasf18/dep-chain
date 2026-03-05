@@ -3,6 +3,8 @@ package ist.depchain.core;
 import ist.depchain.common.ClientRequest;
 import ist.depchain.common.ClientResponse;
 import ist.depchain.common.HotStuffMessage;
+import ist.depchain.core.hotstuff.BasicHotStuffProtocol;
+import ist.depchain.core.hotstuff.HotStuffCoordinator;
 import ist.depchain.common.Block;
 import com.google.protobuf.ByteString;
 import java.util.Set;

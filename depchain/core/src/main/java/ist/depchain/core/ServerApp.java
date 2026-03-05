@@ -1,6 +1,7 @@
 package ist.depchain.core;
 
 import ist.depchain.common.utils.Config;
+import ist.depchain.core.hotstuff.HotStuffCoordinator;
 
 import java.util.Scanner;
 import java.util.Set;

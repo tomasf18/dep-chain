@@ -1,7 +1,9 @@
-package ist.depchain.core;
+package ist.depchain.core.hotstuff;
 
 import java.util.Timer;
 import java.util.TimerTask;
+
+import ist.depchain.core.ServerContext;
 
 // ALL ALGORITHM COORDINATION (E.G., LEADER ROTATION, TIMEOUTS, ETC.) SHOULD BE HANDLED IN THIS CLASS
 public class HotStuffCoordinator {

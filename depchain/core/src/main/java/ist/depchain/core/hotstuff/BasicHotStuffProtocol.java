@@ -1,12 +1,11 @@
-package ist.depchain.core;
+package ist.depchain.core.hotstuff;
 
 import com.google.protobuf.ByteString;
-import ist.depchain.common.*;
 import ist.depchain.common.Block;
 import ist.depchain.common.Command;
 import ist.depchain.common.HotStuffMessage;
 import ist.depchain.common.QC;
-import ist.depchain.core.hotstuff.*;
+import ist.depchain.core.ServerContext;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,7 +14,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.weavechain.sig.ThresholdSigEd25519;
 import com.weavechain.sig.ThresholdSigEd25519Params;
 import com.weavechain.curve25519.EdwardsPoint;
-import com.weavechain.curve25519.Scalar;
 
 public class BasicHotStuffProtocol {
     private final BasicHotStuffUtils utils;
@@ -216,7 +214,7 @@ public class BasicHotStuffProtocol {
             return;
 
         Block commitedBlock = storage.getBlock(m.getJustify().getBlockId());
-        //executeBlock(commitedBlock); TODO - SOMEHOW SEND THE BLOCK TO BE EXECUTED
+        serverContext.getBlockChain().appendBlock(commitedBlock.getCommand().getData());
 
         startNextView();
     }
