@@ -54,8 +54,15 @@ public class Config {
         this.signatureAlgorithm = signatureAlgorithm;
     }
 
-    public static Config loadConfiguration(String configFile, String selfId) throws IOException {
-        String jsonContent = Files.readString(Paths.get(configFile));
+    public static Config loadConfiguration(String configFile, String selfId) {
+        String jsonContent;
+        try {
+            jsonContent = Files.readString(Paths.get(configFile));
+        } catch (IOException e) {
+            System.out.println("Failed to read configuration file: " + e.getMessage());
+            return null;
+        }
+        
         Gson gson = new Gson();
         JsonObject root = gson.fromJson(jsonContent, JsonObject.class);
         JsonObject faultConfigNode = root.getAsJsonObject("faultConfig");
