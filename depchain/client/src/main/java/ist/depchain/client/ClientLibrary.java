@@ -2,6 +2,7 @@ package ist.depchain.client;
 
 import java.util.Set;
 
+import ist.depchain.common.ApplicationMessage;
 import ist.depchain.common.ClientRequest;
 import ist.depchain.common.Command;
 
@@ -27,9 +28,13 @@ public class ClientLibrary {
                                             .setCommand(command)
                                             .build();
 
+        ApplicationMessage appMsg = ApplicationMessage.newBuilder()
+                                        .setClientRequest(clientRequest)
+                                        .build();
+
         System.out.println("[SENT] Client " + clientContext.getConfig().getSelfId() + " | Request Id: " + reqId + " | Data: " + data);
 
-        byte[] payload = clientRequest.toByteArray();
+        byte[] payload = appMsg.toByteArray();
         Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
         clientContext.getPendingRequests().put(reqId, 0); // initialize ack count
         clientContext.getPerfectLink().broadcast(destinations, payload);

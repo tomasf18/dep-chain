@@ -1,18 +1,27 @@
 package ist.depchain.core.hotstuff;
 
-import java.util.LinkedList;
-import java.util.Queue;
+import com.google.protobuf.ByteString;
+import ist.depchain.common.Block;
 
-import ist.depchain.common.Command;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BasicHotStuffTree {
-    private final Queue<Command> commandsTree = new LinkedList<>();
+    private final Map<ByteString, Block> blocks = new ConcurrentHashMap<>();
 
-    public void addCommand(Command command) {
-        commandsTree.offer(command);
+    public BasicHotStuffTree() {
+        Block genesisBlock = Block.newBuilder()
+                .setId(ByteString.EMPTY)
+                .setParentId(ByteString.EMPTY)
+                .build();
+        this.putBlock(genesisBlock);
     }
 
-    public Command getNextCommand() {
-        return commandsTree.poll();
+    public void putBlock(Block block) {
+        blocks.put(block.getId(), block);
+    }
+
+    public Block getBlock(ByteString id) {
+        return blocks.get(id);
     }
 }

@@ -31,9 +31,18 @@ message Ack {
 
 // Client <-> Replica Messages
 
+message ApplicationMessage { // serves to simplify the message handling logic by MessageHandler
+    oneof content {
+        ClientRequest  client_request   = 1;
+        HotStuffMessage hotstuff_message = 2;
+    }
+}
+
 message Command {
     string type = 1; // e.g., "append", "read", etc.
     string data = 2; // e.g., for "append", the string to append
+    string client_id = 3; 
+    int32  request_id = 4;
 }
 
 message ClientRequest {

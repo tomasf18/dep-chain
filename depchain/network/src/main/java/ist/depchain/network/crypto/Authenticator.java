@@ -118,6 +118,10 @@ public class Authenticator implements MessageAuthenticator {
      */
     public byte[] authenticatePayload(String destinationId, long seq, byte[] payload) {
         SecretKey key = sessionKeys.get(destinationId);
+        if (key == null) {
+            // Session not yet established — StubbornLink will retry later
+            throw new IllegalStateException("Session key not yet available for: " + destinationId);
+        }
         try {
             return Crypto.authenticate(seq, payload, key);
         } catch (Exception e) {

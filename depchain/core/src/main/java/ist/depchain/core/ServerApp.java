@@ -30,10 +30,9 @@ public class ServerApp {
             System.err.println("Error while starting server: " + e.getMessage());
             return;
         }
+        hotStuffCoordinator.start();
+        
         System.out.println("[INFO] Successfully started");
-
-        interactiveMode(config, server);
-
     }
 
 
