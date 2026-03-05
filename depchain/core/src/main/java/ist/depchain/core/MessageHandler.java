@@ -3,8 +3,7 @@ package ist.depchain.core;
 import ist.depchain.common.ClientRequest;
 import ist.depchain.common.ClientResponse;
 import ist.depchain.common.HotStuffMessage;
-import ist.depchain.core.hotstuff.BasicHotStuffProtocol;
-import ist.depchain.core.hotstuff.HotStuffCoordinator;
+import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 import ist.depchain.common.Block;
 import com.google.protobuf.ByteString;
 import java.util.Set;
@@ -12,14 +11,12 @@ import java.util.HashSet;
 
 public class MessageHandler {
     private final ServerContext serverContext;
-    private final BasicHotStuffProtocol protocol;
-    private final HotStuffCoordinator coordinator;
+    private final BasicHotStuffCoordinator coordinator;
 
-    public MessageHandler(ServerContext serverContext, HotStuffCoordinator coordinator) {
+    public MessageHandler(ServerContext serverContext, BasicHotStuffCoordinator coordinator) {
         this.serverContext = serverContext;
         serverContext.getPerfectLink().registerReceiver(this::handleIncomingMessage);
         this.coordinator = coordinator;
-        this.protocol = coordinator.getProtocol();
     }
 
     private void handleIncomingMessage(String sourceId, byte[] data) {
@@ -75,6 +72,6 @@ public class MessageHandler {
         System.out.println("Received HotStuffMessage from " + sourceId + " with type: " + hotstuffMsg.getType());
         // TODO: Add actual handling logic for different HotStuff message types (e.g., Propose, Vote, etc.)
         coordinator.restartTimer();
-        protocol.processMessage(sourceId, hotstuffMsg);
+        coordinator.processMessage(sourceId, hotstuffMsg);
     }
 }

@@ -11,15 +11,11 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.weavechain.sig.ThresholdSigEd25519;
-import com.weavechain.sig.ThresholdSigEd25519Params;
-import com.weavechain.curve25519.EdwardsPoint;
-
-public class BasicHotStuffProtocol {
+public class BasicHotStuffCoordinator {
+    private final ServerContext serverContext;
     private final BasicHotStuffUtils utils;
     private final BlockStorage storage;
-    private final ServerContext serverContext;
-    private final AtomicInteger curView = new AtomicInteger(1);
+    private final AtomicInteger currentView = new AtomicInteger(1);
     private int n, f;
 
     // Safety State
@@ -29,28 +25,35 @@ public class BasicHotStuffProtocol {
     // Phase Tracking
     private final Map<HotStuffMessage.Type, Map<ByteString, Set<HotStuffMessage>>> voteCollector = new ConcurrentHashMap<>();
     private final Map<Integer, Set<HotStuffMessage>> newViewMsgs = new ConcurrentHashMap<>();
-    private final Queue<Command> commandMempool = new LinkedList<>();
+    private final BasicHotStuffTree tree;
 
-    // Threshold sign
-    private final ThresholdSigEd25519 tsign;
-    private final ThresholdSigEd25519Params tsignParams;
-    private final Map<ByteString, List<EdwardsPoint>> riCollector =  new ConcurrentHashMap<>();
+    private Timer viewTimer;
+    private static final long TIMEOUT_MS = 1000000;
 
-    public BasicHotStuffProtocol(ServerContext serverContext) {
+    public BasicHotStuffCoordinator(ServerContext serverContext) {
         this.serverContext = serverContext;
-
         this.n = serverContext.getConfig().getN();
         this.f = serverContext.getConfig().getF();
-
         this.storage = new BlockStorage();
         this.utils = new BasicHotStuffUtils(this.storage);
+        this.tree = new BasicHotStuffTree();
+        startTimer();
+    }
 
-        try {
-            this.tsign = new ThresholdSigEd25519(this.f, this.n);
-            this.tsignParams = this.tsign.generate();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize HotStuff Cryptography: " + e.getMessage(), e);
-        }
+    public void startTimer() {
+        if (viewTimer != null) {viewTimer.cancel();}
+        viewTimer = new Timer();
+        viewTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                System.out.println("[TIMEOUT] - Starting new view");
+                startNextView();
+            }
+        }, TIMEOUT_MS);
+    }
+
+    public void restartTimer() {
+        startTimer();
     }
 
     public String getLeader(int view){
@@ -76,7 +79,7 @@ public class BasicHotStuffProtocol {
                     .max(Comparator.comparingInt(QC::getViewNumber))
                     .orElse(BasicHotStuffUtils.genesisQC);
 
-            Command command = commandMempool.poll();
+            Command command = tree.getNextCommand();
             if(command == null)
                 return;
 
@@ -84,10 +87,7 @@ public class BasicHotStuffProtocol {
             Block curProposal = utils.createLeaf(storage.getBlock(highQC.getBlockId()), command, newId);
             storage.putBlock(curProposal);
 
-            HotStuffMessage prepareMsg = utils.msg(HotStuffMessage.Type.PREPARE,
-                    curView.get(),
-                    curProposal,
-                    highQC);
+            HotStuffMessage prepareMsg = utils.msg(HotStuffMessage.Type.PREPARE, curProposal, highQC, currentView.get());
 
             broadcast(prepareMsg);
 
@@ -97,7 +97,7 @@ public class BasicHotStuffProtocol {
 
     /** PRE-COMMIT PHASE FOR LEADER **/
     public void onReceivePrepareVote(String sourceId, HotStuffMessage vote){
-        if(!utils.matchingMSG(vote, HotStuffMessage.Type.PREPARE, curView.get()))
+        if(!utils.matchingMSG(vote, HotStuffMessage.Type.PREPARE, currentView.get()))
             return;
 
         voteCollector.putIfAbsent(HotStuffMessage.Type.PREPARE, new HashMap<>());
@@ -111,7 +111,7 @@ public class BasicHotStuffProtocol {
             byte[] aggregatedSig = new byte[0]; //TODO - Replace with real crypto later
             this.prepareQC = utils.createQC(votes, aggregatedSig);
 
-            HotStuffMessage preCommitMsg = utils.msg(HotStuffMessage.Type.PRE_COMMIT, curView.get(), null, prepareQC);
+            HotStuffMessage preCommitMsg = utils.msg(HotStuffMessage.Type.PRE_COMMIT, null, prepareQC, currentView.get());
             broadcast(preCommitMsg);
 
             voteCollector.get(HotStuffMessage.Type.PREPARE).remove(blockId);
@@ -120,7 +120,7 @@ public class BasicHotStuffProtocol {
 
     /** COMMIT PHASE FOR LEADER **/
     public void onReceivePreCommitVote(String sourceId, HotStuffMessage vote){
-        if(!utils.matchingMSG(vote, HotStuffMessage.Type.PRE_COMMIT, curView.get()))
+        if(!utils.matchingMSG(vote, HotStuffMessage.Type.PRE_COMMIT, currentView.get()))
             return;
 
         voteCollector.putIfAbsent(HotStuffMessage.Type.PRE_COMMIT, new HashMap<>());
@@ -134,7 +134,7 @@ public class BasicHotStuffProtocol {
             byte[] aggregatedSig = new byte[0]; //TODO - Replace with real crypto later
             QC preCommitQC = utils.createQC(votes, aggregatedSig);
 
-            HotStuffMessage commitMsg = utils.msg(HotStuffMessage.Type.COMMIT, curView.get(), null, preCommitQC);
+            HotStuffMessage commitMsg = utils.msg(HotStuffMessage.Type.COMMIT, null, preCommitQC, currentView.get());
             broadcast(commitMsg);
 
             voteCollector.get(HotStuffMessage.Type.COMMIT).remove(blockId);
@@ -143,7 +143,7 @@ public class BasicHotStuffProtocol {
 
     /** DECIDE PHASE FOR LEADER **/
     public void onReceiveCommitVote(String sourceId, HotStuffMessage vote){
-        if(!utils.matchingMSG(vote, HotStuffMessage.Type.COMMIT, curView.get()))
+        if(!utils.matchingMSG(vote, HotStuffMessage.Type.COMMIT, currentView.get()))
             return;
 
         voteCollector.putIfAbsent(HotStuffMessage.Type.COMMIT, new HashMap<>());
@@ -156,7 +156,7 @@ public class BasicHotStuffProtocol {
             byte[] aggregatedSig = new byte[0]; // TODO - Replace with real crypto later
             QC commitQC = utils.createQC(votes, aggregatedSig);
 
-            HotStuffMessage decideMSG = utils.msg(HotStuffMessage.Type.DECIDE, curView.get(), null, commitQC);
+            HotStuffMessage decideMSG = utils.msg(HotStuffMessage.Type.DECIDE, null, commitQC, currentView.get());
             broadcast(decideMSG);
             voteCollector.get(HotStuffMessage.Type.COMMIT).remove(blockId);
         }
@@ -164,7 +164,7 @@ public class BasicHotStuffProtocol {
 
     /** PREPARE PHASE FOR REPLICA **/
     public void onReceivePrepare(HotStuffMessage m){
-        if(!utils.matchingMSG(m, HotStuffMessage.Type.PREPARE, curView.get()))
+        if(!utils.matchingMSG(m, HotStuffMessage.Type.PREPARE, currentView.get()))
             return;
 
         Block node = m.getBlock();
@@ -184,33 +184,33 @@ public class BasicHotStuffProtocol {
 
     /** PRE-COMMIT PHASE FOR REPLICA **/
     public void onReceivePreCommit(HotStuffMessage m){
-        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PREPARE, curView.get()))
+        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PREPARE, currentView.get()))
             return;
 
         this.prepareQC = m.getJustify();
         Block node = storage.getBlock(prepareQC.getBlockId());
         sendVote(HotStuffMessage.Type.PRE_COMMIT, node, prepareQC);
 
-        System.out.println("[REPLICA] - Voted PRE-COMMIT for view " + curView.get());
+        System.out.println("[REPLICA] - Voted PRE-COMMIT for view " + currentView.get());
     }
 
     /** COMMIT PHASE FOR REPLICA **/
     public void onReceiveCommit(HotStuffMessage m){
-        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PRE_COMMIT, curView.get()))
+        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PRE_COMMIT, currentView.get()))
             return;
 
         this.lockedQC = m.getJustify();
-        System.out.println("[REPLICA] - Locked QC for view " + curView.get());
+        System.out.println("[REPLICA] - Locked QC for view " + currentView.get());
 
         Block node = storage.getBlock(lockedQC.getBlockId());
         sendVote(HotStuffMessage.Type.COMMIT, node, lockedQC);
 
-        System.out.println("[REPLICA] - Voted COMMIT for view " + curView.get());
+        System.out.println("[REPLICA] - Voted COMMIT for view " + currentView.get());
     }
 
     /** DECIDE PHASE FOR REPLICA **/
     public void onReceiveDecide(HotStuffMessage m){
-        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.COMMIT, curView.get()))
+        if(!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.COMMIT, currentView.get()))
             return;
 
         Block commitedBlock = storage.getBlock(m.getJustify().getBlockId());
@@ -222,11 +222,11 @@ public class BasicHotStuffProtocol {
     /** HELPER FUNCTIONS **/
     // Method to start a new view
     public synchronized void startNextView(){
-        int oldView = curView.get();
-        int newView = curView.incrementAndGet();
+        int oldView = currentView.get();
+        int newView = currentView.incrementAndGet();
         voteCollector.clear();
 
-        HotStuffMessage newViewMSG = utils.msg(HotStuffMessage.Type.NEW_VIEW, oldView, null, prepareQC);
+        HotStuffMessage newViewMSG = utils.msg(HotStuffMessage.Type.NEW_VIEW, null, prepareQC, oldView);
         String nextLeader = getLeader(newView);
 
         System.out.println("[VIEW CHANGE] - Moving to view " + newView + " with leader " + nextLeader);
@@ -238,7 +238,7 @@ public class BasicHotStuffProtocol {
     // Hub of received messages
     public void processMessage(String sourceId, HotStuffMessage m){
         // Basic Validation - Is this a message for the current view
-        if(m.getViewNumber() < curView.get() && m.getType() != HotStuffMessage.Type.NEW_VIEW)
+        if(m.getViewNumber() < currentView.get() && m.getType() != HotStuffMessage.Type.NEW_VIEW)
             return;
 
         boolean isVote = !m.getPartialSig().isEmpty();
@@ -268,10 +268,10 @@ public class BasicHotStuffProtocol {
 
     // General send vote function for replicas
     private void sendVote(HotStuffMessage.Type msgType, Block node, QC justify){
-        String leaderId = getLeader(curView.get());
+        String leaderId = getLeader(currentView.get());
 
-        byte[] partialSign = utils.getMsgDigest(msgType, curView.get(), node.getId());
-        HotStuffMessage vote = utils.voteMsg(msgType, curView.get(), node, justify, partialSign);
+        byte[] partialSign = utils.getMsgDigest(msgType, currentView.get(), node.getId());
+        HotStuffMessage vote = utils.voteMsg(msgType, node, justify, currentView.get(), partialSign);
 
         serverContext.getPerfectLink().send(leaderId, vote.toByteArray());
     }

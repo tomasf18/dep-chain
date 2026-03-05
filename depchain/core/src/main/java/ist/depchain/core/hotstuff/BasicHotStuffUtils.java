@@ -26,22 +26,21 @@ import java.util.Collection;
          this.storage = storage;
      }
 
-     /* MESSAGES */
+     /* Messages */
 
      // [Line 1-6] - Create base HotStuff Message
-     public HotStuffMessage msg(Type type, int viewNumber, Block block, QC justify) {
+     public HotStuffMessage msg(Type type, Block block, QC justify, int viewNumber) {
          return HotStuffMessage.newBuilder()
-                 .setType(type)                // [Line 2]
-                 .setViewNumber(viewNumber)    // [Line 3]
-                 .setBlock(block)              // [Line 4]
-                 .setJustify(justify)          // [Line 5]
+                 .setType(type)
+                 .setViewNumber(viewNumber)    
+                 .setBlock(block)              
+                 .setJustify(justify)          
                  .build();
      }
 
      // [Line 7-10] - Create Vote Message
-     public HotStuffMessage voteMsg(Type type, int viewNumber, Block node,  QC justify, byte[] partialSig) {
-         // [Line 8] - m <- Msg(type, node, qc)
-         HotStuffMessage m = msg(type, viewNumber, node, justify);
+     public HotStuffMessage voteMsg(Type type, Block node,  QC justify, int viewNumber, byte[] partialSig) {
+         HotStuffMessage m = msg(type, node, justify, viewNumber);
 
          // [Line 9-10] - m.partialSig <- tsignr(<m.type, m.viewNumber, m.node>)
          return m.toBuilder()
@@ -49,7 +48,7 @@ import java.util.Collection;
                  .build();
      }
 
-     /* TREE & QC */
+     /* Tree & QC */
 
      // [Line 11-14] - Create a new block (LEAF)
      public Block createLeaf(Block parent, Command cmd, ByteString id){
@@ -66,14 +65,14 @@ import java.util.Collection;
          HotStuffMessage msg = v.iterator().next();
 
          return QC.newBuilder()
-                 .setType(msg.getType())                     // [Line 16]
-                 .setViewNumber(msg.getViewNumber())         // [Line 17]
-                 .setBlockId(msg.getBlock().getId())          // [Line 18]
-                 .setThresholdSig(ByteString.copyFrom(combinedSig))   // [Line 19]
+                 .setType(msg.getType())
+                 .setViewNumber(msg.getViewNumber())                    
+                 .setBlockId(msg.getBlock().getId())                    
+                 .setThresholdSig(ByteString.copyFrom(combinedSig))     
                  .build();
      }
 
-     /* MATCHING & SAFETY FUNCTIONS */
+     /* Matching and Safety Functions */
 
      // [Line 21-22] - Verify if Message is the same
      public boolean matchingMSG(HotStuffMessage m, Type t, int v) {
@@ -98,9 +97,9 @@ import java.util.Collection;
          return extendsLocked || viewIsHigher;
      }
 
-     /* HELPER FUNCTIONS */
+     /* Helper Functions */
 
-     // [NEW FUNCTION] - Verify if "node" has antecessor "targethash"
+     // Verify if "node" has antecessor "targethash"
      public boolean extendsFrom(Block node, ByteString targetId){
          if(node.getId() == targetId){return true;}
 
@@ -115,6 +114,7 @@ import java.util.Collection;
          return false;
      }
 
+     // [Line 9] - Get the digest of a message for signing
      public byte[] getMsgDigest(Type type, int viewNumber, ByteString blockId) {
          return ByteBuffer.allocate(4 + 4 + blockId.size())
                  .putInt(type.getNumber())

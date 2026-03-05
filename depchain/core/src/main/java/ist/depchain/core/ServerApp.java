@@ -1,7 +1,7 @@
 package ist.depchain.core;
 
 import ist.depchain.common.utils.Config;
-import ist.depchain.core.hotstuff.HotStuffCoordinator;
+import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 
 import java.util.Scanner;
 import java.util.Set;
@@ -22,7 +22,7 @@ public class ServerApp {
             return;
         }
         ServerContext server = new ServerContext(config);
-        HotStuffCoordinator hotStuffCoordinator = new HotStuffCoordinator(server);
+        BasicHotStuffCoordinator hotStuffCoordinator = new BasicHotStuffCoordinator(server);
         new MessageHandler(server, hotStuffCoordinator);
         try {
             server.start();
