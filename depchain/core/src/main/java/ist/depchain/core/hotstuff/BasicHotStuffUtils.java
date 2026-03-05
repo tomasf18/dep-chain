@@ -10,21 +10,24 @@ import ist.depchain.common.Command;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.UUID;
 
  public class BasicHotStuffUtils {
 
      private final BlockStorage storage;
+     
+    public BasicHotStuffUtils(BlockStorage storage) {
+        this.storage = storage;
+    }
 
-     public static final QC genesisQC = QC.newBuilder()
-             .setType(Type.DECIDE)
-             .setViewNumber(0)
-             .setBlockId(ByteString.EMPTY)
-             .setThresholdSig(ByteString.EMPTY)
-             .build();
-
-     public BasicHotStuffUtils(BlockStorage storage) {
-         this.storage = storage;
-     }
+    public QC getGenesisQC() {
+        return QC.newBuilder()
+                .setType(Type.DECIDE)
+                .setViewNumber(0)
+                .setBlockId(ByteString.EMPTY)
+                .setThresholdSig(ByteString.EMPTY)
+                .build();
+    }
 
      /* Messages */
 
@@ -39,30 +42,33 @@ import java.util.Collection;
      }
 
      // [Line 7-10] - Create Vote Message
-     public HotStuffMessage voteMsg(Type type, Block node,  QC justify, int viewNumber, byte[] partialSig) {
+     public HotStuffMessage voteMsg(Type type, Block node,  QC justify, int viewNumber) {
          HotStuffMessage m = msg(type, node, justify, viewNumber);
+        byte[] partialSign = getMsgDigest(type, viewNumber, node.getId());
 
          // [Line 9-10] - m.partialSig <- tsignr(<m.type, m.viewNumber, m.node>)
          return m.toBuilder()
-                 .setPartialSig(ByteString.copyFrom(partialSig))
+                 .setPartialSig(ByteString.copyFrom(partialSign))
                  .build();
      }
 
      /* Tree & QC */
 
      // [Line 11-14] - Create a new block (LEAF)
-     public Block createLeaf(Block parent, Command cmd, ByteString id){
-         return Block.newBuilder()
+     public Block createLeaf(Block parent, Command cmd){
+        ByteString newId = ByteString.copyFromUtf8(UUID.randomUUID().toString());
+        return Block.newBuilder()
                  .setParentId(parent.getId())
-                 .setId(id)
+                 .setId(newId)
                  .setCommand(cmd)
                  .build();
      }
 
      // [Line 15-20] - Create QC
-     public QC createQC(Collection<HotStuffMessage> v, byte[] combinedSig) {
+     public QC createQC(Collection<HotStuffMessage> v) {
          if ( v.isEmpty() ) {return null;}
          HotStuffMessage msg = v.iterator().next();
+         byte[] combinedSig = new byte[0]; //TODO - Replace with real crypto later
 
          return QC.newBuilder()
                  .setType(msg.getType())
