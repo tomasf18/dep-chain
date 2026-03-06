@@ -5,16 +5,16 @@ import ist.depchain.network.abstractions.AuthenticatedPerfectLink;
 import ist.depchain.network.abstractions.StubbornLink;
 import ist.depchain.network.abstractions.UdpFairLossLink;
 import ist.depchain.network.crypto.Authenticator;
-import ist.depchain.network.interfaces.Link;
 
 public class ServerContext {
     private final Config config;
 
     private final UdpFairLossLink fairLossLink;
     private final StubbornLink stubbornLink;
-    private final Link perfectLink;
+    private final AuthenticatedPerfectLink perfectLink;
 
     private BlockChain blockChain;
+    private CommandExecutor commandExecutor;
 
     public ServerContext(Config config) {
         this.config = config;
@@ -22,6 +22,7 @@ public class ServerContext {
         stubbornLink = new StubbornLink(config, fairLossLink);
         perfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config, fairLossLink));
         blockChain = new BlockChain();
+        commandExecutor = new CommandExecutor(blockChain);
     }
 
     public void start() throws Exception {
@@ -37,7 +38,7 @@ public class ServerContext {
         return config;
     }
 
-    public Link getPerfectLink() {
+    public AuthenticatedPerfectLink getPerfectLink() {
         return perfectLink;
     }
 
@@ -45,4 +46,7 @@ public class ServerContext {
         return blockChain;
     }
 
+    public CommandExecutor getCommandExecutor() {
+        return commandExecutor;
+    }
 }

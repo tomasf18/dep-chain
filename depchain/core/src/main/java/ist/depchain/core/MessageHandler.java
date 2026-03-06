@@ -26,21 +26,20 @@ public class MessageHandler {
                     handleHotStuffMessage(sourceId, wrapper.getHotstuffMessage());
                     break;
                 default:
-                    System.err.println("Unknown message type from " + sourceId);
+                    System.err.println("[MESSAGE_HANDLER | ERROR] - Unknown message type from " + sourceId);
             }
         } catch (Exception e) {
-            System.err.println("Failed to parse ApplicationMessage from " + sourceId);
+            System.err.println("[MESSAGE_HANDLER | ERROR] - Failed to parse ApplicationMessage from " + sourceId);
         }
     }
 
     private void handleClientRequest(String sourceId, ClientRequest clientRequest) {
-        System.out.println("[INFO] Received client request " + clientRequest.getRequestId() + " from " + sourceId);
+        System.out.println("[MESSAGE_HANDLER | INFO] - Received client request " + clientRequest.getRequestId() + " from " + sourceId);
         coordinator.enqueueClientRequest(clientRequest);
     }
 
     private void handleHotStuffMessage(String sourceId, HotStuffMessage hotstuffMsg) {
-        System.out.println("Received HotStuffMessage from " + sourceId + " with type: " + hotstuffMsg.getType());
-        coordinator.restartTimer();
+        System.out.println("[MESSAGE_HANDLER | INFO] - Received HotStuffMessage from " + sourceId + " with type: " + hotstuffMsg.getType());
         coordinator.processMessage(sourceId, hotstuffMsg);
     }
 }

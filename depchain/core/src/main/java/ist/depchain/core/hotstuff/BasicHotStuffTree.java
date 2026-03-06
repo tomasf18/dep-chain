@@ -24,4 +24,8 @@ public class BasicHotStuffTree {
     public Block getBlock(ByteString id) {
         return blocks.get(id);
     }
+
+    public Block getGenesisBlock() {
+        return blocks.get(ByteString.EMPTY);
+    }
 }

@@ -121,6 +121,11 @@ public class BasicHotStuffUtils {
             return true;
         }
 
+        // handle genesis case: if targetId is empty, any block extends from genesis
+        if (targetId.isEmpty()) {
+            return true;
+        }
+
         ByteString currentParentId = node.getParentId();
         while (!currentParentId.isEmpty()) {
             if (currentParentId.equals(targetId)) {

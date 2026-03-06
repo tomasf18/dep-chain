@@ -27,6 +27,7 @@ public class ClientApp {
                 System.out.println("\n === === === === === === === === ===");
                 System.out.println("  [" + config.getSelfId() + "] Select an action (or 'exit' to quit):");
                 System.out.println("  Enter '1' to: Append to log");
+                System.out.println("  Enter '2' to: View log");
                 System.out.println(" === === === === === === === === ===");
                 System.out.print("> ");
                 String line = in.nextLine();
@@ -36,6 +37,9 @@ public class ClientApp {
                         System.out.print("Enter message to append: ");
                         String message = in.nextLine();
                         clientLib.append(message);
+                        break;
+                    case "2":
+                        clientLib.showLog();
                         break;
                     case "exit":
                         System.out.println("[INFO] Exiting...");

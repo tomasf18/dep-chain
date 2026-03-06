@@ -26,6 +26,7 @@ public class Crypto {
         byte[] output = new byte[plaintext.length + tag.length];
         System.arraycopy(plaintext, 0, output, 0, plaintext.length);
         System.arraycopy(tag, 0, output, plaintext.length, tag.length);
+        // System.out.println("[CRYPTO | INFO] - Authenticated message.");
         return output;
     }
 
@@ -41,7 +42,11 @@ public class Crypto {
         mac.init(key);
         mac.update(longToBytes(seq));
         byte[] expectedTag = mac.doFinal(plaintext);
-        if (!MessageDigest.isEqual(expectedTag, receivedTag)) return null;
+        if (!MessageDigest.isEqual(expectedTag, receivedTag)) {
+            System.out.println("[CRYPTO | ERROR] - Message authentication verification failed.");
+            return null;
+        }
+        // System.out.println("[CRYPTO | INFO] - Message authentication verification succeeded.");
         return plaintext;
     }
 

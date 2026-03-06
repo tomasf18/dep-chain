@@ -59,7 +59,7 @@ public class Config {
         try {
             jsonContent = Files.readString(Paths.get(configFile));
         } catch (IOException e) {
-            System.out.println("Failed to read configuration file: " + e.getMessage());
+            System.out.println("[CONFIG | ERROR] - Failed to read configuration file: " + e.getMessage());
             return null;
         }
         

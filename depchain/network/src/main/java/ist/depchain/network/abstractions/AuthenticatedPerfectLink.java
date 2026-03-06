@@ -100,7 +100,7 @@ public class AuthenticatedPerfectLink implements Link {
             // and verifies the HMAC tag for payload envelopes.
             Envelope processed = authenticator.verifyMessageAuthenticity(envelope);
             if (processed == null) {
-                return; // handshake message or tampered payload — discard
+                return; // handshake message or tampered payload, discard
             }
 
             perfectLink.handleIncomingMessage(senderId, processed.toByteArray());
@@ -108,6 +108,10 @@ public class AuthenticatedPerfectLink implements Link {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public Authenticator getAuthenticator() {
+        return authenticator;
     }
 
     // ============================================================

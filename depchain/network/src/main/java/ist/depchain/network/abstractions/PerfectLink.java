@@ -105,6 +105,7 @@ public class PerfectLink implements Link {
 
             if (seq == expected) {
                 // this is the expected message, can be delivered immediately
+                // System.out.println("[PERFECT_LINK | INFO] - Received expected message with seq " + seq + " from " + senderId);
                 deliverToUpperLayer(senderId, envelope.getPayload().toByteArray());
                 nextExpected.put(senderId, seq + 1);
 
@@ -113,6 +114,7 @@ public class PerfectLink implements Link {
 
             } else if (seq > expected) {
                 // out-of-order message, buffer it until we can deliver it in order
+                // System.out.println("[PERFECT_LINK | INFO] - Received out-of-order message with seq " + seq + " from " + senderId + ", expected seq is " + expected + ". Buffering.");
                 pendingDeliveries.computeIfAbsent(senderId, k -> new ConcurrentHashMap<>())
                         .put(seq, envelope.getPayload().toByteArray());
 
@@ -129,7 +131,6 @@ public class PerfectLink implements Link {
     // ============================================================
 
     private void deliverToUpperLayer(String senderId, byte[] payload) {
-        System.out.println("Delivering payload: " + new String(payload));
         if (handler != null) {
             handler.onReceive(senderId, payload);
         }

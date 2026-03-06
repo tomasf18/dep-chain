@@ -6,6 +6,10 @@
     "processes": {
       "client1": {
         "host": "localhost",
+        "port": 4001
+      },
+      "s0": {
+        "host": "localhost",
         "port": 5000
       },
       "s1": {
@@ -19,18 +23,14 @@
       "s3": {
         "host": "localhost",
         "port": 5003
-      },
-      "s4": {
-        "host": "localhost",
-        "port": 5004
       }
     }
   },
   "faultConfig": {
-    "dropProbability": 0.02,
-    "duplicateProbability": 0.02,
-    "tamperProbability": 0.0,
-    "maxDelayMs": 200
+    "dropProbability": 0.05,
+    "duplicateProbability": 0.05,
+    "tamperProbability": 0.05,
+    "maxDelayMs": 100
   },
   "cryptoConfig": {
     "signatureAlgorithm": "SHA256withECDSA"

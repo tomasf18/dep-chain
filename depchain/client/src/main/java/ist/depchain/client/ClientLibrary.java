@@ -39,4 +39,30 @@ public class ClientLibrary {
         clientContext.getPendingRequests().put(reqId, 0); // initialize ack count
         clientContext.getPerfectLink().broadcast(destinations, payload);
     }
+
+    public void showLog() {
+        String commandType = "show_log";
+        int reqId = clientContext.getRequestId().incrementAndGet();
+
+        Command command = Command.newBuilder()
+                .setType(commandType)
+                .build();
+
+        ClientRequest clientRequest = ClientRequest.newBuilder()
+                                            .setClientId(clientContext.getConfig().getSelfId())
+                                            .setRequestId(reqId)
+                                            .setCommand(command)
+                                            .build();
+
+        ApplicationMessage appMsg = ApplicationMessage.newBuilder()
+                                        .setClientRequest(clientRequest)
+                                        .build();
+        
+        System.out.println("[SENT] Client " + clientContext.getConfig().getSelfId() + " | Request Id: " + reqId + " | Show log");
+
+        byte[] payload = appMsg.toByteArray();
+        Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
+        clientContext.getPendingRequests().put(reqId, 0); // initialize ack count
+        clientContext.getPerfectLink().broadcast(destinations, payload);
+    }
 }

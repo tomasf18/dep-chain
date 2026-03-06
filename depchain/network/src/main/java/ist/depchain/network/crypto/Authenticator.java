@@ -21,6 +21,8 @@ public class Authenticator implements MessageAuthenticator {
 
     private final KeyPair myKeyPair;
     private final Map<String, SecretKey> sessionKeys = new ConcurrentHashMap<>();
+    private final Object handshakesComplete = new Object(); // notification object for proposer loop in BHSCoordinator
+
 
     public Authenticator(Config config, Link fairLossLink) {
         this.config = config;
@@ -55,7 +57,7 @@ public class Authenticator implements MessageAuthenticator {
 
                 if (!pending.isEmpty()) {
                     try {
-                        Thread.sleep(2000); // retry every 2s for peers not yet up
+                        Thread.sleep(200); // retry every 200ms for peers not yet up
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         return;
@@ -63,11 +65,20 @@ public class Authenticator implements MessageAuthenticator {
                 }
             }
 
-            System.out.println("All handshakes complete.");
+            System.out.println("[AUTHENTICATOR | INFO] - All handshakes complete.");
+            synchronized (handshakesComplete) {
+                handshakesComplete.notifyAll();
+            }
         });
 
         thread.setDaemon(true);
         thread.start();
+    }
+
+    public void waitForHandshakesComplete() throws InterruptedException {
+        synchronized (handshakesComplete) {
+            handshakesComplete.wait();
+        }
     }
 
     @Override
@@ -107,6 +118,7 @@ public class Authenticator implements MessageAuthenticator {
 
         } catch (Exception e) {
             e.printStackTrace();
+            System.err.println("[AUTHENTICATOR | ERROR] - Failed to verify message authenticity from " + envelope.getSenderId());
             return null;
         }
     }
@@ -178,6 +190,7 @@ public class Authenticator implements MessageAuthenticator {
 
         } catch (Exception e) {
             e.printStackTrace();
+            System.err.println("[AUTHENTICATOR | ERROR] - Failed to process handshake from " + peerId);
         }
     }
 
