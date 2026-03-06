@@ -7,7 +7,7 @@ public class ClientApp {
     public static void main(String[] args) {
         if (args.length < 2) {
             System.out.println("Usage: mvn exec:java -Dexec.args=\"<configFile> <clientId>\"");
-            System.out.println("Example: mvn exec:java -Dexec.args=\"config.json client1\"");
+            System.out.println("Example: mvn exec:java -Dexec.args=\"config-dev.json client1\"");
             return;
         }
 

@@ -7,7 +7,7 @@ public class ServerApp {
     public static void main(String[] args) {
         if (args.length < 2) {
             System.out.println("Usage: mvn exec:java -Dexec.args='<configFile> <serverId>'");
-            System.out.println("Example: mvn exec:java -Dexec.args='../config.json s1'");
+            System.out.println("Example: mvn exec:java -Dexec.args='../config-dev.json s1'");
             return;
         }
 
