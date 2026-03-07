@@ -9,6 +9,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,22 +58,23 @@ public class MultipleRequestsTest {
         String[] requests = {"Request1", "Request2", "Request3", "Request4"};
         System.out.println("[TEST] - Client multiple requests:");
 
+        List<Integer> requestIds = new ArrayList<>();
         for (String request : requests) {
-            int currentId = clientContext.getRequestId().get() + 1;
+            requestIds.add(clientContext.getRequestId().get() + 1);
             clientLibrary.append(request);
-
-            // HotStuff protocol has lots of phases, we wait 10 seconds as messages could be lost and therefore delaying the overall performance/end of the protocol
-            TimeUnit.SECONDS.sleep(10);
-
-            System.out.println("[TEST] - Final Verification");
-
-            boolean isCommited = !clientContext.getPendingRequests().containsKey(currentId);
-            assertTrue(isCommited, "Request not commited");
-            System.out.println("[TEST] - Client received f+1 ACKs and request " + currentId + " has been commited");
-
-            clientLibrary.showLog();
-            TimeUnit.SECONDS.sleep(10);
         }
+        // HotStuff protocol has lots of phases, we wait 70 seconds as messages could be lost and therefore delaying the overall performance/end of the protocol
+        TimeUnit.SECONDS.sleep(70);
+
+        System.out.println("[TEST] - Final Verification");
+        for (Integer requestId : requestIds) {
+            boolean isCommited = !clientContext.getPendingRequests().containsKey(requestId);
+            assertTrue(isCommited, "Request " + requestId + " not commited");
+            System.out.println("[TEST] - Client received f+1 ACKs and request " + requestId + " has been commited");
+        }
+
+        clientLibrary.showLog();
+        TimeUnit.SECONDS.sleep(10);
     }
 
     private static void startReplica(String serverId){
