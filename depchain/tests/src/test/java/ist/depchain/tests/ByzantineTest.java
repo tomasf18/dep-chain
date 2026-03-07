@@ -106,7 +106,8 @@ public class ByzantineTest {
             try{
                 ServerApp.main(new String[]{CONFIG_FILE, serverId, isByzantine});
             }catch (Exception e){
-                System.out.println("[TEST] - Error starting replica " + serverId + " in ResilienceTest");
+                System.out.println("[TEST] - Error starting replica " + serverId + " in ByzantineTest");
+                e.printStackTrace();
             }
         });
         t.setDaemon(true);

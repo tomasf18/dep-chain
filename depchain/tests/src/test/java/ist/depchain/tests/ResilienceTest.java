@@ -91,6 +91,7 @@ public class ResilienceTest {
                 ServerApp.main(new String[]{CONFIG_FILE, serverId, "false"});
             }catch (Exception e){
                 System.out.println("[TEST] - Error starting replica " + serverId + " in ResilienceTest");
+                e.printStackTrace();
             }
         });
         t.setDaemon(true);

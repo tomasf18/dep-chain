@@ -89,6 +89,7 @@ public class HappyPathTest {
                 System.out.println("[TEST] - Replica " + serverId + " started");
             }catch (Exception e){
                 System.out.println("[TEST] - Error starting replica " + serverId + " in HappyPathTest");
+                e.printStackTrace();
             }
         });
         t.setDaemon(true);
