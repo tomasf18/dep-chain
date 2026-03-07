@@ -28,8 +28,7 @@ public class ServerContext {
         blockChain = new BlockChain();
         commandExecutor = new CommandExecutor(blockChain);
         BLSManager.init();
-        int threshold = config.getF() + 1;
-        this.blsThresholdSig = new BLSThresholdSig(config.getSelfKeysDirectory(), config.selfBlsIndex(), threshold);
+        this.blsThresholdSig = new BLSThresholdSig(config);
     }
 
     public void start() throws Exception {

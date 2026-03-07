@@ -74,7 +74,6 @@ public class BasicHotStuffCoordinator {
             } catch (Exception e) {
                 System.err.println("[COORDINATOR | ERROR] - Failed to send initial NEW_VIEW message to " + leader);
             }
-            
         }).start();
     }
 

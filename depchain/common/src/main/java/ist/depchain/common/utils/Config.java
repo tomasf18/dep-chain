@@ -31,6 +31,8 @@ public class Config {
     // cryptography configuration
     private String signatureAlgorithm;
     private String keysDirectory = "keystore"; // default directory for keys
+    private String BLSSecretShareFileName = "bls_secret_share.key";
+    private String BLSMasterPubFileName = "bls_master_pub.key";
 
     public Config(String selfId, int N, int f, Map<String, ProcessInfo> processes, int resendPeriodMillis,
                   double dropProbability, double duplicateProbability,
@@ -188,11 +190,19 @@ public class Config {
     }
 
     public String getSelfPrivateKeyPathString() {
-        return Path.of(keysDirectory, selfId, "private.pem").toString();
+        return Path.of(getSelfKeysDirectory(), "private.pem").toString();
     }
 
     public String getTrustedProcessKeyPathString(String processId) {
-        return Path.of(keysDirectory, selfId, "trusted", processId + ".pem").toString();
+        return Path.of(getSelfKeysDirectory(), "trusted", processId + ".pem").toString();
+    }
+
+    public String getBLSSecretSharePathString() {
+        return Path.of(getSelfKeysDirectory(), BLSSecretShareFileName).toString();
+    }
+
+    public String getBLSMasterPubPathString() {
+        return Path.of(getSelfKeysDirectory(), BLSMasterPubFileName).toString();
     }
 
     @Override

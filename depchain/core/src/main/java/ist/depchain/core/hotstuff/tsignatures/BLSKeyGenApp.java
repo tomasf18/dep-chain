@@ -1,13 +1,30 @@
 package ist.depchain.core.hotstuff.tsignatures;
 
-import com.herumi.bls.*;
-import java.nio.file.*;
+import ist.depchain.common.utils.Config;
 
+import com.herumi.bls.SecretKey;
+import com.herumi.bls.SecretKeyVec;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+/* 
+    NOTE: Only for key generation, not used at runtime (only run once). This is a standalone app to generate BLS keys for the replicas.
+    How to run: 
+    0) Go to pom and change 'org.apache.maven.plugins' and 'org.codehaus.mojo' main class from 'ist.depchain.core.ServerApp' to 'ist.depchain.core.hotstuff.tsignatures.BLSKeyGenApp' 
+    1) mvn clean compile (inside core/)
+    2) mvn exec:java -Dexec.args="path/to/config.json"
+    3) Change the main class back to 'ist.depchain.core.ServerApp' and run the server as normal. The generated keys will be in core/keystore/s0, s1, s2, s3 (one folder per replica).
+*/
 public class BLSKeyGenApp {
+
+    private static Config config;
+
     public static void main(String[] args) throws Exception {
+        config = Config.loadConfiguration(args[0], "raw"); // selfId doesn't matter for keygen, just need access to config for N and f
+
         BLSManager.init();
 
-        int n = 4, f = 1, threshold = f + 1; // k=2, n=4
+        int n = config.getN(), f = config.getF(), threshold = f + 1;
 
         // Generate master secret polynomial: k random coefficients
         SecretKeyVec msk = new SecretKeyVec();

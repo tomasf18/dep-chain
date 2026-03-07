@@ -4,25 +4,27 @@ import com.herumi.bls.*;
 import java.nio.file.*;
 import java.util.Collection;
 
+import ist.depchain.common.utils.Config;
+
 public class BLSThresholdSig {
 
     private final SecretKey secretShare;
     private final PublicKey masterPubKey;
-    private final int replicaIndex; // 1-based
-    private final int threshold;    // f+1
+    private final int replicaIndex; 
+    private final int threshold;
 
-    public BLSThresholdSig(String keystoreDir, int replicaIndex, int threshold) {
-        this.replicaIndex = replicaIndex;
-        this.threshold = threshold;
+    public BLSThresholdSig(Config config) {
+        this.replicaIndex = config.selfBlsIndex();
+        this.threshold = 2 * config.getF() + 1; // 2f+1 partial sigs needed for threshold sig
 
         try {
             this.secretShare = new SecretKey();
-            this.secretShare.deserialize(Files.readAllBytes(Path.of(keystoreDir, "bls_secret_share.key")));
+            this.secretShare.deserialize(Files.readAllBytes(Path.of(config.getBLSSecretSharePathString())));
 
             this.masterPubKey = new PublicKey();
-            this.masterPubKey.deserialize(Files.readAllBytes(Path.of(keystoreDir, "bls_master_pub.key")));
+            this.masterPubKey.deserialize(Files.readAllBytes(Path.of(config.getBLSMasterPubPathString())));
         } catch (Exception e) {
-            throw new RuntimeException("Failed to load BLS keys from " + keystoreDir, e);
+            throw new RuntimeException("Failed to load BLS keys from " + config.getSelfKeysDirectory(), e);
         }
 
         System.out.println("[BLS | INFO] - Loaded BLS keys for replica index " + replicaIndex);
@@ -51,8 +53,7 @@ public class BLSThresholdSig {
      */
     public byte[] combine(Collection<byte[]> encodedPartialSigs) {
         if (encodedPartialSigs.size() < threshold) {
-            throw new IllegalArgumentException(
-                "Need at least " + threshold + " partial sigs, got " + encodedPartialSigs.size());
+            throw new IllegalArgumentException("Need at least " + threshold + " partial sigs, got " + encodedPartialSigs.size());
         }
 
         SignatureVec sigVec = new SignatureVec();
