@@ -1,79 +1,199 @@
-# dep-chain
+# DepChain - Dependable Blockchain
 
-A fault-tolerant blockchain built on the HotStuff BFT consensus protocol.
+A permissioned blockchain system implementing the **BasicHotStuff** BFT consensus protocol with BLS12-381 threshold signatures, built on top of authenticated UDP communication links.
+
+---
+
+## Overview
+
+The system tolerates up to `f` Byzantine faults among `n = 3f+1` replicas. Clients submit append requests and wait for `f+1` committed responses. The consensus layer uses the four-phase BasicHotStuff protocol (PREPARE -> PRE-COMMIT -> COMMIT -> DECIDE) with threshold signatures for quorum certificates.
+
+---
 
 ## Requirements
 
-- Java 17+
-- Maven 3.8+
-- `tmux` (for the test script) — install with `sudo apt install tmux`
-
-## Running the servers
-
-### With the test script (recommended)
-
-From the `depchain/` directory:
-
-```bash
-# Launch all 4 servers (no recompile)
-./test.sh
-
-# Recompile first, then launch
-./test.sh -c
-```
-
-This opens a tmux session with a 2×2 grid — one pane per server (s1–s4). Each pane is interactive.
-
-**tmux quick reference:**
-- Switch panes: `Ctrl-b` then arrow keys
-- Detach (leave running): `Ctrl-b d`
-- Kill session: `Ctrl-b :kill-session`
-
-### Manually
-
-From the `depchain/` directory:
-
-```bash
-mvn exec:java -pl core -Dexec.mainClass="ist.depchain.core.ServerApp" -Dexec.args="config.json s1"
-```
-
-Replace `s1` with `s2`, `s3`, or `s4` for the other servers.
-
-## ServerApp interactive input
-
-Once a server is running it reads commands from stdin.
-
-| Input | Effect |
+| Dependency | Version |
 |---|---|
-| `s1 hello` | Sends `hello` to server `s1` |
-| `s2 some message` | Sends `some message` to server `s2` |
-| `anything hello` | Broadcasts `anything hello` to all servers |
-| `exit` | Shuts down this server |
+| Java (OpenJDK) | 21 |
+| Maven | 3.8+ |
 
-**Rule:** if the line starts with `s1`–`s4` (followed by a space), it is a unicast to that server and the message is everything after the space. Any other prefix triggers a broadcast of the whole line.
+---
+
+## Setup on a New Machine
+
+### 1. Install System Dependencies (install only those you don't have)
+
+**Fedora / RHEL:**
+```bash
+sudo dnf install -y java-21-openjdk-devel maven
+```
+
+**Ubuntu / Debian:**
+```bash
+sudo apt install -y openjdk-21-jdk maven
+```
+
+Set `JAVA_HOME` if not already set (Bash shell):
+```bash
+export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))
+```
+
+### 2. Clone the Repository
+
+```bash
+git clone https://github.com/tomasf18/dep-chain/tree/main
+cd depchain
+```
+
+### 3. Build the Project
+
+```bash
+cd ../depchain
+mvn clean install
+```
 
 ## Configuration
 
-Network topology, fault injection, and crypto settings live in `depchain/config.json`.
+Two config files are provided:
+
+| File | Purpose |
+|---|---|
+| `config-dev.json` | Zero fault injection, fast timeouts - use for development |
+| `config.json` | Realistic fault injection (10% drop/duplicate/tamper) - use for testing |
+
+### Config Structure
 
 ```json
 {
   "networkConfig": {
     "N": 4,
     "f": 1,
-    "resendPeriodMillis": 1000,
+    "resendPeriodMillis": 500,
     "processes": {
-      "s1": { "host": "localhost", "port": 5001 },
-      ...
+      "client1": { "host": "localhost", "port": 4001 },
+      "client2": { "host": "localhost", "port": 4002 },
+      "s0":      { "host": "localhost", "port": 5000 },
+      "s1":      { "host": "localhost", "port": 5001 },
+      "s2":      { "host": "localhost", "port": 5002 },
+      "s3":      { "host": "localhost", "port": 5003 }
     }
   },
   "faultConfig": {
     "dropProbability": 0.0,
     "duplicateProbability": 0.0,
     "tamperProbability": 0.0,
-    "maxDelayMs": 200
+    "maxDelayMs": 0
+  },
+  "cryptoConfig": {
+    "signatureAlgorithm": "SHA256withECDSA"
   }
 }
 ```
 
-Increase `dropProbability` / `tamperProbability` to stress-test the authenticated perfect link.
+---
+
+## Running
+
+Open 5 terminals. All commands run from `depchain/core/`.
+
+**Terminal 1–4 - Servers:**
+
+```fish
+mvn exec:java -Dexec.args='../config-dev.json s0'
+mvn exec:java -Dexec.args='../config-dev.json s1'
+mvn exec:java -Dexec.args='../config-dev.json s2'
+mvn exec:java -Dexec.args='../config-dev.json s3'
+```
+
+**Terminal 5 (and 6 optionally) - Clients** (from `depchain/client/`):
+
+```fish
+mvn exec:java -Dexec.args='../config-dev.json client1'
+mvn exec:java -Dexec.args='../config-dev.json client2'
+```
+
+### Expected Server Startup
+
+```
+[BLS | INFO] - BLS12-381 initialized
+[BLS | INFO] - Loaded BLS keys for replica index 1
+[SERVER_APP | INFO] Successfully started
+[AUTHENTICATOR | INFO] - All handshakes complete.
+```
+
+### Client Menu
+
+```
+=== [client1] Select an action ===
+  1: Append to log
+  2: View log
+  exit
+```
+
+---
+
+## Protocol Summary
+
+### BasicHotStuff Phases
+
+```
+Leader                          Replicas
+  │                                │
+  │── PREPARE(block, highQC) ────▶│  replicas check safeNode, vote PREPARE
+  │◀─ PREPARE votes ──────────────│
+  │── PRE-COMMIT(prepareQC) ────▶ │  replicas update prepareQC, vote PRE-COMMIT
+  │◀─ PRE-COMMIT votes ───────────│
+  │── COMMIT(preCommitQC) ──────▶ │  replicas lock on lockedQC, vote COMMIT
+  │◀─ COMMIT votes ───────────────│
+  │── DECIDE(commitQC) ─────────▶ │  all replicas execute, respond to client
+```
+
+A quorum certificate (QC) requires `n - f = 3` votes out of 4 replicas.
+
+### View Change
+
+If no progress within `INITIAL_TIMEOUT_MS` (10s), all replicas advance to the next view and send `NEW_VIEW` to the next leader. Timeouts use **exponential backoff** (doubling after 2 consecutive failures, capped at 60s) to converge replica timers under asynchrony.
+
+### Threshold Signatures (BLS12-381)
+
+- Keys are generated offline via Shamir secret sharing over the BLS12-381 curve.
+- Each replica holds a private share; all replicas share the same master public key.
+- Voting: each replica independently produces a **partial signature** (no coordination).
+- QC creation: leader combines any `f+1` partial signatures via Lagrange interpolation.
+- QC verification: any replica verifies the combined signature against the master public key.
+
+---
+
+## Project Structure
+
+```
+depchain/
+├── client/          - client application
+├── common/          - shared protobuf definitions, Config, ProcessInfo
+├── core/            - server application
+│   ├── keystore/    - BLS key shares (generated, not committed)
+│   │   ├── s0/
+│   │   ├── s1/
+│   │   ├── s2/
+│   │   └── s3/
+│   └── src/main/java/ist/depchain/core/
+│       ├── hotstuff/
+│       │   ├── BasicHotStuffCoordinator.java
+│       │   ├── BasicHotStuffUtils.java
+│       │   ├── BasicHotStuffTree.java
+│       │   ├── CommandMempool.java
+│       │   └── tsignatures/
+│       │       ├── BLSManager.java
+│       │       ├── BLSThresholdSig.java
+│       │       └── BLSKeyGenApp.java
+│       ├── BlockChain.java
+│       ├── MessageHandler.java
+│       ├── ServerApp.java
+│       └── ServerContext.java
+├── native/
+│   └── linux-x86_64/
+│       └── libblsjava.so   - built per-machine, not committed
+├── network/         - UDP link stack (FairLoss -> Stubborn -> Perfect -> Authenticated)
+├── config-dev.json  - zero faults, for development
+└── config.json      - realistic faults, for testing
+```
