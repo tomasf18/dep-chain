@@ -45,19 +45,13 @@
         <version>1.0.0</version>
     </dependency>
 
-      <dependency>
-          <groupId>com.weavechain</groupId>
-          <artifactId>threshold-sig</artifactId>
-          <version>1.2</version>
-      </dependency>
-
-      <dependency>
-          <groupId>com.weavechain</groupId>
-          <artifactId>curve25519-elisabeth</artifactId>
-          <version>0.1.5</version>
-      </dependency>
-
     <!-- External dependencies -->
+    <dependency>
+      <groupId>net.java.dev.jna</groupId>
+      <artifactId>jna</artifactId>
+      <version>5.18.1</version>
+      <scope>compile</scope>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
@@ -129,12 +123,15 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
-        <version>3.6.3</version>
-        <configuration>
-          <mainClass>ist.depchain.core.ServerApp</mainClass>
-        </configuration>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>exec-maven-plugin</artifactId>
+          <version>3.6.3</version> 
+          <configuration>
+              <mainClass>ist.depchain.core.ServerApp</mainClass>
+              <environmentVariables>
+                  <LD_LIBRARY_PATH>${project.basedir}/../native/linux-x86_64</LD_LIBRARY_PATH>
+              </environmentVariables>
+          </configuration>
       </plugin>
     </plugins>
   </build>

@@ -3,20 +3,25 @@ package ist.depchain.core.hotstuff;
 import com.google.protobuf.ByteString;
 import ist.depchain.common.HotStuffMessage;
 import ist.depchain.common.HotStuffMessage.Type;
+import ist.depchain.core.hotstuff.tsignatures.BLSThresholdSig;
 import ist.depchain.common.Block;
 import ist.depchain.common.QC;
 import ist.depchain.common.Command;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class BasicHotStuffUtils {
 
     private final BasicHotStuffTree tree;
+    private final BLSThresholdSig blsThresholdSig;
 
-    public BasicHotStuffUtils(BasicHotStuffTree tree) {
+    public BasicHotStuffUtils(BasicHotStuffTree tree, BLSThresholdSig blsThresholdSig) {
         this.tree = tree;
+        this.blsThresholdSig = blsThresholdSig;
     }
 
     public QC getGenesisQC() {
@@ -43,15 +48,18 @@ public class BasicHotStuffUtils {
     }
 
     // [Line 7-10] - Create Vote Message
-    public HotStuffMessage voteMsg(Type type, Block node, QC justify, int viewNumber) {
-        HotStuffMessage m = msg(type, node, justify, viewNumber);
-        // TODO - Replace with real crypto later -> tsignr(<m.type, m.viewNumber, m.node>)
-        byte[] partialSign = getMsgDigest(type, viewNumber, node.getId());
+    public HotStuffMessage voteMsg(HotStuffMessage.Type type, Block node, QC justify, int viewNumber) {
+        ByteString blockId = (node != null) ? node.getId() : ByteString.EMPTY;
+        byte[] digest = getMsgDigest(type, viewNumber, blockId);
+        byte[] partialSig = blsThresholdSig.partialSign(digest); // partial signature
 
-        // [Line 9-10] - m.partialSig <- tsignr(<m.type, m.viewNumber, m.node>)
-        return m.toBuilder()
-                .setPartialSig(ByteString.copyFrom(partialSign))
-                .build();
+        HotStuffMessage.Builder builder = HotStuffMessage.newBuilder()
+            .setType(type)
+            .setViewNumber(viewNumber)
+            .setPartialSig(ByteString.copyFrom(partialSig));
+        if (node != null)    builder.setBlock(node);
+        if (justify != null) builder.setJustify(justify);
+        return builder.build();
     }
 
     /* Tree & QC */
@@ -67,26 +75,32 @@ public class BasicHotStuffUtils {
     }
 
     // [Line 15-20] - Create QC
-    public QC createQC(Collection<HotStuffMessage> v) {
-        if (v.isEmpty()) {
-            return null;
-        }
-        HotStuffMessage msg = v.iterator().next();
-        byte[] combinedSig = new byte[0]; // TODO - Replace with real crypto later -> tcombine({m.partialSig | m in v})
+    public QC createQC(Collection<HotStuffMessage> votes) {
+        HotStuffMessage first = votes.iterator().next();
+        ByteString blockId = first.getBlock().getId();
+
+        List<byte[]> partialSigs = votes.stream()
+            .map(v -> v.getPartialSig().toByteArray())
+            .collect(Collectors.toList());
+
+        byte[] thresholdSig = blsThresholdSig.combine(partialSigs); // threshold combination
 
         return QC.newBuilder()
-                .setType(msg.getType())
-                .setViewNumber(msg.getViewNumber())
-                .setBlockId(msg.getBlock().getId())
-                .setThresholdSig(ByteString.copyFrom(combinedSig))
-                .build();
+            .setType(first.getType())
+            .setViewNumber(first.getViewNumber())
+            .setBlockId(blockId)
+            .setThresholdSig(ByteString.copyFrom(thresholdSig))
+            .build();
     }
 
     /* Matching and Safety Functions */
 
     public boolean verifyQC(QC qc) {
-        // TODO - Replace with real crypto later -> tverify(qc.thresholdSig, <qc.type, qc.viewNumber, qc.blockId>)
-        return true;
+        if (qc == null || qc.equals(QC.getDefaultInstance())) return true; // genesis QC always valid
+        if (qc.getThresholdSig().isEmpty()) return true; // stub QC during transition
+
+        byte[] digest = getMsgDigest(qc.getType(), qc.getViewNumber(), qc.getBlockId());
+        return blsThresholdSig.verify(digest, qc.getThresholdSig().toByteArray()); // ← real verification
     }
 
     // [Line 21-22] - Verify if Message is the same

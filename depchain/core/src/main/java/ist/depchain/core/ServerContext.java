@@ -1,6 +1,8 @@
 package ist.depchain.core;
 
 import ist.depchain.common.utils.Config;
+import ist.depchain.core.hotstuff.tsignatures.BLSManager;
+import ist.depchain.core.hotstuff.tsignatures.BLSThresholdSig;
 import ist.depchain.network.abstractions.AuthenticatedPerfectLink;
 import ist.depchain.network.abstractions.StubbornLink;
 import ist.depchain.network.abstractions.UdpFairLossLink;
@@ -16,6 +18,8 @@ public class ServerContext {
     private BlockChain blockChain;
     private CommandExecutor commandExecutor;
 
+    private final BLSThresholdSig blsThresholdSig;
+
     public ServerContext(Config config) {
         this.config = config;
         fairLossLink = new UdpFairLossLink(config);
@@ -23,6 +27,8 @@ public class ServerContext {
         perfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config, fairLossLink));
         blockChain = new BlockChain();
         commandExecutor = new CommandExecutor(blockChain);
+        BLSManager.init();
+        this.blsThresholdSig = new BLSThresholdSig(config);
     }
 
     public void start() throws Exception {
@@ -48,5 +54,9 @@ public class ServerContext {
 
     public CommandExecutor getCommandExecutor() {
         return commandExecutor;
+    }
+
+    public BLSThresholdSig getBlsThresholdSig() {
+        return blsThresholdSig;
     }
 }

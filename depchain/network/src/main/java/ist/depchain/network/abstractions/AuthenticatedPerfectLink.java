@@ -11,7 +11,6 @@ import ist.depchain.network.interfaces.SendHandle;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
