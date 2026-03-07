@@ -47,7 +47,7 @@ public class BasicHotStuffCoordinator {
 
     public BasicHotStuffCoordinator(ServerContext serverContext) {
         this.serverContext = serverContext;
-        this.utils = new BasicHotStuffUtils(this.tree);
+        this.utils = new BasicHotStuffUtils(this.tree, serverContext.getBlsThresholdSig());
         this.n = serverContext.getConfig().getN();
         this.f = serverContext.getConfig().getF();
         this.hotStuffQuorum = (n - f);
@@ -102,7 +102,6 @@ public class BasicHotStuffCoordinator {
     }
 
     public synchronized void processMessage(String sourceId, HotStuffMessage m) {
-        // Basic Validation - Is this a message for the current view
         System.out.println("[COORDINATOR | INFO] - Received message of type " + m.getType() + " from " + sourceId + " for view " + m.getViewNumber());
         
         // only restart the timer for messages that represent progress in the current view, future-view messages are buffered but should noti delay our own timeout
@@ -202,8 +201,10 @@ public class BasicHotStuffCoordinator {
         Map<String, HotStuffMessage> msgs = newViewMsgs.get(oldView);
 
         QC highQC = utils.getGenesisQC();
-        for (HotStuffMessage m : msgs.values()) { 
+        for (Map.Entry<String, HotStuffMessage> entry : msgs.entrySet()) {
+            HotStuffMessage m = entry.getValue();
             if (!utils.verifyQC(m.getJustify())) continue;
+            System.out.println("[COORDINATOR | LEADER] - Considering NEW_VIEW message with valid justify QC from " + entry.getKey() + " with justify QC view number " + m.getJustify().getViewNumber());
             if (m.getJustify().getViewNumber() > highQC.getViewNumber()) {
                 highQC = m.getJustify();
             }
@@ -298,7 +299,6 @@ public class BasicHotStuffCoordinator {
 
     /** PREPARE phase as Replica **/
     public void onReceivePrepare(String sourceId, HotStuffMessage m) {
-        System.out.println("[COORDINATOR | REPLICA] - Receivsssssssssssssed PREPARE from " + sourceId + " for view " + m.getViewNumber());
         if (!utils.matchingMSG(m, HotStuffMessage.Type.PREPARE, currentView.get()) || !getLeaderForView(currentView.get()).equals(sourceId))
             return;
 
@@ -310,6 +310,8 @@ public class BasicHotStuffCoordinator {
         if (!utils.verifyQC(justify)) {
             System.out.println("[COORDINATOR | REPLICA] - Received PREPARE with invalid QC from " + sourceId);
             return;
+        } else {
+            System.out.println("[COORDINATOR | REPLICA] - Received PREPARE with valid QC from " + sourceId + ", justify QC view number: " + justify.getViewNumber());
         }
 
         boolean extendsJustify = utils.extendsFrom(node, justify.getBlockId());
@@ -337,6 +339,8 @@ public class BasicHotStuffCoordinator {
         if (!utils.verifyQC(newPrepareQC)) {
             System.out.println("[COORDINATOR | REPLICA] - Received PRE-COMMIT with invalid QC from " + sourceId);
             return;
+        } else {
+            System.out.println("[COORDINATOR | REPLICA] - Received PRE-COMMIT with valid QC from " + sourceId + ", QC view number: " + newPrepareQC.getViewNumber());
         }
         this.prepareQC = newPrepareQC; 
         
@@ -356,6 +360,8 @@ public class BasicHotStuffCoordinator {
         if (!utils.verifyQC(newLockedQC)) {
             System.out.println("[COORDINATOR | REPLICA] - Received COMMIT with invalid QC from " + sourceId);
             return;
+        } else {
+            System.out.println("[COORDINATOR | REPLICA] - Received COMMIT with valid QC from " + sourceId + ", QC view number: " + newLockedQC.getViewNumber());
         }
         this.lockedQC = newLockedQC; 
 
@@ -376,6 +382,8 @@ public class BasicHotStuffCoordinator {
         if (!utils.verifyQC(m.getJustify())) {
             System.out.println("[COORDINATOR | REPLICA] - Received DECIDE with invalid QC from " + sourceId);
             return;
+        } else {
+            System.out.println("[COORDINATOR | REPLICA] - Received DECIDE with valid QC from " + sourceId + ", QC view number: " + m.getJustify().getViewNumber());
         }
 
         Block commitedBlock = tree.getBlock(m.getJustify().getBlockId());

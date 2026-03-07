@@ -100,6 +100,11 @@ public class Config {
         return selfId;
     }
 
+    // replica ids are 0-indexed strings like "s0", BLS ids are 1-indexed integers, so we add 1 here to convert
+    public int selfBlsIndex() {
+        return Integer.parseInt(selfId.replace("s", "")) + 1;
+    }
+
     public int getN() {
         return N;
     }
