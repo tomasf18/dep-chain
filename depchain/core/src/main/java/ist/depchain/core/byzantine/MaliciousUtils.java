@@ -5,11 +5,12 @@ import ist.depchain.common.HotStuffMessage;
 import ist.depchain.common.QC;
 import ist.depchain.core.hotstuff.BasicHotStuffTree;
 import ist.depchain.core.hotstuff.BasicHotStuffUtils;
+import ist.depchain.core.hotstuff.tsignatures.BLSThresholdSig;
 
 public class MaliciousUtils extends BasicHotStuffUtils {
 
-    public MaliciousUtils(BasicHotStuffTree tree) {
-        super(tree);
+    public MaliciousUtils(BasicHotStuffTree tree, BLSThresholdSig blsThresholdSig) {
+        super(tree, blsThresholdSig);
     }
 
     @Override

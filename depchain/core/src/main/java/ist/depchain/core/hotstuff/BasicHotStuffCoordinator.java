@@ -10,6 +10,7 @@ import ist.depchain.common.Command;
 import ist.depchain.common.HotStuffMessage;
 import ist.depchain.common.QC;
 import ist.depchain.core.ServerContext;
+import ist.depchain.core.byzantine.MaliciousUtils;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,9 +46,9 @@ public class BasicHotStuffCoordinator {
 
     private boolean quorumReady = false; 
 
-    public BasicHotStuffCoordinator(ServerContext serverContext) {
+    public BasicHotStuffCoordinator(ServerContext serverContext, boolean isByzantine) {
         this.serverContext = serverContext;
-        this.utils = new BasicHotStuffUtils(this.tree, serverContext.getBlsThresholdSig());
+        this.utils = !isByzantine? new BasicHotStuffUtils(this.tree, serverContext.getBlsThresholdSig()): new MaliciousUtils(this.tree, serverContext.getBlsThresholdSig());
         this.n = serverContext.getConfig().getN();
         this.f = serverContext.getConfig().getF();
         this.hotStuffQuorum = (n - f);

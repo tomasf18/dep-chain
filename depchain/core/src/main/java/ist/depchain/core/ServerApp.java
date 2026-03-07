@@ -23,7 +23,7 @@ public class ServerApp {
         ServerContext server = new ServerContext(config);
         BasicHotStuffCoordinator hotStuffCoordinator;
         if (byzantineFlag) { hotStuffCoordinator = new ByzantineCoordinator(server);}
-        else {hotStuffCoordinator = new BasicHotStuffCoordinator(server, false);}
+        else {hotStuffCoordinator = new BasicHotStuffCoordinator(server, byzantineFlag);}
         new MessageHandler(server, hotStuffCoordinator);
         try {
             server.start();
