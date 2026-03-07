@@ -27,11 +27,12 @@ public class ResilienceTest {
 
     @BeforeEach
     public void setup() {
-        System.out.println("[TEST] - Starting ResilianceTest (f=1 Failure)");
+        System.out.println("[TEST] - Starting ResilienceTest (f=1 Failure)");
         String[] replicas = {"s0", "s1", "s2"};
 
         System.out.println("[TEST] - Starting Replicas");
         for (String replica : replicas) {startReplica(replica);}
+
         System.out.println("[TEST] - Replica s3 is offline (Simulating Crash)");
 
         System.out.println("[TEST] - Waiting for Replicas Handshake");
@@ -87,10 +88,9 @@ public class ResilienceTest {
     private static void startReplica(String serverId){
         Thread t = new Thread(() -> {
             try{
-                ServerApp.main(new String[]{CONFIG_FILE, serverId});
-                System.out.println("[TEST] - Replica " + serverId + " started");
+                ServerApp.main(new String[]{CONFIG_FILE, serverId, "false"});
             }catch (Exception e){
-                System.out.println("[TEST] - Error starting replica " + serverId + " in ResilianceTest");
+                System.out.println("[TEST] - Error starting replica " + serverId + " in ResilienceTest");
             }
         });
         t.setDaemon(true);

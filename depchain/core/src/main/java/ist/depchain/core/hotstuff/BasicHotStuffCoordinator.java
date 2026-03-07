@@ -10,6 +10,7 @@ import ist.depchain.common.Command;
 import ist.depchain.common.HotStuffMessage;
 import ist.depchain.common.QC;
 import ist.depchain.core.ServerContext;
+import ist.depchain.core.byzantine.MaliciousUtils;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,7 +37,7 @@ public class BasicHotStuffCoordinator {
 
     private final ScheduledExecutorService timerExecutor = Executors.newSingleThreadScheduledExecutor();
     private ScheduledFuture<?> viewTimerFuture;
-    private static final long INITIAL_TIMEOUT_MS = 10000; // 10 seconds
+    private static final long INITIAL_TIMEOUT_MS = 15000; // 10 seconds
     private static final long MAX_TIMEOUT_MS = 60000;
     private long currentTimeoutMs = INITIAL_TIMEOUT_MS;
     private int consecutiveTimeouts = 0;
@@ -45,9 +46,9 @@ public class BasicHotStuffCoordinator {
 
     private boolean quorumReady = false; 
 
-    public BasicHotStuffCoordinator(ServerContext serverContext) {
+    public BasicHotStuffCoordinator(ServerContext serverContext, boolean isByzantine) {
         this.serverContext = serverContext;
-        this.utils = new BasicHotStuffUtils(this.tree);
+        this.utils = !isByzantine? new BasicHotStuffUtils(this.tree) : new MaliciousUtils(this.tree);
         this.n = serverContext.getConfig().getN();
         this.f = serverContext.getConfig().getF();
         this.hotStuffQuorum = (n - f);
@@ -298,7 +299,7 @@ public class BasicHotStuffCoordinator {
 
     /** PREPARE phase as Replica **/
     public void onReceivePrepare(String sourceId, HotStuffMessage m) {
-        System.out.println("[COORDINATOR | REPLICA] - Receivsssssssssssssed PREPARE from " + sourceId + " for view " + m.getViewNumber());
+        System.out.println("[COORDINATOR | REPLICA] - Received PREPARE from " + sourceId + " for view " + m.getViewNumber());
         if (!utils.matchingMSG(m, HotStuffMessage.Type.PREPARE, currentView.get()) || !getLeaderForView(currentView.get()).equals(sourceId))
             return;
 
