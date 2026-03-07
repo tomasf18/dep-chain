@@ -1,0 +1,99 @@
+package ist.depchain.tests;
+import ist.depchain.client.ClientContext;
+import ist.depchain.client.ClientLibrary;
+import ist.depchain.common.utils.Config;
+import ist.depchain.core.ServerApp;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * Happy Path test assumes:
+ *  All replicas connected are honest
+ *  Even though we could have losses in messages, the network is reliable enough for the protocol to end
+ *  No deliberate Byzantine attacks
+ *  One replica "s3" crashed
+ * This test is purely made to validate the base functionality of the protocol, according to Liveness (the system progresses) and safety (everyone agrees with the log).
+ */
+public class ResilienceTest {
+    private static final String CONFIG_FILE = "../config-test.json";
+    private ClientContext clientContext;
+    private ClientLibrary clientLibrary;
+
+    @BeforeEach
+    public void setup() {
+        System.out.println("[TEST] - Starting ResilianceTest (f=1 Failure)");
+        String[] replicas = {"s0", "s1", "s2"};
+
+        System.out.println("[TEST] - Starting Replicas");
+        for (String replica : replicas) {startReplica(replica);}
+        System.out.println("[TEST] - Replica s3 is offline (Simulating Crash)");
+
+        System.out.println("[TEST] - Waiting for Replicas Handshake");
+        try {
+            // 5 seconds waiting necessary for the Handshake to be made as the method handshakeAll() runs on a separate thread
+            TimeUnit.SECONDS.sleep(5);
+        }catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("[TEST] - Starting Client");
+        Config clientConfig = Config.loadConfiguration(CONFIG_FILE, "client1");
+        clientContext = new ClientContext(clientConfig);
+        clientLibrary = new ClientLibrary(clientContext);
+        clientContext.start();
+    }
+
+    @AfterEach
+    public void teardown() {
+        System.out.println("[TEST] - Ending ResilianceTest");
+        if (clientContext != null) {
+            clientContext.stop();
+        }
+        // Replicas Threads are DAEMON therefore they terminate automatically after the TEST ends
+    }
+
+    @Test
+    @DisplayName("Verify that a request is commited by the quorum in an ideal condition")
+    void testResilience() {
+        String request = "Testing project for ResilianceTest";
+        System.out.println("[TEST] - Client sending request: " + request);
+
+        int currentId = clientContext.getRequestId().get() + 1;
+        clientLibrary.append(request);
+
+        try{
+            // HotStuff protocol has lots of phases, we wait 10 seconds as messages could be lost and therefore delaying the overall performance/end of the protocol
+            TimeUnit.SECONDS.sleep(10);
+        }catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("[TEST] - Final Verification");
+
+        boolean isCommited = !clientContext.getPendingRequests().containsKey(currentId);
+        assertTrue(isCommited, "Request not commited");
+        System.out.println("[TEST] - Client received f+1 ACKs and request " + currentId + " has been commited");
+
+        clientLibrary.showLog();
+        try{TimeUnit.SECONDS.sleep(10);}catch(Exception e) {e.printStackTrace();}
+    }
+
+    private static void startReplica(String serverId){
+        Thread t = new Thread(() -> {
+            try{
+                ServerApp.main(new String[]{CONFIG_FILE, serverId});
+                System.out.println("[TEST] - Replica " + serverId + " started");
+            }catch (Exception e){
+                System.out.println("[TEST] - Error starting replica " + serverId + " in ResilianceTest");
+            }
+        });
+        t.setDaemon(true);
+        t.start();
+    }
+}

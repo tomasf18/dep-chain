@@ -44,6 +44,21 @@
       <artifactId>junit-jupiter-params</artifactId>
       <scope>test</scope>
     </dependency>
+      <dependency>
+          <groupId>ist.depchain.core</groupId>
+          <artifactId>core</artifactId>
+          <version>1.0.0</version>
+      </dependency>
+      <dependency>
+          <groupId>ist.depchain.common</groupId>
+          <artifactId>common</artifactId>
+          <version>1.0.0</version>
+      </dependency>
+      <dependency>
+          <groupId>ist.depchain.client</groupId>
+          <artifactId>client</artifactId>
+          <version>1.0.0</version>
+      </dependency>
   </dependencies>
 
   <build>
