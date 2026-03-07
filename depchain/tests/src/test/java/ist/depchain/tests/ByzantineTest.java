@@ -70,7 +70,7 @@ public class ByzantineTest {
     }
 
     @Test
-    @DisplayName("Verify that honest replicas will timeout and request a NEW_VIEW, rotating the byzantine leader")
+    @DisplayName("Verify that honest replicas will timeout and request a NEW_VIEW, rotating the byzantine leader and eventually handle the pending request")
     public void testByzantineLeader() throws Exception {
         System.out.println("[TEST] - Byzantine Replica");
 
@@ -82,7 +82,7 @@ public class ByzantineTest {
 
         System.out.println("[TEST] - Waiting for Replicas Handshake");
         // 5 seconds waiting necessary for the Handshake to be made as the method handshakeAll() runs on a separate thread
-        TimeUnit.SECONDS.sleep(20);
+        TimeUnit.SECONDS.sleep(8);
 
         String request = "Testing project for Byzantine Leader Test";
         System.out.println("[TEST] - Client sending request: " + request);
@@ -90,7 +90,7 @@ public class ByzantineTest {
         int currentId = clientContext.getRequestId().get() + 1;
         clientLibrary.append(request);
         // HotStuff protocol has lots of phases, we wait 10 seconds as messages could be lost and therefore delaying the overall performance/end of the protocol
-        TimeUnit.SECONDS.sleep(20);
+        TimeUnit.SECONDS.sleep(35);
 
         System.out.println("[TEST] - Final Verification");
         boolean isCommited = !clientContext.getPendingRequests().containsKey(currentId);
@@ -98,7 +98,7 @@ public class ByzantineTest {
         System.out.println("[TEST] - Client received f+1 ACKs and request " + currentId + " has been commited");
 
         clientLibrary.showLog();
-        TimeUnit.SECONDS.sleep(20);
+        TimeUnit.SECONDS.sleep(10);
     }
 
     private static void startReplica(String serverId, String isByzantine){
