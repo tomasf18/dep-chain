@@ -49,6 +49,9 @@ public class AuthenticatedPerfectLink implements Link {
     @Override
     public SendHandle send(String destinationId, byte[] payload) {
         if (authenticator.shouldAuthenticate(destinationId)) {
+            if (!authenticator.hasSession(destinationId)) {
+                return null; // no session yet
+            }
             long seq = perfectLink.getOutgoingMessagesSeqNumbers().computeIfAbsent(destinationId, k -> new AtomicLong(0)).incrementAndGet();
             byte[] signed = authenticator.authenticatePayload(destinationId, seq, payload);
             return perfectLink.sendWithSeqNumber(destinationId, signed, seq);
@@ -60,6 +63,9 @@ public class AuthenticatedPerfectLink implements Link {
     public Map<String, SendHandle> broadcast(Set<String> destinationIds, byte[] payload) {
         Map<String, SendHandle> handles = new HashMap<>();
         for (String dest : destinationIds) {
+            if (authenticator.shouldAuthenticate(dest) && !authenticator.hasSession(dest)) {
+                continue;
+            }
             SendHandle handle = send(dest, payload);
             handles.put(dest, handle);
         }

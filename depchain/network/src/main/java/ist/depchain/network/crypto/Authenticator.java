@@ -22,6 +22,7 @@ public class Authenticator implements MessageAuthenticator {
     private final KeyPair myKeyPair;
     private final Map<String, SecretKey> sessionKeys = new ConcurrentHashMap<>();
     private final Object handshakesComplete = new Object(); // notification object for proposer loop in BHSCoordinator
+    private volatile boolean handshakesReady = false;
 
 
     public Authenticator(Config config, Link fairLossLink) {
@@ -39,6 +40,7 @@ public class Authenticator implements MessageAuthenticator {
     }
 
     private void handshakeAll() {
+        int quorum = config.getN() - config.getF(); // 2F+1: min peers needed to proceed
         Set<String> targets = new HashSet<>(config.getBlockChainServers().keySet());
 
         Thread thread = new Thread(() -> {
@@ -55,6 +57,15 @@ public class Authenticator implements MessageAuthenticator {
                     }
                 }
 
+                // Signal ready once we have enough session keys to tolerate F crashes
+                if (!handshakesReady && sessionKeys.size() >= quorum) {
+                    System.out.println("[AUTHENTICATOR | INFO] - Handshakes complete with " + sessionKeys.size() + "/" + targets.size() + " peers (quorum=" + quorum + ").");
+                    handshakesReady = true;
+                    synchronized (handshakesComplete) {
+                        handshakesComplete.notifyAll();
+                    }
+                }
+
                 if (!pending.isEmpty()) {
                     try {
                         Thread.sleep(200); // retry every 200ms for peers not yet up
@@ -64,10 +75,13 @@ public class Authenticator implements MessageAuthenticator {
                     }
                 }
             }
-
             System.out.println("[AUTHENTICATOR | INFO] - All handshakes complete.");
-            synchronized (handshakesComplete) {
-                handshakesComplete.notifyAll();
+
+            if (!handshakesReady) {
+                handshakesReady = true;
+                synchronized (handshakesComplete) {
+                    handshakesComplete.notifyAll();
+                }
             }
         });
 
@@ -77,13 +91,19 @@ public class Authenticator implements MessageAuthenticator {
 
     public void waitForHandshakesComplete() throws InterruptedException {
         synchronized (handshakesComplete) {
-            handshakesComplete.wait();
+            while (!handshakesReady) {
+                handshakesComplete.wait();
+            }
         }
     }
 
     @Override
     public boolean shouldAuthenticate(String peerId) {
         return config.getBlockChainServers().containsKey(peerId);
+    }
+
+    public boolean hasSession(String peerId) {
+        return sessionKeys.containsKey(peerId);
     }
 
     /**

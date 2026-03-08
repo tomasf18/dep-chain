@@ -94,22 +94,60 @@ Two config files are provided:
 
 ## Running
 
-Open 5 terminals. All commands run from `depchain/core/`.
+### Using `test.sh` (recommended)
 
-**Terminal 1–4 - Servers:**
+`test.sh` launches all servers and clients in a single `tmux` session. Run it from the `depchain/` directory:
 
-```fish
+```bash
+./test.sh [options]
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `-f F` | Number of tolerated faults; starts `3F+1` servers | `1` |
+| `-n N` | Number of clients to start | `1` |
+| `-t` | Use `config-test.json` (fault injection enabled) | uses `config-dev.json` |
+| `-c` | Recompile before starting | off |
+
+**Examples:**
+
+```bash
+./test.sh                  # 4 servers, 1 client, dev config
+./test.sh -c               # same but recompile first
+./test.sh -f 2 -n 3        # 7 servers, 3 clients, dev config
+./test.sh -t               # 4 servers, 1 client, test config (fault injection)
+./test.sh -f 2 -n 2 -t -c  # 7 servers, 2 clients, test config, recompile
+```
+
+**tmux navigation:**
+
+| Keys | Action |
+|---|---|
+| `Ctrl+b 0` | Switch to servers window |
+| `Ctrl+b 1` | Switch to clients window |
+| `Ctrl+b arrow` | Move between panes |
+
+Servers are named `s0`…`s(3F)` and clients `client1`…`clientN`. Clients wait 2 seconds after launch to give servers time to initialize.
+
+---
+
+### Manual (without tmux)
+
+All server commands run from `depchain/core/`, client commands from `depchain/client/`.
+
+**Servers:**
+
+```bash
 mvn exec:java -Dexec.args='../config-dev.json s0'
 mvn exec:java -Dexec.args='../config-dev.json s1'
 mvn exec:java -Dexec.args='../config-dev.json s2'
 mvn exec:java -Dexec.args='../config-dev.json s3'
 ```
 
-**Terminal 5 (and 6 optionally) - Clients** (from `depchain/client/`):
+**Clients:**
 
-```fish
+```bash
 mvn exec:java -Dexec.args='../config-dev.json client1'
-mvn exec:java -Dexec.args='../config-dev.json client2'
 ```
 
 ### Expected Server Startup
