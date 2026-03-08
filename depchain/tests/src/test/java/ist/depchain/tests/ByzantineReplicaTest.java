@@ -1,4 +1,5 @@
 package ist.depchain.tests;
+
 import ist.depchain.client.ClientContext;
 import ist.depchain.client.ClientLibrary;
 import ist.depchain.common.utils.Config;
@@ -11,36 +12,16 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Resilience test assumes:
- *  All replicas connected are honest
- *  Even though we could have losses in messages, the network is reliable enough for the protocol to end
- *  No deliberate Byzantine attacks
- *  One replica "s3" crashed
- * This test is purely made to validate the base functionality of the protocol, according to Liveness (the system progresses) and safety (everyone agrees with the log).
- */
-public class ResilienceTest {
+public class ByzantineReplicaTest {
     private static final String CONFIG_FILE = "../config-test.json";
     private ClientContext clientContext;
     private ClientLibrary clientLibrary;
 
     @BeforeEach
-    public void setup() throws InterruptedException{
-        System.out.println("[TEST] - Starting ResilienceTest (f=1 Failure)");
-        String[] replicas = {"s0", "s1", "s2"};
-
-        System.out.println("[TEST] - Starting Replicas");
-        for (String replica : replicas) {startReplica(replica);}
-
-        System.out.println("[TEST] - Replica s3 is offline (Simulating Crash)");
-
-        System.out.println("[TEST] - Waiting for Replicas Handshake");
-
-        // 5 seconds waiting necessary for the Handshake to be made as the method handshakeAll() runs on a separate thread
-        TimeUnit.SECONDS.sleep(5);
-
+    public void setup() {
         System.out.println("[TEST] - Starting Client");
         Config clientConfig = Config.loadConfiguration(CONFIG_FILE, "client1");
         clientContext = new ClientContext(clientConfig);
@@ -50,7 +31,7 @@ public class ResilienceTest {
 
     @AfterEach
     public void teardown() {
-        System.out.println("[TEST] - Ending ResilianceTest");
+        System.out.println("[TEST] - Ending ByzantineTest");
         if (clientContext != null) {
             clientContext.stop();
         }
@@ -58,37 +39,49 @@ public class ResilienceTest {
     }
 
     @Test
-    @DisplayName("Verify that a request is commited by the quorum in an ideal condition")
-    void testResilience() throws InterruptedException {
-        String request = "Testing project for ResilianceTest";
+    @DisplayName("Verify that a test still goes through if one replica is byzantine and changes the content of the message")
+    public void testByzantineReplica() throws Exception {
+        System.out.println("[TEST] - Byzantine Replica");
+
+        System.out.println("[TEST] - Starting Replicas");
+        startReplica("s0", "false");
+        startReplica("s1", "false");
+        startReplica("s2", "true");
+        startReplica("s3", "false");
+
+        System.out.println("[TEST] - Waiting for Replicas Handshake");
+        // 5 seconds waiting necessary for the Handshake to be made as the method handshakeAll() runs on a separate thread
+        TimeUnit.SECONDS.sleep(5);
+
+        String request = "Testing project for Byzantine Replica Test";
         System.out.println("[TEST] - Client sending request: " + request);
 
         int currentId = clientContext.getRequestId().get() + 1;
         clientLibrary.append(request);
 
-        // HotStuff protocol has lots of phases, we wait 10 seconds as messages could be lost and therefore delaying the overall performance/end of the protocol
-
+        // Dynamic Wait
         System.out.println("[TEST] - Final Verification");
+        boolean success = waitForCommit(1, 200, currentId);
+        assertTrue(success, "Request wasn't commited in the expect time");
 
-        boolean isCommited = waitForCommit(1, 200, currentId);
-        assertTrue(isCommited, "Request not commited");
-
-        //Content validation
-        List<String> commitedLog = clientContext.getCommitedLog();
-        assertTrue(commitedLog.contains(request), "Request not commited");
+        // Content Validation
+        List<String> log = clientContext.getCommitedLog();
+        assertTrue(log.contains(request), "Request log contains not commited");
+        assertFalse(log.contains("MALICIOUS DATA ALTERED BY BYZANTINE"), "Malicious replica inserted false message");
 
         System.out.println("[TEST] - Client received f+1 ACKs and request " + currentId + " has been commited");
 
+        // Logs
         clientLibrary.showLog();
         TimeUnit.SECONDS.sleep(60);
     }
 
-    private static void startReplica(String serverId){
+    private static void startReplica(String serverId, String isByzantine){
         Thread t = new Thread(() -> {
             try{
-                ServerApp.main(new String[]{CONFIG_FILE, serverId, "false"});
+                ServerApp.main(new String[]{CONFIG_FILE, serverId, isByzantine});
             }catch (Exception e){
-                System.out.println("[TEST] - Error starting replica " + serverId + " in ResilienceTest");
+                System.out.println("[TEST] - Error starting replica " + serverId + " in ByzantineTest");
                 e.printStackTrace();
             }
         });

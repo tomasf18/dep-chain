@@ -10,9 +10,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class MultipleRequestsTest {
@@ -21,7 +23,7 @@ public class MultipleRequestsTest {
     private ClientLibrary clientLibrary;
 
     @BeforeEach
-    public void setup() {
+    public void setup() throws InterruptedException {
         System.out.println("[TEST] - Starting HappyPathTest");
         String[] replicas = {"s0", "s1", "s2", "s3"};
 
@@ -29,12 +31,8 @@ public class MultipleRequestsTest {
         for (String replica : replicas) {startReplica(replica);}
 
         System.out.println("[TEST] - Waiting for Replicas Handshake");
-        try {
-            // 5 seconds waiting necessary for the Handshake to be made as the method handshakeAll() runs on a separate thread
-            TimeUnit.SECONDS.sleep(5);
-        }catch(Exception e) {
-            e.printStackTrace();
-        }
+        // 5 seconds waiting necessary for the Handshake to be made as the method handshakeAll() runs on a separate thread
+        TimeUnit.SECONDS.sleep(5);
 
         System.out.println("[TEST] - Starting Client");
         Config clientConfig = Config.loadConfiguration(CONFIG_FILE, "client1");
@@ -58,23 +56,28 @@ public class MultipleRequestsTest {
         String[] requests = {"Request1", "Request2", "Request3", "Request4"};
         System.out.println("[TEST] - Client multiple requests:");
 
-        List<Integer> requestIds = new ArrayList<>();
         for (String request : requests) {
-            requestIds.add(clientContext.getRequestId().get() + 1);
             clientLibrary.append(request);
         }
         // HotStuff protocol has lots of phases, we wait 70 seconds as messages could be lost and therefore delaying the overall performance/end of the protocol
-        TimeUnit.SECONDS.sleep(70);
+        int time = 120;
+        while(time > 0 && requests.length > clientContext.getCommitedLog().size()) {
+            TimeUnit.SECONDS.sleep(1);
+            time --;
+        }
 
         System.out.println("[TEST] - Final Verification");
-        for (Integer requestId : requestIds) {
-            boolean isCommited = !clientContext.getPendingRequests().containsKey(requestId);
-            assertTrue(isCommited, "Request " + requestId + " not commited");
-            System.out.println("[TEST] - Client received f+1 ACKs and request " + requestId + " has been commited");
+        List<String> committedLog = clientContext.getCommitedLog();
+        assertEquals(committedLog.size(), requests.length, "Committed log size mismatch");
+        for(int i = 0; i < requests.length; i++) {
+            String expected = requests[i];
+            String actual = committedLog.get(i);
+            assertEquals(expected, actual, "Request " + requests[i] + " is not correct");
+            System.out.println("[TEST] - Client received f+1 ACKs and request " + actual + " has been commited");
         }
 
         clientLibrary.showLog();
-        TimeUnit.SECONDS.sleep(10);
+        TimeUnit.SECONDS.sleep(20);
     }
 
     private static void startReplica(String serverId){

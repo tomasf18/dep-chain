@@ -7,9 +7,9 @@ import ist.depchain.network.abstractions.UdpFairLossLink;
 import ist.depchain.common.ClientResponse;
 import ist.depchain.common.utils.Config;
 
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.Map;
-import java.util.HashMap;
 
 public class ClientContext {
     private final Config config;
@@ -21,6 +21,9 @@ public class ClientContext {
     private final AtomicInteger requestId = new AtomicInteger(0);
     private Map<Integer, Integer> pendingRequests = new HashMap<>(); // requestId -> ack count
     private int responsesThreshold; // number of acks required to consider a request committed
+
+    private final Map<Integer, String> requestDataMap = new ConcurrentHashMap<>();
+    private final List<String> commitedLog = Collections.synchronizedList(new ArrayList<>());
 
     public ClientContext(Config config) {
         this.config = config;
@@ -47,6 +50,11 @@ public class ClientContext {
                 pendingRequests.put(reqId, ackCount);
                 if (ackCount >= responsesThreshold) {
                     System.out.println("[COMMITTED] Request " + reqId + " is considered committed with " + ackCount + " acks | Block ID: " + clientResponse.getBlockId().toStringUtf8());
+                    String originalData = requestDataMap.get(reqId);
+                    if(originalData != null) {
+                        commitedLog.add(originalData);
+                        requestDataMap.remove(reqId);
+                    }
                     pendingRequests.remove(reqId); // clean up
                 } else {
                     System.out.println("[PENDING] Request " + reqId + " has " + ackCount + "/" + responsesThreshold + " acks, waiting for more...");
@@ -77,5 +85,13 @@ public class ClientContext {
 
     public Map<Integer, Integer> getPendingRequests() {
         return pendingRequests; 
+    }
+
+    public void registerRequestInMap(int requestId, String requestData) {
+        requestDataMap.put(requestId, requestData);
+    }
+
+    public List<String> getCommitedLog() {
+        return commitedLog;
     }
 }

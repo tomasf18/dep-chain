@@ -12,53 +12,43 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class MultipleClientsTest {
     private static final String CONFIG_FILE = "../config-test.json";
+    private ClientContext clientContext1;
+    private ClientContext clientContext2;
+    private ClientLibrary clientLibrary1;
+    private ClientLibrary clientLibrary2;
 
     @BeforeEach
-    public void setup() {
+    public void setup() throws InterruptedException{
         // Setup all replicas
         String[] replicas = {"s0", "s1", "s2", "s3"};
-        for (String replica : replicas) {
-            startReplica(replica);
-        }
-
+        for (String replica : replicas) {startReplica(replica);}
         // Wait handshake
-        try { TimeUnit.SECONDS.sleep(8); } catch (Exception e) {}
+        TimeUnit.SECONDS.sleep(8);
     }
 
     @Test
     @DisplayName("Verify that multiple Clients can interact concurrently with the system")
     void testConcurrentClients() throws InterruptedException {
         Config config1 = Config.loadConfiguration(CONFIG_FILE, "client1");
-        ClientContext context1 = new ClientContext(config1);
-        ClientLibrary library1 = new ClientLibrary(context1);
+        clientContext1 = new ClientContext(config1);
+        clientLibrary1 = new ClientLibrary(clientContext1);
+        clientContext1.start();
 
         Config config2 = Config.loadConfiguration(CONFIG_FILE, "client2");
-        ClientContext context2 = new ClientContext(config2);
-        ClientLibrary library2 = new ClientLibrary(context2);
+        clientContext2 = new ClientContext(config2);
+        clientLibrary2 = new ClientLibrary(clientContext2);
+        clientContext2.start();
 
         String[] requestsC1 = {"C1-Request1", "C1-Request2", "C1-Request3", "C1-Request4"};
         String[] requestsC2 = {"C2-Request1", "C2-Request2", "C2-Request3", "C2-Request4"};
 
-        List<Integer> commitedC1 = new ArrayList<>();
-        List<Integer> commitedC2 = new ArrayList<>();
-
-        Thread t1 = new Thread(() -> {
-            for(String requestC1 : requestsC1){
-                commitedC1.add(context1.getRequestId().get() + 1);
-                library1.append(requestC1);
-            }
-        });
-
-        Thread t2 = new Thread(() -> {
-            for(String requestC2 : requestsC2){
-                commitedC2.add(context2.getRequestId().get() + 1);
-                library2.append(requestC2);
-            }
-        });
+        Thread t1 = new Thread(() -> {for(String requestC1 : requestsC1){clientLibrary1.append(requestC1);}});
+        Thread t2 = new Thread(() -> {for(String requestC2 : requestsC2){clientLibrary2.append(requestC2);}});
 
         System.out.println("[TEST] - Starting multiple Clients test");
 
@@ -66,23 +56,25 @@ public class MultipleClientsTest {
         t1.start(); t2.start();
         t1.join(); t2.join();
 
-        TimeUnit.SECONDS.sleep(60);
-
-        for(int i = 0; i < commitedC1.size(); i++) {
-            boolean isCommitedC1 = context1.getPendingRequests().containsKey(commitedC1.get(i));
-            assertTrue(isCommitedC1, "Not all requests from Client 1 were commited");
-
-            boolean isCommitedC2 = context2.getPendingRequests().containsKey(commitedC2.get(i));
-            assertTrue(isCommitedC2, "Not all requests from Client 2 were commited");
+        int time = 300;
+        while (time > 0 && (clientContext1.getCommitedLog().size() < requestsC1.length || clientContext2.getCommitedLog().size() < requestsC2.length)) {
+            TimeUnit.SECONDS.sleep(1);
+            time --;
         }
 
-        library1.showLog();
-        library2.showLog();
+        // Final validation
+        List<String> committedLog1 = clientContext1.getCommitedLog();
+        List<String> committedLog2 = clientContext2.getCommitedLog();
 
-        TimeUnit.SECONDS.sleep(20);
+        assertEquals(committedLog1.size(), requestsC1.length, "Client1 missing some commits");
+        assertEquals(committedLog2.size(), requestsC2.length, "Client2 missing some commits");
 
-        context1.stop();
-        context2.stop();
+        for(String requestC1 : requestsC1){assertTrue(committedLog1.contains(requestC1), "Request " + requestC1 +" is not correct");}
+        for(String requestC2 : requestsC2){assertTrue(committedLog2.contains(requestC2), "Request " + requestC2 +" is not correct");}
+
+        clientLibrary1.showLog(); clientLibrary2.showLog();
+        TimeUnit.SECONDS.sleep(120);
+        clientContext1.stop(); clientContext2.stop();
     }
 
     private static void startReplica(String serverId){
