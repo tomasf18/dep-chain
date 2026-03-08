@@ -93,4 +93,24 @@ public class AuthenticatedPerfectLinkTest {
         TimeUnit.SECONDS.sleep(8);
         assertEquals(totalMessages, counter.get(), "All messages should be received and authenticated");
     }
+
+    /**
+     * Test 3: Replay attack test
+     */
+    @Test
+    public void testReplayAttack() throws Exception {
+        byte[] originalMsg = "Sensitive Transaction".getBytes();
+
+        // Legit send
+        apl0.send("s1", originalMsg);
+        TimeUnit.SECONDS.sleep(2);
+        assertEquals(1, counter.get(), "First delivery should succeed");
+
+        // Simulate someone trying to replay the message
+        System.out.println("[TEST] - Attempting Replay Attack...");
+        apl0.send("s1", originalMsg);
+
+        TimeUnit.SECONDS.sleep(2);
+        assertEquals(1, counter.get(), "Replayed message MUST be discarded (counter remains 1)");
+    }
 }
