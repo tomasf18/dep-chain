@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class ByzantineReplicaTest {
+public class ByzantineCorruptReplicaTest {
     private static final String CONFIG_FILE = "../config-test.json";
     private ClientContext clientContext;
     private ClientLibrary clientLibrary;
@@ -79,7 +79,7 @@ public class ByzantineReplicaTest {
     private static void startReplica(String serverId, String isByzantine){
         Thread t = new Thread(() -> {
             try{
-                ServerApp.main(new String[]{CONFIG_FILE, serverId, isByzantine});
+                ServerApp.main(new String[]{CONFIG_FILE, serverId, isByzantine, "CORRUPT"});
             }catch (Exception e){
                 System.out.println("[TEST] - Error starting replica " + serverId + " in ByzantineTest");
                 e.printStackTrace();

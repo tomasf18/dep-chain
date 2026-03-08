@@ -15,6 +15,7 @@ public class MaliciousUtils extends BasicHotStuffUtils {
 
     @Override
     public HotStuffMessage voteMsg(HotStuffMessage.Type type, Block node, QC qc, int view){
+        System.out.println("[BYZANTINE REPLICA] - Sending altered vote");
         HotStuffMessage msg = super.msg(type, node, qc, view);
 
         return msg.toBuilder()
