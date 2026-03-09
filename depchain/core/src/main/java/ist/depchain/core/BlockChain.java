@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class BlockChain {
-    private List<String> blocks;
+    private final List<String> blocks;
 
     public BlockChain() {
         this.blocks = new ArrayList<>();

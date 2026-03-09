@@ -1,6 +1,7 @@
 package ist.depchain.client;
 
 import java.util.Set;
+import java.util.HashMap;
 
 import ist.depchain.common.ApplicationMessage;
 import ist.depchain.common.ClientRequest;
@@ -37,8 +38,8 @@ public class ClientLibrary {
 
         byte[] payload = appMsg.toByteArray();
         Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
-        clientContext.getPendingRequests().put(reqId, 0); // initialize ack count
-        clientContext.getPerfectLink().broadcast(destinations, payload);
+        clientContext.getPendingRequests().put(reqId, new HashMap<>()); // blockId -> matching response count
+        clientContext.getAuthenticatedPerfectLink().broadcast(destinations, payload);
     }
 
     public void showLog() {
@@ -63,7 +64,7 @@ public class ClientLibrary {
 
         byte[] payload = appMsg.toByteArray();
         Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
-        clientContext.getPendingRequests().put(reqId, 0); // initialize ack count
-        clientContext.getPerfectLink().broadcast(destinations, payload);
+        clientContext.getPendingRequests().put(reqId, new HashMap<>()); // blockId -> matching response count
+        clientContext.getAuthenticatedPerfectLink().broadcast(destinations, payload);
     }
 }

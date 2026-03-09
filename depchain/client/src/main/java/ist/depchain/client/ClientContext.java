@@ -1,26 +1,32 @@
 package ist.depchain.client;
 
+import ist.depchain.network.abstractions.AuthenticatedPerfectLink;
 import ist.depchain.network.abstractions.PerfectLink;
 import ist.depchain.network.abstractions.StubbornLink;
 import ist.depchain.network.abstractions.UdpFairLossLink;
 /* protobuf classes */
 import ist.depchain.common.ClientResponse;
 import ist.depchain.common.utils.Config;
+import ist.depchain.network.crypto.Authenticator;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Map;
+import java.util.HashMap;
+import com.google.protobuf.ByteString;
 
 public class ClientContext {
     private final Config config;
     
     private final UdpFairLossLink fairLossLink;
     private final StubbornLink stubbornLink;
-    private final PerfectLink perfectLink;
+    private final AuthenticatedPerfectLink authenticatedPerfectLink;
 
     private final AtomicInteger requestId = new AtomicInteger(0);
-    private Map<Integer, Integer> pendingRequests = new HashMap<>(); // requestId -> ack count
-    private int responsesThreshold; // number of acks required to consider a request committed
+    // requestId -> (blockId -> count of matching committed responses)
+    private Map<Integer, Map<String, Integer>> pendingRequests = new HashMap<>();
+    private int responsesThreshold; // f+1 matching responses required
 
     private final Map<Integer, String> requestDataMap = new ConcurrentHashMap<>();
     private final List<String> commitedLog = Collections.synchronizedList(new ArrayList<>());
@@ -29,44 +35,46 @@ public class ClientContext {
         this.config = config;
         fairLossLink = new UdpFairLossLink(config);
         stubbornLink = new StubbornLink(config, fairLossLink);
-        perfectLink = new PerfectLink(config, stubbornLink, fairLossLink);
+        authenticatedPerfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config, fairLossLink));
         this.responsesThreshold = config.getF() + 1; 
     }
     
     public void start() {
-        perfectLink.registerReceiver(this::handleIncomingResponse);
-        perfectLink.start();
+        authenticatedPerfectLink.registerReceiver(this::handleIncomingResponse);
+        authenticatedPerfectLink.start();
     }
 
     private void handleIncomingResponse(String sourceId, byte[] data) {
         try {
             ClientResponse clientResponse = ClientResponse.parseFrom(data);
 
-            System.out.println("[RECEIVED] Response from: " + sourceId + " for request Id: " + clientResponse.getRequestId() + " | Committed: " + clientResponse.getCommitted());
-
             int reqId = clientResponse.getRequestId();
-            if (pendingRequests.containsKey(reqId) && clientResponse.getCommitted()) {
-                int ackCount = pendingRequests.get(reqId) + 1;
-                pendingRequests.put(reqId, ackCount);
-                if (ackCount >= responsesThreshold) {
-                    System.out.println("[COMMITTED] Request " + reqId + " is considered committed with " + ackCount + " acks | Block ID: " + clientResponse.getBlockId().toStringUtf8());
-                    String originalData = requestDataMap.get(reqId);
-                    if(originalData != null) {
-                        commitedLog.add(originalData);
-                        requestDataMap.remove(reqId);
-                    }
-                    pendingRequests.remove(reqId); // clean up
-                } else {
-                    System.out.println("[PENDING] Request " + reqId + " has " + ackCount + "/" + responsesThreshold + " acks, waiting for more...");
-                }
+            if (!pendingRequests.containsKey(reqId) || !clientResponse.getCommitted()) {
+                System.out.println("[ ] (" +  reqId + ", " + sourceId + "): nothing to do...");
+                return;
+            }
+
+            String blockKey = clientResponse.getBlockId().toStringUtf8();
+            Map<String, Integer> blockCounts = pendingRequests.get(reqId);
+            int count = blockCounts.merge(blockKey, 1, Integer::sum);
+
+            if (count >= responsesThreshold) {
+                System.out.println("[*] (" +  reqId + ", " + sourceId + "): [" + blockKey +"] (" + count + "/" + responsesThreshold + ") COMMITED");
+                pendingRequests.remove(reqId);
+            } else {
+                System.out.println("[+] (" +  reqId + ", " + sourceId + "): [" + blockKey +"] (" + count + "/" + responsesThreshold + ")");
             }
         } catch(Exception e) {
             System.out.println("[ERROR] Error while processing request: " + e.getMessage());
         }
     }
 
+    public void waitForHandshakes() throws InterruptedException {
+        authenticatedPerfectLink.getAuthenticator().waitForHandshakesComplete();
+    }
+
     public void stop() {
-        perfectLink.stop();
+        authenticatedPerfectLink.stop();
     }
 
     /* Getters */
@@ -75,16 +83,16 @@ public class ClientContext {
         return config;
     }
 
-    public PerfectLink getPerfectLink() {
-        return perfectLink;
+    public AuthenticatedPerfectLink getAuthenticatedPerfectLink() {
+        return authenticatedPerfectLink;
     }
 
     public AtomicInteger getRequestId() {
         return requestId;
     }
 
-    public Map<Integer, Integer> getPendingRequests() {
-        return pendingRequests; 
+    public Map<Integer, Map<String, Integer>> getPendingRequests() {
+        return pendingRequests;
     }
 
     public void registerRequestInMap(int requestId, String requestData) {
