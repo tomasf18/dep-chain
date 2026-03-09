@@ -1,5 +1,7 @@
 package ist.depchain.tests;
 
+import com.google.protobuf.ByteString;
+import ist.depchain.common.Envelope;
 import ist.depchain.common.utils.Config;
 import ist.depchain.network.abstractions.AuthenticatedPerfectLink;
 import ist.depchain.network.abstractions.PerfectLink;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -104,15 +107,13 @@ public class AuthenticatedPerfectLinkTest {
     public void testReplayAttack() throws Exception {
         TimeUnit.SECONDS.sleep(5);
         AtomicReference<byte[]> capturedPayload = new AtomicReference<>();
+
         apl1.registerReceiver(((sourceId, payload) -> {
-            capturedPayload.set(payload);
+            counter.incrementAndGet();
+            if(capturedPayload.get() == null)
+                capturedPayload.set(payload);
             System.out.println("[TEST] - s1 Received payload from " +  sourceId);
         }));
-
-        apl2.registerReceiver((src, payload) -> {
-            counter.incrementAndGet();
-            System.out.println("[TEST] - s2 Received payload from " + src);
-        });
 
         apl0.send("s1", "Replay message".getBytes());
         TimeUnit.SECONDS.sleep(2);
@@ -121,11 +122,44 @@ public class AuthenticatedPerfectLinkTest {
         System.out.println("[TEST] - S1 will try to resend message from S0");
 
         try(DatagramSocket socket = new DatagramSocket()) {
-            DatagramPacket pkt = new java.net.DatagramPacket(packetFromS0, packetFromS0.length, java.net.InetAddress.getLocalHost(), 5002);
-            socket.send(pkt);
+            DatagramPacket pkt = new java.net.DatagramPacket(packetFromS0, packetFromS0.length, InetAddress.getLocalHost(), 5001);
+            for(int i = 0; i < 100; i++)
+                socket.send(pkt);
+        }
+
+        TimeUnit.SECONDS.sleep(10);
+        assertEquals(1, counter.get(), "Expected: " + 0 + " actual: " + counter.get());
+    }
+
+    /**
+     * Test 4: Impersonation Attack
+     */
+    @Test
+    public void testImpersonation() throws Exception {
+        TimeUnit.SECONDS.sleep(5);
+
+        apl1.registerReceiver(((sourceId, payload) -> {
+            counter.incrementAndGet();
+            System.out.println("[TEST] - s1 Received payload from " +  sourceId);
+        }));
+
+        Envelope fakeEnvelope = Envelope.newBuilder()
+                .setSenderId("s2")
+                .setSequenceNumber(5000)
+                .setPayload(ByteString.copyFrom("Message that was not sent from s2".getBytes()))
+                .build();
+
+        byte[] attackData = fakeEnvelope.toByteArray();
+
+        System.out.println("[TEST] - Attacker will try to impersonate message from S2");
+        try(DatagramSocket socket = new DatagramSocket()) {
+            DatagramPacket pkt = new DatagramPacket(attackData, attackData.length, InetAddress.getLocalHost(), 5001);
+            for(int i = 0; i < 100; i++)
+                socket.send(pkt);
         }
 
         TimeUnit.SECONDS.sleep(10);
         assertEquals(0, counter.get(), "Expected: " + 0 + " actual: " + counter.get());
+
     }
 }
