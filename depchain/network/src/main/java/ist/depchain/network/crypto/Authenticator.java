@@ -99,7 +99,7 @@ public class Authenticator implements MessageAuthenticator {
 
     @Override
     public boolean shouldAuthenticate(String peerId) {
-        return config.getBlockChainServers().containsKey(peerId);
+        return config.getProcesses().containsKey(peerId);
     }
 
     public boolean hasSession(String peerId) {

@@ -20,6 +20,8 @@ public class ClientApp {
             ClientLibrary clientLib = new ClientLibrary(client);
             client.start();
 
+            System.out.println("[INFO] Waiting for authenticated sessions with servers...");
+            client.waitForHandshakes();
             System.out.println("[INFO] Successfully started");
 
             Scanner in = new Scanner(System.in);

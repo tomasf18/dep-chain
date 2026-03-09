@@ -62,12 +62,18 @@ public class AuthenticatedPerfectLink implements Link {
     @Override
     public Map<String, SendHandle> broadcast(Set<String> destinationIds, byte[] payload) {
         Map<String, SendHandle> handles = new HashMap<>();
+        int skipped = 0;
         for (String dest : destinationIds) {
             if (authenticator.shouldAuthenticate(dest) && !authenticator.hasSession(dest)) {
+                System.out.println("[APL][BROADCAST] Skipping " + dest + " — no authenticated session yet");
+                skipped++;
                 continue;
             }
             SendHandle handle = send(dest, payload);
             handles.put(dest, handle);
+        }
+        if (skipped > 0) {
+            System.out.println("[APL][BROADCAST] Skipped " + skipped + "/" + destinationIds.size() + " destinations (no session)");
         }
         return handles;
     }
@@ -78,12 +84,19 @@ public class AuthenticatedPerfectLink implements Link {
 
     private void handleIncomingMessage(String senderId, byte[] data) {
         try {
+            Envelope envelope = Envelope.parseFrom(data);
+
+            // Handshakes must be processed for any sender so sessions can be established
+            // before the first authenticated payload arrives.
+            if (envelope.hasHandshake()) {
+                authenticator.verifyMessageAuthenticity(envelope);
+                return;
+            }
+
             if (!authenticator.shouldAuthenticate(senderId)) {
                 perfectLink.handleIncomingMessage(senderId, data);
                 return;
             }
-
-            Envelope envelope = Envelope.parseFrom(data);
 
             if (envelope.hasAck()) {
                 // ACKs are unauthenticated by design; pass through so PL can cancel retransmissions.
