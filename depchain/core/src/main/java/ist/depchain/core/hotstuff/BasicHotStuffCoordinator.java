@@ -10,6 +10,7 @@ import ist.depchain.common.Command;
 import ist.depchain.common.HotStuffMessage;
 import ist.depchain.common.QC;
 import ist.depchain.core.ServerContext;
+import ist.depchain.core.byzantine.MaliciousUtils;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,9 +21,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class BasicHotStuffCoordinator {
-    private final ServerContext serverContext;
-    private final BasicHotStuffUtils utils;
-    private final AtomicInteger currentView = new AtomicInteger(1); // incremented either by finishing a decision or by a NEXT_VIEW interrupt
+    protected final ServerContext serverContext;
+    protected final BasicHotStuffUtils utils;
+    protected final AtomicInteger currentView = new AtomicInteger(1); // incremented either by finishing a decision or by a NEXT_VIEW interrupt
     private int n, f;
     private final int hotStuffQuorum; // n - f, the number of votes needed to form a QC
 
@@ -31,7 +32,7 @@ public class BasicHotStuffCoordinator {
 
     private final Map<HotStuffMessage.Type, Map<ByteString, Map<String, HotStuffMessage>>> voteCollector = new ConcurrentHashMap<>(); // phase -> blockId -> set of votes (maps from voterId to vote message)
     private final Map<Integer, Map<String, HotStuffMessage>> newViewMsgs = new ConcurrentHashMap<>();
-    private final BasicHotStuffTree tree = new BasicHotStuffTree();
+    protected final BasicHotStuffTree tree = new BasicHotStuffTree();
     private final CommandMempool mempool = new CommandMempool();
 
     private final ScheduledExecutorService timerExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -45,9 +46,9 @@ public class BasicHotStuffCoordinator {
 
     private boolean quorumReady = false; 
 
-    public BasicHotStuffCoordinator(ServerContext serverContext) {
+    public BasicHotStuffCoordinator(ServerContext serverContext, boolean isByzantine) {
         this.serverContext = serverContext;
-        this.utils = new BasicHotStuffUtils(this.tree, serverContext.getBlsThresholdSig());
+        this.utils = !isByzantine? new BasicHotStuffUtils(this.tree, serverContext.getBlsThresholdSig()): new MaliciousUtils(this.tree, serverContext.getBlsThresholdSig());
         this.n = serverContext.getConfig().getN();
         this.f = serverContext.getConfig().getF();
         this.hotStuffQuorum = (n - f);
@@ -195,7 +196,7 @@ public class BasicHotStuffCoordinator {
         }
     }
 
-    private void doPropose() {
+    protected void doPropose() {
         int oldView = currentView.get() - 1;
         Map<String, HotStuffMessage> msgs = newViewMsgs.get(oldView);
 

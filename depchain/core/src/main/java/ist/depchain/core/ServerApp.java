@@ -2,24 +2,37 @@ package ist.depchain.core;
 
 import ist.depchain.common.utils.Config;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
+import ist.depchain.core.byzantine.ByzantineCoordinator;
 
 public class ServerApp {
     public static void main(String[] args) {
         if (args.length < 2) {
-            System.out.println("Usage: mvn exec:java -Dexec.args='<configFile> <serverId>'");
-            System.out.println("Example: mvn exec:java -Dexec.args='../config-dev.json s1'");
+            System.out.println("Usage: mvn exec:java -Dexec.args='<configFile> <serverId> <byzantine_flag> <attack_type>'");
+            System.out.println("Example: mvn exec:java -Dexec.args='../config-dev.json s1 true EQUIVOCATE'");
             return;
         }
 
         String configFile = args[0];
         String selfId = args[1];
+        boolean byzantineFlag = args.length > 2 && args[2].equalsIgnoreCase("true");
+        String attackType = args.length > 3 ? args[3].toUpperCase() : "SILENT";
         
         Config config = Config.loadConfiguration(configFile, selfId);
         if (config == null) {
             return;
         }
         ServerContext server = new ServerContext(config);
-        BasicHotStuffCoordinator hotStuffCoordinator = new BasicHotStuffCoordinator(server);
+        BasicHotStuffCoordinator hotStuffCoordinator;
+        if (byzantineFlag) {
+            ist.depchain.core.byzantine.ByzantineCoordinator byzantineCoordinator = new ByzantineCoordinator(server);
+            try {
+                byzantineCoordinator.setAttack(ByzantineCoordinator.AttackType.valueOf(attackType));
+            }catch (IllegalArgumentException e) {
+                byzantineCoordinator.setAttack(ByzantineCoordinator.AttackType.SILENT);
+            }
+            hotStuffCoordinator = byzantineCoordinator;
+        }
+        else {hotStuffCoordinator = new BasicHotStuffCoordinator(server, byzantineFlag);}
         new MessageHandler(server, hotStuffCoordinator);
         try {
             server.start();

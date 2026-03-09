@@ -9,6 +9,8 @@ import ist.depchain.common.ClientResponse;
 import ist.depchain.common.utils.Config;
 import ist.depchain.network.crypto.Authenticator;
 
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Map;
 import java.util.HashMap;
@@ -25,6 +27,9 @@ public class ClientContext {
     // requestId -> (blockId -> count of matching committed responses)
     private Map<Integer, Map<String, Integer>> pendingRequests = new HashMap<>();
     private int responsesThreshold; // f+1 matching responses required
+
+    private final Map<Integer, String> requestDataMap = new ConcurrentHashMap<>();
+    private final List<String> commitedLog = Collections.synchronizedList(new ArrayList<>());
 
     public ClientContext(Config config) {
         this.config = config;
@@ -88,5 +93,13 @@ public class ClientContext {
 
     public Map<Integer, Map<String, Integer>> getPendingRequests() {
         return pendingRequests;
+    }
+
+    public void registerRequestInMap(int requestId, String requestData) {
+        requestDataMap.put(requestId, requestData);
+    }
+
+    public List<String> getCommitedLog() {
+        return commitedLog;
     }
 }

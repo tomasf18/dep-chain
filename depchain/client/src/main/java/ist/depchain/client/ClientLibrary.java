@@ -17,6 +17,7 @@ public class ClientLibrary {
     public void append(String data){
         String commandType = "append";
         int reqId = clientContext.getRequestId().incrementAndGet();
+        clientContext.registerRequestInMap(reqId, data);
 
         Command command = Command.newBuilder()
                 .setType(commandType)
