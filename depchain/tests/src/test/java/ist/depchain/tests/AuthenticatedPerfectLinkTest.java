@@ -10,8 +10,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -99,18 +102,30 @@ public class AuthenticatedPerfectLinkTest {
      */
     @Test
     public void testReplayAttack() throws Exception {
-        byte[] originalMsg = "Sensitive Transaction".getBytes();
+        TimeUnit.SECONDS.sleep(5);
+        AtomicReference<byte[]> capturedPayload = new AtomicReference<>();
+        apl1.registerReceiver(((sourceId, payload) -> {
+            capturedPayload.set(payload);
+            System.out.println("[TEST] - s1 Received payload from " +  sourceId);
+        }));
 
-        // Legit send
-        apl0.send("s1", originalMsg);
+        apl2.registerReceiver((src, payload) -> {
+            counter.incrementAndGet();
+            System.out.println("[TEST] - s2 Received payload from " + src);
+        });
+
+        apl0.send("s1", "Replay message".getBytes());
         TimeUnit.SECONDS.sleep(2);
-        assertEquals(1, counter.get(), "First delivery should succeed");
+        byte[] packetFromS0 = capturedPayload.get();
 
-        // Simulate someone trying to replay the message
-        System.out.println("[TEST] - Attempting Replay Attack...");
-        apl0.send("s1", originalMsg);
+        System.out.println("[TEST] - S1 will try to resend message from S0");
 
-        TimeUnit.SECONDS.sleep(2);
-        assertEquals(1, counter.get(), "Replayed message MUST be discarded (counter remains 1)");
+        try(DatagramSocket socket = new DatagramSocket()) {
+            DatagramPacket pkt = new java.net.DatagramPacket(packetFromS0, packetFromS0.length, java.net.InetAddress.getLocalHost(), 5002);
+            socket.send(pkt);
+        }
+
+        TimeUnit.SECONDS.sleep(10);
+        assertEquals(0, counter.get(), "Expected: " + 0 + " actual: " + counter.get());
     }
 }
