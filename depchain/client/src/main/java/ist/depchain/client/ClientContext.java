@@ -1,9 +1,9 @@
 package ist.depchain.client;
 
 import ist.depchain.network.abstractions.AuthenticatedPerfectLink;
-import ist.depchain.network.abstractions.PerfectLink;
 import ist.depchain.network.abstractions.StubbornLink;
 import ist.depchain.network.abstractions.UdpFairLossLink;
+
 /* protobuf classes */
 import ist.depchain.common.ClientResponse;
 import ist.depchain.common.utils.Config;
@@ -14,7 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Map;
 import java.util.HashMap;
-import com.google.protobuf.ByteString;
 
 public class ClientContext {
     private final Config config;
