@@ -93,12 +93,12 @@ Two config files are provided:
 
 ## Running
 
-### Using `start.sh` (recommended)
+### Using `run.sh` (recommended)
 
-`start.sh` launches all servers and clients in a single `tmux` session. Run it from the `depchain/` directory:
+`run.sh` launches all servers and clients in a single `tmux` session. Run it from the `depchain/` directory:
 
 ```bash
-./start.sh [options]
+./run.sh [options]
 ```
 
 | Flag | Description | Default |
@@ -111,11 +111,11 @@ Two config files are provided:
 **Examples:**
 
 ```bash
-./start.sh                  # 4 servers, 1 client, dev config
-./start.sh -c               # same but recompile first
-./start.sh -f 2 -n 3        # 7 servers, 3 clients, dev config
-./start.sh -t               # 4 servers, 1 client, test config (fault injection)
-./start.sh -f 2 -n 2 -t -c  # 7 servers, 2 clients, test config, recompile
+./run.sh                  # 4 servers, 1 client, dev config
+./run.sh -c               # same but recompile first
+./run.sh -f 2 -n 3        # 7 servers, 3 clients, dev config
+./run.sh -t               # 4 servers, 1 client, test config (fault injection)
+./run.sh -f 2 -n 2 -t -c  # 7 servers, 2 clients, test config, recompile
 ```
 
 **tmux navigation:**
