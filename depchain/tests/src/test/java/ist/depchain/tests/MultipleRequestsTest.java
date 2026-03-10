@@ -55,7 +55,7 @@ public class MultipleRequestsTest {
     void testMultipleRequests() throws InterruptedException {
         String[] requests = {"Request1", "Request2", "Request3", "Request4"};
         System.out.println("[TEST] - Client multiple requests:");
-
+        TimeUnit.SECONDS.sleep(20);
         for (String request : requests) {
             clientLibrary.append(request);
         }

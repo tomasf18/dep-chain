@@ -51,7 +51,7 @@ public class ByzantineSilentLeaderTest {
 
         System.out.println("[TEST] - Waiting for Replicas Handshake");
         // 5 seconds waiting necessary for the Handshake to be made as the method handshakeAll() runs on a separate thread
-        TimeUnit.SECONDS.sleep(8);
+        TimeUnit.SECONDS.sleep(20);
 
         String request = "Testing project for Byzantine Leader Test";
         System.out.println("[TEST] - Client sending request: " + request);

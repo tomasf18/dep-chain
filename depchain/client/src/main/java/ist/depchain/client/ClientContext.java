@@ -60,7 +60,12 @@ public class ClientContext {
 
             if (count >= responsesThreshold) {
                 System.out.println("[*] (" +  reqId + ", " + sourceId + "): [" + blockKey +"] (" + count + "/" + responsesThreshold + ") COMMITED");
+                String originalData = requestDataMap.get(reqId);
+                if(originalData != null && !commitedLog.contains(originalData)) {
+                    commitedLog.add(originalData);
+                }
                 pendingRequests.remove(reqId);
+                requestDataMap.remove(reqId);
             } else {
                 System.out.println("[+] (" +  reqId + ", " + sourceId + "): [" + blockKey +"] (" + count + "/" + responsesThreshold + ")");
             }

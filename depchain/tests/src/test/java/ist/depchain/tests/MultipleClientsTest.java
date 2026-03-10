@@ -47,6 +47,7 @@ public class MultipleClientsTest {
         String[] requestsC1 = {"C1-Request1", "C1-Request2", "C1-Request3", "C1-Request4"};
         String[] requestsC2 = {"C2-Request1", "C2-Request2", "C2-Request3", "C2-Request4"};
 
+        TimeUnit.SECONDS.sleep(30);
         Thread t1 = new Thread(() -> {for(String requestC1 : requestsC1){clientLibrary1.append(requestC1);}});
         Thread t2 = new Thread(() -> {for(String requestC2 : requestsC2){clientLibrary2.append(requestC2);}});
 

@@ -58,8 +58,9 @@ public class ResilienceTest {
     }
 
     @Test
-    @DisplayName("Verify that a request is commited by the quorum in an ideal condition")
+    @DisplayName("Verify that a request is commited by the quorum with one crashed process")
     void testResilience() throws InterruptedException {
+        TimeUnit.SECONDS.sleep(10);
         String request = "Testing project for ResilianceTest";
         System.out.println("[TEST] - Client sending request: " + request);
 
@@ -70,7 +71,7 @@ public class ResilienceTest {
 
         System.out.println("[TEST] - Final Verification");
 
-        boolean isCommited = waitForCommit(1, 200, currentId);
+        boolean isCommited = waitForCommit(1, 60, currentId);
         assertTrue(isCommited, "Request not commited");
 
         //Content validation
@@ -80,7 +81,7 @@ public class ResilienceTest {
         System.out.println("[TEST] - Client received f+1 ACKs and request " + currentId + " has been commited");
 
         clientLibrary.showLog();
-        TimeUnit.SECONDS.sleep(60);
+        TimeUnit.SECONDS.sleep(30);
     }
 
     private static void startReplica(String serverId){

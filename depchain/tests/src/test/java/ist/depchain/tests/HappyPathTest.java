@@ -35,7 +35,7 @@ public class HappyPathTest {
 
         System.out.println("[TEST] - Waiting for Replicas Handshake");
         // 5 seconds waiting necessary for the Handshake to be made as the method handshakeAll() runs on a separate thread
-        TimeUnit.SECONDS.sleep(5);
+        TimeUnit.SECONDS.sleep(15);
 
         System.out.println("[TEST] - Starting Client");
         Config clientConfig = Config.loadConfiguration(CONFIG_FILE, "client1");
@@ -56,6 +56,7 @@ public class HappyPathTest {
     @Test
     @DisplayName("Verify that a request is commited by the quorum in an ideal condition")
     void testHappyPath() throws InterruptedException {
+        TimeUnit.SECONDS.sleep(15);
         String request = "Testing project for HappyPathTest";
         System.out.println("[TEST] - Client sending request: " + request);
 
