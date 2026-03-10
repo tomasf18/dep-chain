@@ -1,7 +1,7 @@
 #!/bin/bash
 # Builds the project and spawns 3F+1 servers and N clients in tmux.
 # Run from the depchain/ directory (where config.json lives).
-# Usage: ./test.sh [-c] [-n N] [-f F]
+# Usage: ./start.sh [-c] [-n N] [-f F]
 #   -c      recompile before starting
 #   -n N    number of clients (default: 1)
 #   -f F    number of tolerated faults (default: 1)

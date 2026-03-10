@@ -1,4 +1,4 @@
-# DepChain - Dependable Blockchain
+# DepChain - Dependable Blockchain - Group 5
 
 A permissioned blockchain system implementing the **BasicHotStuff** BFT consensus protocol with BLS12-381 threshold signatures, built on top of authenticated UDP communication links.
 
@@ -6,7 +6,7 @@ A permissioned blockchain system implementing the **BasicHotStuff** BFT consensu
 
 ## Overview
 
-The system tolerates up to `f` Byzantine faults among `n = 3f+1` replicas. Clients submit append requests and wait for `f+1` committed responses. The consensus layer uses the four-phase BasicHotStuff protocol (PREPARE -> PRE-COMMIT -> COMMIT -> DECIDE) with threshold signatures for quorum certificates.
+The system tolerates up to `f` Byzantine faults among `n = 3f+1` replicas. Clients submit append requests and wait for `f+1` identical responses. The consensus layer uses the four-phase BasicHotStuff protocol (PREPARE -> PRE-COMMIT -> COMMIT -> DECIDE) with threshold signatures for quorum certificates.
 
 ---
 
@@ -17,7 +17,6 @@ The system tolerates up to `f` Byzantine faults among `n = 3f+1` replicas. Clien
 | Java (OpenJDK) | 21 |
 | Maven | 3.8+ |
 
----
 
 ## Setup on a New Machine
 
@@ -49,7 +48,7 @@ cd depchain
 
 ```bash
 cd ../depchain
-mvn clean install
+mvn clean compile
 ```
 
 ## Configuration
@@ -58,8 +57,8 @@ Two config files are provided:
 
 | File | Purpose |
 |---|---|
-| `config-dev.json` | Zero fault injection, fast timeouts - use for development |
-| `config.json` | Realistic fault injection (10% drop/duplicate/tamper) - use for testing |
+| `config-dev.json` | Zero fault injection, fast timeouts - used for development |
+| `config-test.json` | Realistic fault injection (10% drop/duplicate/tamper) - used for testing |
 
 ### Config Structure
 
@@ -94,12 +93,12 @@ Two config files are provided:
 
 ## Running
 
-### Using `test.sh` (recommended)
+### Using `start.sh` (recommended)
 
-`test.sh` launches all servers and clients in a single `tmux` session. Run it from the `depchain/` directory:
+`start.sh` launches all servers and clients in a single `tmux` session. Run it from the `depchain/` directory:
 
 ```bash
-./test.sh [options]
+./start.sh [options]
 ```
 
 | Flag | Description | Default |
@@ -112,11 +111,11 @@ Two config files are provided:
 **Examples:**
 
 ```bash
-./test.sh                  # 4 servers, 1 client, dev config
-./test.sh -c               # same but recompile first
-./test.sh -f 2 -n 3        # 7 servers, 3 clients, dev config
-./test.sh -t               # 4 servers, 1 client, test config (fault injection)
-./test.sh -f 2 -n 2 -t -c  # 7 servers, 2 clients, test config, recompile
+./start.sh                  # 4 servers, 1 client, dev config
+./start.sh -c               # same but recompile first
+./start.sh -f 2 -n 3        # 7 servers, 3 clients, dev config
+./start.sh -t               # 4 servers, 1 client, test config (fault injection)
+./start.sh -f 2 -n 2 -t -c  # 7 servers, 2 clients, test config, recompile
 ```
 
 **tmux navigation:**
@@ -233,7 +232,7 @@ A quorum certificate (QC) requires `n - f = 3` votes out of 4 replicas.
 
 ### View Change
 
-If no progress within `INITIAL_TIMEOUT_MS` (10s), all replicas advance to the next view and send `NEW_VIEW` to the next leader. Timeouts use **exponential backoff** (doubling after 2 consecutive failures, capped at 60s) to converge replica timers under asynchrony.
+If no progress within `INITIAL_TIMEOUT_MS` (10s), all replicas advance to the next view and send `NEW_VIEW` to the next leader. Timeouts use **exponential backoff** (doubling after 2 consecutive failures) to converge replica timers under asynchrony.
 
 ### Threshold Signatures (BLS12-381)
 
@@ -278,3 +277,10 @@ depchain/
 ├── config-dev.json  - zero faults, for development
 └── config.json      - realistic faults, for testing
 ```
+
+---
+
+## Authors
+
+| <div align="center"><a href="https://github.com/andrepires2211"><img src="https://avatars.githubusercontent.com/u/163666619?v=4" width="150px;" alt="André Pires"/></a><br/><strong>André Pires</strong><br/>116452<br/></div> | <div align="center"><a href="https://github.com/pedropmad"><img src="https://avatars.githubusercontent.com/u/163666619?v=4" width="150px;" alt="Pedro Duarte"/></a><br/><strong>Pedro Duarte</strong><br/>116390<br/></div> | <div align="center"><a href="https://github.com/tomasf18"><img src="https://avatars.githubusercontent.com/u/122024767?v=4" width="150px;" alt="Tomás Santos"/></a><br/><strong>Tomás Santos</strong><br/>116122<br/></div> |
+| --- | --- | --- |
