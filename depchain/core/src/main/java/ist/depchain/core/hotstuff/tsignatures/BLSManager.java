@@ -1,6 +1,7 @@
 package ist.depchain.core.hotstuff.tsignatures;
 
 import java.nio.file.*;
+import com.herumi.bls.Bls;
 
 /*
     BLS Manager for loading the native BLS library and initializing it. 
@@ -18,7 +19,7 @@ public class BLSManager {
 
             System.load(nativePath.toString()); // absolute path
 
-            com.herumi.bls.Bls.init(5); // 5 = BLS12_381
+            Bls.init(5); // 5 = BLS12_381
             initialized = true;
             System.out.println("[BLS | INFO] - BLS12-381 initialized");
         } catch (Exception e) {

@@ -97,7 +97,7 @@ public class BasicHotStuffUtils {
 
     public boolean verifyQC(QC qc) {
         if (qc == null || qc.equals(QC.getDefaultInstance())) return true; // genesis QC always valid
-        if (qc.getThresholdSig().isEmpty()) return true; // stub QC during transition
+        // if (qc.getThresholdSig().isEmpty()) return true; // stub QC during transition
 
         byte[] digest = getMsgDigest(qc.getType(), qc.getViewNumber(), qc.getBlockId());
         return blsThresholdSig.verify(digest, qc.getThresholdSig().toByteArray()); // ← real verification

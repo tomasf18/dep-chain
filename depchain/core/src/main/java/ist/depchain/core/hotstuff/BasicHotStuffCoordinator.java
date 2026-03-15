@@ -66,7 +66,6 @@ public class BasicHotStuffCoordinator {
         String leader = getLeaderForView(1);
         byte[] payload = wrapper.toByteArray();
 
-        // retry until session key is established (handshake may not be done yet)
         new Thread(() -> {
             try {
                 serverContext.getPerfectLink().getAuthenticator().waitForHandshakesComplete();

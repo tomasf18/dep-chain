@@ -15,7 +15,7 @@ public class BLSThresholdSig {
 
     public BLSThresholdSig(Config config) {
         this.replicaIndex = config.selfBlsIndex();
-        this.threshold = config.getF() + 1; // f+1 partial sigs needed for threshold sig
+        this.threshold = 2 * config.getF() + 1; // f+1 partial sigs needed for threshold sig
 
         try {
             this.secretShare = new SecretKey();
