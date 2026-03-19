@@ -361,7 +361,13 @@ public class BasicHotStuffCoordinator {
         } else {
             System.out.println("[COORDINATOR | REPLICA] - Received COMMIT with valid QC from " + sourceId + ", QC view number: " + newLockedQC.getViewNumber());
         }
-        this.lockedQC = newLockedQC; 
+        this.lockedQC = newLockedQC;
+
+        // Prune mempool: discard any commands from the same client that could conflict
+        Block lockedBlock = tree.getBlock(lockedQC.getBlockId());
+        if (lockedBlock != null) {
+            mempool.discardConflicting(lockedBlock.getCommand().getClientId());
+        }
 
         System.out.println("[COORDINATOR | REPLICA] - Locked QC for view " + currentView.get());
 

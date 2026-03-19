@@ -21,6 +21,10 @@ public class CommandMempool {
         pending.removeIf(req -> req.getClientId().equals(clientId) && req.getRequestId() == requestId);
     }
 
+    public void discardConflicting(String clientId) {
+        pending.removeIf(req -> req.getClientId().equals(clientId));
+    }
+
     public boolean isEmpty() {
         return pending.isEmpty();
     }
