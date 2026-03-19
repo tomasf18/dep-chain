@@ -68,7 +68,6 @@ public class BasicHotStuffCoordinator {
 
         new Thread(() -> {
             try {
-                serverContext.getPerfectLink().getAuthenticator().waitForHandshakesComplete();
                 serverContext.getPerfectLink().send(leader, payload);
                 startTimer();
             } catch (Exception e) {

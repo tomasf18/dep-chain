@@ -43,10 +43,10 @@ public class Config {
         this.f = f;
         this.processes = processes;
         this.clients = processes.entrySet().stream()
-                .filter(e -> e.getKey().startsWith("client"))
+                .filter(e -> e.getValue().isClient())
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         this.blockChainServers = processes.entrySet().stream()
-                .filter(e -> e.getKey().startsWith("s"))
+                .filter(e -> e.getValue().isServer())
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         this.resendPeriodMillis = resendPeriodMillis;
         this.dropProbability = dropProbability;
@@ -78,7 +78,8 @@ public class Config {
             ProcessInfo info = new ProcessInfo(
                     processId,
                     processJson.get("host").getAsString(),
-                    processJson.get("port").getAsInt()
+                    processJson.get("port").getAsInt(),
+                    processJson.get("role").getAsString()
             );
             processes.put(processId, info);
         }
@@ -117,6 +118,14 @@ public class Config {
 
     public ProcessInfo getSelfInfo() {
         return processes.get(selfId);
+    }
+
+    public boolean isSelfClient() {
+        return getSelfInfo().isClient();
+    }
+
+    public boolean isSelfServer() {
+        return getSelfInfo().isServer();
     }
 
     public Map<String, ProcessInfo> getProcesses() {
@@ -191,6 +200,10 @@ public class Config {
 
     public String getSelfPrivateKeyPathString() {
         return Path.of(getSelfKeysDirectory(), "private.pem").toString();
+    }
+
+    public String getSelfPublicKeyPathString() {
+        return Path.of(getSelfKeysDirectory(), "public.pem").toString();
     }
 
     public String getTrustedProcessKeyPathString(String processId) {

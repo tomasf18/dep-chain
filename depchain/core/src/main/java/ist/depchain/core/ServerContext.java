@@ -24,7 +24,7 @@ public class ServerContext {
         this.config = config;
         fairLossLink = new UdpFairLossLink(config);
         stubbornLink = new StubbornLink(config, fairLossLink);
-        perfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config, fairLossLink));
+        perfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config));
         blockChain = new BlockChain();
         commandExecutor = new CommandExecutor(blockChain);
         BLSManager.init();

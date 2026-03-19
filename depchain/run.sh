@@ -34,7 +34,59 @@ fi
 
 cd "$SCRIPT_DIR"
 
+generate_ec_keys() {
+    echo "[INFO] Generating EC key pairs for all processes..."
+
+    # Collect all process IDs
+    SERVERS=()
+    CLIENTS=()
+    for (( i = 0; i < NUM_SERVERS; i++ )); do
+        SERVERS+=("s${i}")
+    done
+    for (( i = 1; i <= NUM_CLIENTS; i++ )); do
+        CLIENTS+=("client${i}")
+    done
+    ALL_PROCESSES=("${SERVERS[@]}" "${CLIENTS[@]}")
+
+    # Generate key pairs in a temp directory
+    TMPKEYS="$(mktemp -d)"
+    for proc in "${ALL_PROCESSES[@]}"; do
+        openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 \
+            -out "$TMPKEYS/${proc}_private.pem" 2>/dev/null
+        openssl pkey -in "$TMPKEYS/${proc}_private.pem" -pubout \
+            -out "$TMPKEYS/${proc}_public.pem" 2>/dev/null
+    done
+
+    # Distribute keys: servers -> core/keystore/, clients -> client/keystore/
+    # Also populate tests/keystore/ for both (tests run from tests/ directory)
+    for proc in "${ALL_PROCESSES[@]}"; do
+        KEYDIRS=()
+        if [[ "$proc" == s* ]]; then
+            KEYDIRS+=("$SCRIPT_DIR/core/keystore/$proc")
+        else
+            KEYDIRS+=("$SCRIPT_DIR/client/keystore/$proc")
+        fi
+        KEYDIRS+=("$SCRIPT_DIR/tests/keystore/$proc")
+
+        for KEYDIR in "${KEYDIRS[@]}"; do
+            mkdir -p "$KEYDIR/trusted"
+            cp "$TMPKEYS/${proc}_private.pem" "$KEYDIR/private.pem"
+            cp "$TMPKEYS/${proc}_public.pem" "$KEYDIR/public.pem"
+
+            for peer in "${ALL_PROCESSES[@]}"; do
+                if [[ "$peer" != "$proc" ]]; then
+                    cp "$TMPKEYS/${peer}_public.pem" "$KEYDIR/trusted/${peer}.pem"
+                fi
+            done
+        done
+    done
+
+    rm -rf "$TMPKEYS"
+    echo "[INFO] EC keys generated and distributed."
+}
+
 if $RECOMPILE; then
+    generate_ec_keys
     echo "[INFO] Building project..."
     mvn clean install -DskipTests -q
     echo "[INFO] Build complete."

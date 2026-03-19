@@ -8,7 +8,10 @@ import ist.depchain.network.abstractions.UdpFairLossLink;
 import ist.depchain.common.ClientResponse;
 import ist.depchain.common.utils.Config;
 import ist.depchain.network.crypto.Authenticator;
+import ist.depchain.network.crypto.KeyLoader;
 
+import java.security.MessageDigest;
+import java.security.PrivateKey;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,11 +24,12 @@ public class ClientContext {
     private final UdpFairLossLink fairLossLink;
     private final StubbornLink stubbornLink;
     private final AuthenticatedPerfectLink authenticatedPerfectLink;
+    private final PrivateKey privateKey;
 
     private final AtomicInteger requestId = new AtomicInteger(0);
-    // requestId -> (blockId -> count of matching committed responses)
-    private Map<Integer, Map<String, Integer>> pendingRequests = new HashMap<>();
-    private int responsesThreshold; // f+1 matching responses required
+    // requestId -> (response digest -> count of matching committed responses)
+    private final Map<Integer, Map<String, Integer>> pendingRequests = new HashMap<>();
+    private final int responsesThreshold; // f+1 matching responses required
 
     private final Map<Integer, String> requestDataMap = new ConcurrentHashMap<>();
     private final List<String> commitedLog = Collections.synchronizedList(new ArrayList<>());
@@ -34,8 +38,12 @@ public class ClientContext {
         this.config = config;
         fairLossLink = new UdpFairLossLink(config);
         stubbornLink = new StubbornLink(config, fairLossLink);
-        authenticatedPerfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config, fairLossLink));
-        this.responsesThreshold = config.getF() + 1; 
+        authenticatedPerfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config));
+        this.privateKey = KeyLoader.loadPrivateKey(config.getSelfPrivateKeyPathString());
+        if (this.privateKey == null) {
+            throw new RuntimeException("Failed to load private key from " + config.getSelfPrivateKeyPathString());
+        }
+        this.responsesThreshold = config.getF() + 1;
     }
     
     public void start() {
@@ -53,12 +61,12 @@ public class ClientContext {
                 return;
             }
 
-            String blockKey = clientResponse.getBlockId().toStringUtf8();
-            Map<String, Integer> blockCounts = pendingRequests.get(reqId);
-            int count = blockCounts.merge(blockKey, 1, Integer::sum);
+            String responseDigest = digestMessage(clientResponse.toByteArray());
+            Map<String, Integer> digestCounts = pendingRequests.get(reqId);
+            int count = digestCounts.merge(responseDigest, 1, Integer::sum);
 
             if (count >= responsesThreshold) {
-                System.out.println("[*] (" +  reqId + ", " + sourceId + "): [" + blockKey +"] (" + count + "/" + responsesThreshold + ") COMMITED");
+                System.out.println("[*] (" +  reqId + ", " + sourceId + "): [" + responseDigest +"] (" + count + "/" + responsesThreshold + ") COMMITED");
                 String originalData = requestDataMap.get(reqId);
                 if(originalData != null && !commitedLog.contains(originalData)) {
                     commitedLog.add(originalData);
@@ -66,15 +74,21 @@ public class ClientContext {
                 pendingRequests.remove(reqId);
                 requestDataMap.remove(reqId);
             } else {
-                System.out.println("[+] (" +  reqId + ", " + sourceId + "): [" + blockKey +"] (" + count + "/" + responsesThreshold + ")");
+                System.out.println("[+] (" +  reqId + ", " + sourceId + "): [" + responseDigest +"] (" + count + "/" + responsesThreshold + ")");
             }
         } catch(Exception e) {
             System.out.println("[ERROR] Error while processing request: " + e.getMessage());
         }
     }
 
-    public void waitForHandshakes() throws InterruptedException {
-        authenticatedPerfectLink.getAuthenticator().waitForHandshakesComplete();
+    private String digestMessage(byte[] data) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(data);
+            return Base64.getEncoder().encodeToString(hash);
+        } catch (Exception e) {
+            throw new RuntimeException("SHA-256 not available", e);
+        }
     }
 
     public void stop() {
@@ -101,6 +115,10 @@ public class ClientContext {
 
     public void registerRequestInMap(int requestId, String requestData) {
         requestDataMap.put(requestId, requestData);
+    }
+
+    public PrivateKey getPrivateKey() {
+        return privateKey;
     }
 
     public List<String> getCommitedLog() {

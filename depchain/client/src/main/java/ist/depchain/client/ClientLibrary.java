@@ -1,11 +1,14 @@
 package ist.depchain.client;
 
+import com.google.protobuf.ByteString;
+
 import java.util.Set;
 import java.util.HashMap;
 
 import ist.depchain.common.ApplicationMessage;
 import ist.depchain.common.ClientRequest;
 import ist.depchain.common.Command;
+import ist.depchain.network.crypto.Crypto;
 
 public class ClientLibrary {
     private ClientContext clientContext;
@@ -24,11 +27,11 @@ public class ClientLibrary {
                 .setData(data)
                 .build();
 
-        ClientRequest clientRequest = ClientRequest.newBuilder()
-                                            .setClientId(clientContext.getConfig().getSelfId())
-                                            .setRequestId(reqId)
-                                            .setCommand(command)
-                                            .build();
+        ClientRequest clientRequest = signRequest(ClientRequest.newBuilder()
+                .setClientId(clientContext.getConfig().getSelfId())
+                .setRequestId(reqId)
+                .setCommand(command)
+                .build());
 
         ApplicationMessage appMsg = ApplicationMessage.newBuilder()
                                         .setClientRequest(clientRequest)
@@ -38,7 +41,7 @@ public class ClientLibrary {
 
         byte[] payload = appMsg.toByteArray();
         Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
-        clientContext.getPendingRequests().put(reqId, new HashMap<>()); // blockId -> matching response count
+        clientContext.getPendingRequests().put(reqId, new HashMap<>());
         clientContext.getAuthenticatedPerfectLink().broadcast(destinations, payload);
     }
 
@@ -50,21 +53,35 @@ public class ClientLibrary {
                 .setType(commandType)
                 .build();
 
-        ClientRequest clientRequest = ClientRequest.newBuilder()
-                                            .setClientId(clientContext.getConfig().getSelfId())
-                                            .setRequestId(reqId)
-                                            .setCommand(command)
-                                            .build();
+        ClientRequest clientRequest = signRequest(ClientRequest.newBuilder()
+                .setClientId(clientContext.getConfig().getSelfId())
+                .setRequestId(reqId)
+                .setCommand(command)
+                .build());
 
         ApplicationMessage appMsg = ApplicationMessage.newBuilder()
                                         .setClientRequest(clientRequest)
                                         .build();
-        
+
         System.out.println("[SENT] Client " + clientContext.getConfig().getSelfId() + " | Request Id: " + reqId + " | Show log");
 
         byte[] payload = appMsg.toByteArray();
         Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
-        clientContext.getPendingRequests().put(reqId, new HashMap<>()); // blockId -> matching response count
+        clientContext.getPendingRequests().put(reqId, new HashMap<>());
         clientContext.getAuthenticatedPerfectLink().broadcast(destinations, payload);
+    }
+
+    private ClientRequest signRequest(ClientRequest unsigned) {
+        try {
+            byte[] sig = Crypto.sign(
+                    unsigned.toByteArray(),
+                    clientContext.getPrivateKey(),
+                    clientContext.getConfig().getSignatureAlgorithm());
+            return ClientRequest.newBuilder(unsigned)
+                    .setSignature(ByteString.copyFrom(sig))
+                    .build();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to sign client request", e);
+        }
     }
 }
