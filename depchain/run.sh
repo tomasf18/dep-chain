@@ -1,9 +1,10 @@
 #!/bin/bash
 # Builds the project and spawns 3F+1 servers and N clients in tmux.
 # Run from the depchain/ directory (where config.json lives).
-# Usage: ./run.sh [-c] [-n N] [-f F]
+# Usage: ./run.sh [-c] [-b] [-n N] [-f F]
 #   -c      recompile before starting
-#   -n N    number of clients (default: 1)
+#   -b      build only (compile + key gen, no tmux session)
+#   -n N    number of clients (default: 2)
 #   -f F    number of tolerated faults (default: 1)
 
 set -e
@@ -12,12 +13,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="config-dev.json"
 SESSION="depchain"
 RECOMPILE=false
-NUM_CLIENTS=1
+BUILD_ONLY=false
+NUM_CLIENTS=2
 F=1
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -c) RECOMPILE=true; shift ;;
+        -b) BUILD_ONLY=true; RECOMPILE=true; shift ;;
         -t) CONFIG="config-test.json"; shift ;;
         -n) NUM_CLIENTS="$2"; shift 2 ;;
         -f) F="$2"; shift 2 ;;
@@ -92,6 +95,11 @@ if $RECOMPILE; then
     echo "[INFO] Build complete."
 else
     echo "[INFO] Skipping build (pass -c to recompile)."
+fi
+
+if $BUILD_ONLY; then
+    echo "[INFO] Build-only mode: skipping tmux session."
+    exit 0
 fi
 
 echo "[INFO] Starting $NUM_SERVERS servers (F=$F) and $NUM_CLIENTS client(s)."

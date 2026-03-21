@@ -1,0 +1,48 @@
+{
+  "networkConfig": {
+    "N": 4,
+    "f": 1,
+    "resendPeriodMillis": 1000,
+    "processes": {
+      "client1": {
+        "host": "localhost",
+        "port": 4001,
+        "role": "client"
+      },
+      "client2": {
+        "host": "localhost",
+        "port": 4002,
+        "role": "client"
+      },
+      "s0": {
+        "host": "localhost",
+        "port": 5000,
+        "role": "server"
+      },
+      "s1": {
+        "host": "localhost",
+        "port": 5001,
+        "role": "server"
+      },
+      "s2": {
+        "host": "localhost",
+        "port": 5002,
+        "role": "server"
+      },
+      "s3": {
+        "host": "localhost",
+        "port": 5003,
+        "role": "server"
+      }
+    }
+  },
+  "faultConfig": {
+    "dropProbability": 0.0,
+    "duplicateProbability": 0.0,
+    "tamperProbability": 0.5,
+    "maxDelayMs": 0
+  },
+  "cryptoConfig": {
+    "signatureAlgorithm": "SHA256withECDSA"
+  }
+}

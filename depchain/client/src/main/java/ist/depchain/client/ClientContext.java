@@ -28,7 +28,7 @@ public class ClientContext {
 
     private final AtomicInteger requestId = new AtomicInteger(0);
     // requestId -> (response digest -> count of matching committed responses)
-    private final Map<Integer, Map<String, Integer>> pendingRequests = new HashMap<>();
+    private final Map<Integer, Map<String, Integer>> pendingRequests = new ConcurrentHashMap<>();
     private final int responsesThreshold; // f+1 matching responses required
 
     private final Map<Integer, String> requestDataMap = new ConcurrentHashMap<>();
