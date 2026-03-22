@@ -10,7 +10,6 @@ import ist.depchain.common.utils.Config;
 import ist.depchain.network.crypto.Authenticator;
 import ist.depchain.network.crypto.KeyLoader;
 
-import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -55,24 +54,24 @@ public class ClientContext {
             ClientResponse clientResponse = ClientResponse.parseFrom(data);
 
             int reqId = clientResponse.getRequestId();
-            Map<String, Set<String>> digestSenders = pendingRequests.get(reqId);
-            if (digestSenders == null || !clientResponse.getCommitted()) {
+            Map<String, Set<String>> identitySenders = pendingRequests.get(reqId);
+            if (identitySenders == null || !clientResponse.getCommitted()) {
                 System.out.println("[ ] (" +  reqId + ", " + sourceId + "): nothing to do...");
                 return;
             }
 
-            String responseDigest = digestMessage(clientResponse.toByteArray());
-            Set<String> senders = digestSenders.computeIfAbsent(responseDigest, key -> ConcurrentHashMap.newKeySet());
+            String replyIdentity = makeReplyIdentity(clientResponse);
+            Set<String> senders = identitySenders.computeIfAbsent(replyIdentity, key -> ConcurrentHashMap.newKeySet());
             boolean isNewSender = senders.add(sourceId);
             int count = senders.size();
 
             if (!isNewSender) {
-                System.out.println("[ ] (" +  reqId + ", " + sourceId + "): duplicate sender ignored for [" + responseDigest +"] (" + count + "/" + responsesThreshold + ")");
+                System.out.println("[ ] (" +  reqId + ", " + sourceId + "): duplicate sender ignored for [" + replyIdentity +"] (" + count + "/" + responsesThreshold + ")");
                 return;
             }
 
             if (count >= responsesThreshold) {
-                System.out.println("[*] (" +  reqId + ", " + sourceId + "): [" + responseDigest +"] (" + count + "/" + responsesThreshold + ") COMMITED");
+                System.out.println("[*] (" +  reqId + ", " + sourceId + "): [" + replyIdentity +"] (" + count + "/" + responsesThreshold + ") COMMITED");
                 String originalData = requestDataMap.get(reqId);
                 if(originalData != null && !commitedLog.contains(originalData)) {
                     commitedLog.add(originalData);
@@ -80,21 +79,18 @@ public class ClientContext {
                 pendingRequests.remove(reqId);
                 requestDataMap.remove(reqId);
             } else {
-                System.out.println("[+] (" +  reqId + ", " + sourceId + "): [" + responseDigest +"] (" + count + "/" + responsesThreshold + ")");
+                System.out.println("[+] (" +  reqId + ", " + sourceId + "): [" + replyIdentity +"] (" + count + "/" + responsesThreshold + ")");
             }
         } catch(Exception e) {
             System.out.println("[ERROR] Error while processing request: " + e.getMessage());
         }
     }
 
-    private String digestMessage(byte[] data) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(data);
-            return Base64.getEncoder().encodeToString(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("SHA-256 not available", e);
-        }
+    private String makeReplyIdentity(ClientResponse response) {
+        // canonical reply identity based on essential fields only:
+        // requestId, committed, blockId - nice for stage 2
+        String blockIdStr = response.getBlockId().toStringUtf8();
+        return response.getRequestId() + ":" + blockIdStr;
     }
 
     public void stop() {
