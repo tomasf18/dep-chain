@@ -398,13 +398,14 @@ public class BasicHotStuffCoordinator {
 
         // guard against double-execution: only execute once per block
         boolean isFirstExecution = executedBlockIds.add(blockId);
-        if (isFirstExecution) {
-            // upcall to the server to execute the command and respond to clients
-            serverContext.getCommandExecutor().executeCommand(commitedBlock.getCommand().getType(), commitedBlock.getCommand().getData());
-            System.out.println("[COORDINATOR | REPLICA] - Executed block " + blockId.toStringUtf8());
-        } else {
-            System.out.println("[COORDINATOR | REPLICA] - Block " + blockId.toStringUtf8() + " already executed, skipping state mutation");
+        if (!isFirstExecution) {
+            System.out.println("[COORDINATOR | REPLICA] - Block " + blockId.toStringUtf8() + " already executed, ignoring duplicate DECIDE");
+            return;
         }
+
+        // upcall to the server to execute the command and respond to clients
+        serverContext.getCommandExecutor().executeCommand(commitedBlock.getCommand().getType(), commitedBlock.getCommand().getData());
+        System.out.println("[COORDINATOR | REPLICA] - Executed block " + blockId.toStringUtf8());
         
         onCommit();
         

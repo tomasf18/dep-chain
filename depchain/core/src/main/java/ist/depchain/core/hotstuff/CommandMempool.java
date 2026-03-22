@@ -21,7 +21,7 @@ public class CommandMempool {
         return makeKey(req.getClientId(), req.getRequestId());
     }
 
-    public void enqueue(ClientRequest req) {
+    public synchronized void enqueue(ClientRequest req) {
         String key = makeKey(req);
         if (!pendingKeys.contains(key)) {
             pending.offer(req);
@@ -29,7 +29,7 @@ public class CommandMempool {
         }
     }
 
-    public ClientRequest dequeue() {
+    public synchronized ClientRequest dequeue() {
         ClientRequest req = pending.poll();
         if (req != null) {
             pendingKeys.remove(makeKey(req));
@@ -37,7 +37,7 @@ public class CommandMempool {
         return req;
     }
 
-    public void discardIfPresent(String clientId, int requestId) {
+    public synchronized void discardIfPresent(String clientId, int requestId) {
         String key = makeKey(clientId, requestId);
         if (pendingKeys.contains(key)) {
             pending.removeIf(req -> req.getClientId().equals(clientId) && req.getRequestId() == requestId);
@@ -45,7 +45,7 @@ public class CommandMempool {
         }
     }
 
-    public void discardConflicting(String clientId) {
+    public synchronized void discardConflicting(String clientId) {
         pending.removeIf(req -> {
             if (req.getClientId().equals(clientId)) {
                 pendingKeys.remove(makeKey(req));
@@ -55,7 +55,7 @@ public class CommandMempool {
         });
     }
 
-    public boolean isEmpty() {
+    public synchronized boolean isEmpty() {
         return pending.isEmpty();
     }
 }

@@ -90,7 +90,7 @@ public class ClientContext {
         // canonical reply identity based on essential fields only:
         // requestId, committed, blockId - nice for stage 2
         String blockIdStr = response.getBlockId().toStringUtf8();
-        return response.getRequestId() + ":" + blockIdStr;
+        return response.getRequestId() + ":" + blockIdStr + ":" + response.getCommitted();
     }
 
     public void stop() {
