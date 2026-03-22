@@ -3,7 +3,7 @@ package ist.depchain.client;
 import com.google.protobuf.ByteString;
 
 import java.util.Set;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import ist.depchain.common.ApplicationMessage;
 import ist.depchain.common.ClientRequest;
@@ -41,7 +41,7 @@ public class ClientLibrary {
 
         byte[] payload = appMsg.toByteArray();
         Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
-        clientContext.getPendingRequests().put(reqId, new HashMap<>());
+        clientContext.getPendingRequests().put(reqId, new ConcurrentHashMap<>());
         clientContext.getAuthenticatedPerfectLink().broadcast(destinations, payload);
     }
 
@@ -67,7 +67,7 @@ public class ClientLibrary {
 
         byte[] payload = appMsg.toByteArray();
         Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
-        clientContext.getPendingRequests().put(reqId, new HashMap<>());
+        clientContext.getPendingRequests().put(reqId, new ConcurrentHashMap<>());
         clientContext.getAuthenticatedPerfectLink().broadcast(destinations, payload);
     }
 

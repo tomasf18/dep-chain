@@ -16,7 +16,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Map;
-import java.util.HashMap;
 
 public class ClientContext {
     private final Config config;
@@ -27,8 +26,8 @@ public class ClientContext {
     private final PrivateKey privateKey;
 
     private final AtomicInteger requestId = new AtomicInteger(0);
-    // requestId -> (response digest -> count of matching committed responses)
-    private final Map<Integer, Map<String, Integer>> pendingRequests = new ConcurrentHashMap<>();
+    // requestId -> (response digest -> set of distinct replica sender ids)
+    private final Map<Integer, Map<String, Set<String>>> pendingRequests = new ConcurrentHashMap<>();
     private final int responsesThreshold; 
 
     private final Map<Integer, String> requestDataMap = new ConcurrentHashMap<>();
@@ -56,14 +55,21 @@ public class ClientContext {
             ClientResponse clientResponse = ClientResponse.parseFrom(data);
 
             int reqId = clientResponse.getRequestId();
-            if (!pendingRequests.containsKey(reqId) || !clientResponse.getCommitted()) {
+            Map<String, Set<String>> digestSenders = pendingRequests.get(reqId);
+            if (digestSenders == null || !clientResponse.getCommitted()) {
                 System.out.println("[ ] (" +  reqId + ", " + sourceId + "): nothing to do...");
                 return;
             }
 
             String responseDigest = digestMessage(clientResponse.toByteArray());
-            Map<String, Integer> digestCounts = pendingRequests.get(reqId);
-            int count = digestCounts.merge(responseDigest, 1, Integer::sum);
+            Set<String> senders = digestSenders.computeIfAbsent(responseDigest, key -> ConcurrentHashMap.newKeySet());
+            boolean isNewSender = senders.add(sourceId);
+            int count = senders.size();
+
+            if (!isNewSender) {
+                System.out.println("[ ] (" +  reqId + ", " + sourceId + "): duplicate sender ignored for [" + responseDigest +"] (" + count + "/" + responsesThreshold + ")");
+                return;
+            }
 
             if (count >= responsesThreshold) {
                 System.out.println("[*] (" +  reqId + ", " + sourceId + "): [" + responseDigest +"] (" + count + "/" + responsesThreshold + ") COMMITED");
@@ -109,7 +115,7 @@ public class ClientContext {
         return requestId;
     }
 
-    public Map<Integer, Map<String, Integer>> getPendingRequests() {
+    public Map<Integer, Map<String, Set<String>>> getPendingRequests() {
         return pendingRequests;
     }
 
