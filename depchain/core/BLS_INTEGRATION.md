@@ -234,7 +234,7 @@ import ist.depchain.core.hotstuff.tsignatures.BLSManager;
 import java.nio.file.*;
 
 BLSManager.init();
-int n = 4, f = 1, threshold = f + 1;
+int n = 4, f = 1, threshold = 2*f + 1;
 SecretKeyVec msk = new SecretKeyVec();
 for (int i = 0; i < threshold; i++) {
     SecretKey coeff = new SecretKey();

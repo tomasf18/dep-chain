@@ -29,7 +29,7 @@ public class ClientContext {
     private final AtomicInteger requestId = new AtomicInteger(0);
     // requestId -> (response digest -> count of matching committed responses)
     private final Map<Integer, Map<String, Integer>> pendingRequests = new ConcurrentHashMap<>();
-    private final int responsesThreshold; // f+1 matching responses required
+    private final int responsesThreshold; 
 
     private final Map<Integer, String> requestDataMap = new ConcurrentHashMap<>();
     private final List<String> commitedLog = Collections.synchronizedList(new ArrayList<>());
@@ -43,7 +43,7 @@ public class ClientContext {
         if (this.privateKey == null) {
             throw new RuntimeException("Failed to load private key from " + config.getSelfPrivateKeyPathString());
         }
-        this.responsesThreshold = config.getF() + 1;
+        this.responsesThreshold = config.getThreshold();
     }
     
     public void start() {

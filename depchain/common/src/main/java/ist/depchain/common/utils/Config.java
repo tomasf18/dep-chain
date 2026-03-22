@@ -34,6 +34,8 @@ public class Config {
     private String BLSSecretShareFileName = "bls_secret_share.key";
     private String BLSMasterPubFileName = "bls_master_pub.key";
 
+    private int threshold;
+
     public Config(String selfId, int N, int f, Map<String, ProcessInfo> processes, int resendPeriodMillis,
                   double dropProbability, double duplicateProbability,
                   double tamperProbability, int maxDelayMs,
@@ -41,6 +43,7 @@ public class Config {
         this.selfId = selfId;
         this.N = N;
         this.f = f;
+        this.threshold = 2*f + 1; 
         this.processes = processes;
         this.clients = processes.entrySet().stream()
                 .filter(e -> e.getValue().isClient())
@@ -114,6 +117,10 @@ public class Config {
 
     public int getF() {
         return f;
+    }
+
+    public int getThreshold() {
+        return threshold;
     }
 
     public ProcessInfo getSelfInfo() {

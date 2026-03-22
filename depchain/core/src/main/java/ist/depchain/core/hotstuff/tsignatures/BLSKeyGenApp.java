@@ -24,7 +24,8 @@ public class BLSKeyGenApp {
 
         BLSManager.init();
 
-        int n = config.getN(), f = config.getF(), threshold = f + 1;
+        int n = config.getN();
+        int threshold = config.getThreshold();
 
         // Generate master secret polynomial: k random coefficients
         SecretKeyVec msk = new SecretKeyVec();

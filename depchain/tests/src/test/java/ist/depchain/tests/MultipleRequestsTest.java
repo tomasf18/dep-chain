@@ -73,7 +73,7 @@ public class MultipleRequestsTest {
             String expected = requests[i];
             String actual = committedLog.get(i);
             assertEquals(expected, actual, "Request " + requests[i] + " is not correct");
-            System.out.println("[TEST] - Client received f+1 ACKs and request " + actual + " has been commited");
+            System.out.println("[TEST] - Client received 2f+1 ACKs and request " + actual + " has been commited");
         }
 
         clientLibrary.showLog();

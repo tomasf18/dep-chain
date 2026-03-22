@@ -69,7 +69,7 @@ public class ByzantineCorruptReplicaTest {
         assertTrue(log.contains(request), "Request log contains not commited");
         assertFalse(log.contains("MALICIOUS DATA ALTERED BY BYZANTINE"), "Malicious replica inserted false message");
 
-        System.out.println("[TEST] - Client received f+1 ACKs and request " + currentId + " has been commited");
+        System.out.println("[TEST] - Client received 2f+1 ACKs and request " + currentId + " has been commited");
 
         // Logs
         clientLibrary.showLog();

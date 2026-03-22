@@ -78,7 +78,7 @@ public class ResilienceTest {
         List<String> commitedLog = clientContext.getCommitedLog();
         assertTrue(commitedLog.contains(request), "Request not commited");
 
-        System.out.println("[TEST] - Client received f+1 ACKs and request " + currentId + " has been commited");
+        System.out.println("[TEST] - Client received 2f+1 ACKs and request " + currentId + " has been commited");
 
         clientLibrary.showLog();
         TimeUnit.SECONDS.sleep(30);
