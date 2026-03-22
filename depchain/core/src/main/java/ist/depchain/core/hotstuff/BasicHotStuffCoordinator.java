@@ -49,6 +49,7 @@ public class BasicHotStuffCoordinator {
     private static final int BACKOFF_THRESHOLD = 2; // start backoff after 2 consecutive failures
 
     private RequestCommitListener requestCommitListener; // callback to notify MessageHandler when a request is committed, so it can mark it as executed
+    private final Set<ByteString> executedBlockIds = ConcurrentHashMap.newKeySet(); // blocks whose commands have been executed; guards against double-execution on DECIDE retransmission
 
     private boolean quorumReady = false;
     private ClientRequest lastProposedRequest = null; // track in-flight proposal so we can re-enqueue on timeout
@@ -393,9 +394,18 @@ public class BasicHotStuffCoordinator {
         }
 
         Block commitedBlock = tree.getBlock(m.getJustify().getBlockId());
+        ByteString blockId = commitedBlock.getId();
 
-        // upcall to the server to execute the command and respond to clients
-        serverContext.getCommandExecutor().executeCommand(commitedBlock.getCommand().getType(), commitedBlock.getCommand().getData());
+        // guard against double-execution: only execute once per block
+        boolean isFirstExecution = executedBlockIds.add(blockId);
+        if (isFirstExecution) {
+            // upcall to the server to execute the command and respond to clients
+            serverContext.getCommandExecutor().executeCommand(commitedBlock.getCommand().getType(), commitedBlock.getCommand().getData());
+            System.out.println("[COORDINATOR | REPLICA] - Executed block " + blockId.toStringUtf8());
+        } else {
+            System.out.println("[COORDINATOR | REPLICA] - Block " + blockId.toStringUtf8() + " already executed, skipping state mutation");
+        }
+        
         onCommit();
         
         Command command = commitedBlock.getCommand();
@@ -409,7 +419,7 @@ public class BasicHotStuffCoordinator {
                     .setClientId(command.getClientId())
                     .setRequestId(command.getRequestId())
                     .setCommitted(true)
-                    .setBlockId(commitedBlock.getId())
+                    .setBlockId(blockId)
                     .build();
             serverContext.getPerfectLink().send(command.getClientId(), response.toByteArray());
         }
