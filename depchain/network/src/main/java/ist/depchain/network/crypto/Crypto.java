@@ -3,6 +3,9 @@ package ist.depchain.network.crypto;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import java.security.MessageDigest;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.Signature;
 import java.util.Arrays;
 
 public class Crypto {
@@ -48,6 +51,20 @@ public class Crypto {
         }
         // System.out.println("[CRYPTO | INFO] - Message authentication verification succeeded.");
         return plaintext;
+    }
+
+    public static byte[] sign(byte[] data, PrivateKey privateKey, String algorithm) throws Exception {
+        Signature sig = Signature.getInstance(algorithm);
+        sig.initSign(privateKey);
+        sig.update(data);
+        return sig.sign();
+    }
+
+    public static boolean verifySignature(byte[] data, byte[] signature, PublicKey publicKey, String algorithm) throws Exception {
+        Signature sig = Signature.getInstance(algorithm);
+        sig.initVerify(publicKey);
+        sig.update(data);
+        return sig.verify(signature);
     }
 
     private static byte[] longToBytes(long v) {

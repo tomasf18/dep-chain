@@ -35,26 +35,26 @@ public class AuthenticatedPerfectLinkTest {
         Config config0 = Config.loadConfiguration(CONFIG_FILE, "s0");
         UdpFairLossLink udpLink0 = new UdpFairLossLink(config0);
         StubbornLink stubbornLink0 = new StubbornLink(config0, udpLink0);
-        Authenticator auth0 = new Authenticator(config0, stubbornLink0);
+        Authenticator auth0 = new Authenticator(config0);
         apl0 = new AuthenticatedPerfectLink(config0, stubbornLink0, udpLink0, auth0);
 
         //Setup of server 1
         Config config1 = Config.loadConfiguration(CONFIG_FILE, "s1");
         UdpFairLossLink udpLink1 = new UdpFairLossLink(config1);
         StubbornLink stubbornLink1 = new StubbornLink(config1, udpLink1);
-        Authenticator auth1 = new Authenticator(config1, stubbornLink1);
+        Authenticator auth1 = new Authenticator(config1);
         apl1 = new AuthenticatedPerfectLink(config1, stubbornLink1, udpLink1, auth1);
 
         Config config2 = Config.loadConfiguration(CONFIG_FILE, "s2");
         UdpFairLossLink udpLink2 = new UdpFairLossLink(config2);
         StubbornLink stubbornLink2 = new StubbornLink(config2, udpLink2);
-        Authenticator auth2 = new Authenticator(config2, stubbornLink2);
+        Authenticator auth2 = new Authenticator(config2);
         apl2 = new AuthenticatedPerfectLink(config2, stubbornLink2, udpLink2, auth2);
 
         Config config3 = Config.loadConfiguration(CONFIG_FILE, "s3");
         UdpFairLossLink udpLink3 = new UdpFairLossLink(config3);
         StubbornLink stubbornLink3 = new StubbornLink(config3, udpLink3);
-        Authenticator auth3 = new Authenticator(config3, stubbornLink3);
+        Authenticator auth3 = new Authenticator(config3);
         apl3 = new AuthenticatedPerfectLink(config3, stubbornLink3, udpLink3, auth3);
 
         counter = new AtomicInteger(0);

@@ -47,7 +47,7 @@ public class MultipleClientsTest {
         String[] requestsC1 = {"C1-Request1", "C1-Request2", "C1-Request3", "C1-Request4"};
         String[] requestsC2 = {"C2-Request1", "C2-Request2", "C2-Request3", "C2-Request4"};
 
-        TimeUnit.SECONDS.sleep(30);
+        TimeUnit.SECONDS.sleep(5);
         Thread t1 = new Thread(() -> {for(String requestC1 : requestsC1){clientLibrary1.append(requestC1);}});
         Thread t2 = new Thread(() -> {for(String requestC2 : requestsC2){clientLibrary2.append(requestC2);}});
 
@@ -57,7 +57,7 @@ public class MultipleClientsTest {
         t1.start(); t2.start();
         t1.join(); t2.join();
 
-        int time = 300;
+        int time = 60;
         while (time > 0 && (clientContext1.getCommitedLog().size() < requestsC1.length || clientContext2.getCommitedLog().size() < requestsC2.length)) {
             TimeUnit.SECONDS.sleep(1);
             time --;
@@ -67,8 +67,8 @@ public class MultipleClientsTest {
         List<String> committedLog1 = clientContext1.getCommitedLog();
         List<String> committedLog2 = clientContext2.getCommitedLog();
 
-        assertEquals(committedLog1.size(), requestsC1.length, "Client1 missing some commits");
-        assertEquals(committedLog2.size(), requestsC2.length, "Client2 missing some commits");
+        assertEquals(requestsC1.length, committedLog1.size(), "Client1 missing some commits");
+        assertEquals(requestsC2.length, committedLog2.size(), "Client2 missing some commits");
 
         for(String requestC1 : requestsC1){assertTrue(committedLog1.contains(requestC1), "Request " + requestC1 +" is not correct");}
         for(String requestC2 : requestsC2){assertTrue(committedLog2.contains(requestC2), "Request " + requestC2 +" is not correct");}

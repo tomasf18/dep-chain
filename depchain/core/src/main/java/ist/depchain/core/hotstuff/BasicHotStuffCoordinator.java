@@ -44,7 +44,8 @@ public class BasicHotStuffCoordinator {
     private static final int BACKOFF_THRESHOLD = 2; // start backoff after 2 consecutive failures
 
 
-    private boolean quorumReady = false; 
+    private boolean quorumReady = false;
+    private ClientRequest lastProposedRequest = null; // track in-flight proposal so we can re-enqueue on timeout
 
     public BasicHotStuffCoordinator(ServerContext serverContext, boolean isByzantine) {
         this.serverContext = serverContext;
@@ -68,7 +69,6 @@ public class BasicHotStuffCoordinator {
 
         new Thread(() -> {
             try {
-                serverContext.getPerfectLink().getAuthenticator().waitForHandshakesComplete();
                 serverContext.getPerfectLink().send(leader, payload);
                 startTimer();
             } catch (Exception e) {
@@ -218,7 +218,8 @@ public class BasicHotStuffCoordinator {
             System.out.println("[COORDINATOR | LEADER] - Block for highQC not found in tree, using genesis as parent");
         }
 
-        ClientRequest clientRequest = mempool.dequeue(); // guaranteed non-null 
+        ClientRequest clientRequest = mempool.dequeue(); // guaranteed non-null
+        lastProposedRequest = clientRequest;
         Command command = clientRequest.getCommand().toBuilder()
             .setClientId(clientRequest.getClientId())
             .setRequestId(clientRequest.getRequestId())
@@ -362,7 +363,7 @@ public class BasicHotStuffCoordinator {
         } else {
             System.out.println("[COORDINATOR | REPLICA] - Received COMMIT with valid QC from " + sourceId + ", QC view number: " + newLockedQC.getViewNumber());
         }
-        this.lockedQC = newLockedQC; 
+        this.lockedQC = newLockedQC;
 
         System.out.println("[COORDINATOR | REPLICA] - Locked QC for view " + currentView.get());
 
@@ -393,6 +394,7 @@ public class BasicHotStuffCoordinator {
         
         Command command = commitedBlock.getCommand();
         synchronized (this) {
+            lastProposedRequest = null; // proposal succeeded, no need to re-enqueue
             mempool.discardIfPresent(command.getClientId(), command.getRequestId());
         }
         if (!command.getClientId().isEmpty()) {
@@ -414,6 +416,12 @@ public class BasicHotStuffCoordinator {
         consecutiveTimeouts++;
         if (consecutiveTimeouts > BACKOFF_THRESHOLD) {
             currentTimeoutMs = Math.min(currentTimeoutMs * 2, MAX_TIMEOUT_MS);
+        }
+
+        // Re-enqueue the proposed request if the view ended without a successful DECIDE
+        if (lastProposedRequest != null) {
+            mempool.enqueue(lastProposedRequest);
+            lastProposedRequest = null;
         }
 
         int oldView = currentView.get();

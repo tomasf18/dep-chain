@@ -6,27 +6,33 @@
     "processes": {
       "client1": {
         "host": "localhost",
-        "port": 4001
+        "port": 4001,
+        "role": "client"
       },
       "client2": {
         "host": "localhost",
-        "port": 4002
+        "port": 4002,
+        "role": "client"
       },
       "s0": {
         "host": "localhost",
-        "port": 5000
+        "port": 5000,
+        "role": "server"
       },
       "s1": {
         "host": "localhost",
-        "port": 5001
+        "port": 5001,
+        "role": "server"
       },
       "s2": {
         "host": "localhost",
-        "port": 5002
+        "port": 5002,
+        "role": "server"
       },
       "s3": {
         "host": "localhost",
-        "port": 5003
+        "port": 5003,
+        "role": "server"
       }
     }
   },

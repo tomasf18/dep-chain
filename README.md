@@ -104,17 +104,19 @@ Two config files are provided:
 | Flag | Description | Default |
 |---|---|---|
 | `-f F` | Number of tolerated faults; starts `3F+1` servers | `1` |
-| `-n N` | Number of clients to start | `1` |
+| `-n N` | Number of clients to start | `2` |
 | `-t` | Use `config-test.json` (fault injection enabled) | uses `config-dev.json` |
-| `-c` | Recompile before starting | off |
+| `-c` | Recompile before starting (generates EC keys + Maven build) | off |
+| `-b` | Build only — compile and generate keys without starting the tmux session (implies `-c`) | off |
 
 **Examples:**
 
 ```bash
-./run.sh                  # 4 servers, 1 client, dev config
+./run.sh                  # 4 servers, 2 clients, dev config
 ./run.sh -c               # same but recompile first
+./run.sh -b               # compile + generate keys only, no tmux
 ./run.sh -f 2 -n 3        # 7 servers, 3 clients, dev config
-./run.sh -t               # 4 servers, 1 client, test config (fault injection)
+./run.sh -t               # 4 servers, 2 clients, test config (fault injection)
 ./run.sh -f 2 -n 2 -t -c  # 7 servers, 2 clients, test config, recompile
 ```
 
@@ -185,6 +187,9 @@ mvn test -Dtest=NAME_OF_TEST_CLASS
 ```
 
 ### Test case descriptions
+
+#### Network Layer
+
 **UDPFairLossTest** - Validates basic sending/receiving over UDP Fair-Loss layer.
 
 **StubbornLinkTest** - Validates message retransmission logic when the packets are lost.
@@ -193,19 +198,39 @@ mvn test -Dtest=NAME_OF_TEST_CLASS
 
 **AuthenticatedPerfectLinkTest** - Tests normal utilization of the layer without any adversaries. Also tests if the layer is capable of detecting man-in-the-middle (impersonation and data tampering).
 
+**AuthenticationTamperingTest** - Verifies the system commits correctly despite 50% HMAC-level message tampering.
+
+#### Consensus (Happy Path)
+
 **HappyPathTest** - Standard execution of the system with 4 honest replicas. Validates protocol completion.
-
-**ResilienceTest** - Demonstrates f = 1 tolerance with one replica offline (Simulation of Crash fault).
-
-**ByzantineSilentLeaderTest** - Validates that the system rotates the leader via timeouts when the leader is silent.
-
-**ByzantineLeaderEquivocate** - Validates that if a Leader tries to send different proposals to different replicas, it does not cause a fork (replicas with different commits).
-
-**ByzantineCorruptReplicaTest** - Validates that the system discards malicious information introduces by a malicious replicas.
 
 **MultipleRequestsTest** - Tests stability and sequencing under a continuous request stream.
 
 **MultipleClientsTest** - Validates concurrent interactions from multiple independent clients.
+
+#### Byzantine Fault Tolerance
+
+**ResilienceTest** - Demonstrates f = 1 tolerance with one replica offline (simulation of crash fault).
+
+**ByzantineSilentLeaderTest** - Validates that the system rotates the leader via timeouts when the leader is silent.
+
+**ByzantineLeaderEquivocate** - Validates that if a leader tries to send different proposals to different replicas, it does not cause a fork.
+
+**ByzantineCorruptReplicaTest** - Validates that the system discards malicious information introduced by a malicious replica.
+
+**ByzantineInvalidQCTest** - Honest replicas reject a PREPARE with a forged QC; system recovers via view change.
+
+**ByzantineAndCrashedReplicaTest** - Verifies no commit is possible when compound crash + Byzantine faults reduce active replicas below quorum.
+
+**ExceedFaultThresholdTest** - System cannot commit when fewer than n-f replicas are reachable (liveness boundary).
+
+**MultipleRequestsByzantineLeaderTest** - All requests committed correctly across multiple rounds with a persistent equivocating leader.
+
+#### Client Security
+
+**InvalidClientSignatureTest** - A request with a forged/random ECDSA signature is rejected by all replicas.
+
+**ReplayAttackTest** - A replayed client request (same requestId) is rejected by server replay protection.
 
 ### Test source location
 The source code for each test is inside the directory: **dep-chain/depchain/tests/src/test/java/ist/depchain/tests**
@@ -275,7 +300,7 @@ depchain/
 │       └── libblsjava.so   - built per-machine, not committed
 ├── network/         - UDP link stack (FairLoss -> Stubborn -> Perfect -> Authenticated)
 ├── config-dev.json  - zero faults, for development
-└── config.json      - realistic faults, for testing
+└── config-test.json - realistic faults, for testing
 ```
 
 ---

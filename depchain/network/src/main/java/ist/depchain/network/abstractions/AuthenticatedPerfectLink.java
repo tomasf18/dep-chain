@@ -86,13 +86,6 @@ public class AuthenticatedPerfectLink implements Link {
         try {
             Envelope envelope = Envelope.parseFrom(data);
 
-            // Handshakes must be processed for any sender so sessions can be established
-            // before the first authenticated payload arrives.
-            if (envelope.hasHandshake()) {
-                authenticator.verifyMessageAuthenticity(envelope);
-                return;
-            }
-
             if (!authenticator.shouldAuthenticate(senderId)) {
                 perfectLink.handleIncomingMessage(senderId, data);
                 return;
@@ -126,10 +119,6 @@ public class AuthenticatedPerfectLink implements Link {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    public Authenticator getAuthenticator() {
-        return authenticator;
     }
 
     // ============================================================

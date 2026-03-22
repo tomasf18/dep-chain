@@ -96,11 +96,12 @@ public class BasicHotStuffUtils {
     /* Matching and Safety Functions */
 
     public boolean verifyQC(QC qc) {
-        if (qc == null || qc.equals(QC.getDefaultInstance())) return true; // genesis QC always valid
-        // if (qc.getThresholdSig().isEmpty()) return true; // stub QC during transition
+        if (qc == null) return true;
+        // Genesis QC has empty signature and viewNumber 0 — skip BLS verification
+        if (qc.getViewNumber() == 0 && qc.getThresholdSig().isEmpty()) return true;
 
         byte[] digest = getMsgDigest(qc.getType(), qc.getViewNumber(), qc.getBlockId());
-        return blsThresholdSig.verify(digest, qc.getThresholdSig().toByteArray()); // ← real verification
+        return blsThresholdSig.verify(digest, qc.getThresholdSig().toByteArray());
     }
 
     // [Line 21-22] - Verify if Message is the same
