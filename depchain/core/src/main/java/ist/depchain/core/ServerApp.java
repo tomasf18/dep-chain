@@ -4,7 +4,17 @@ import ist.depchain.common.utils.Config;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 import ist.depchain.core.byzantine.ByzantineCoordinator;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class ServerApp {
+    // Registry for test inspection — maps serverId to its coordinator
+    private static final Map<String, BasicHotStuffCoordinator> coordinators = new ConcurrentHashMap<>();
+
+    public static BasicHotStuffCoordinator getCoordinator(String serverId) {
+        return coordinators.get(serverId);
+    }
+
     public static void main(String[] args) {
         if (args.length < 2) {
             System.out.println("Usage: mvn exec:java -Dexec.args='<configFile> <serverId> <byzantine_flag> <attack_type>'");
@@ -33,6 +43,7 @@ public class ServerApp {
             hotStuffCoordinator = byzantineCoordinator;
         }
         else {hotStuffCoordinator = new BasicHotStuffCoordinator(server, byzantineFlag);}
+        coordinators.put(selfId, hotStuffCoordinator);
         new MessageHandler(server, hotStuffCoordinator);
         try {
             server.start();

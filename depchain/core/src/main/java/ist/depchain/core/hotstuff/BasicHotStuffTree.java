@@ -28,4 +28,18 @@ public class BasicHotStuffTree {
     public Block getGenesisBlock() {
         return blocks.get(ByteString.EMPTY);
     }
+
+    /** Remove all siblings of the committed block (same parentId, different id). */
+    public void pruneSiblings(Block committed) {
+        ByteString parentId = committed.getParentId();
+        ByteString committedId = committed.getId();
+        blocks.values().removeIf(b ->
+                b.getParentId().equals(parentId)
+                && !b.getId().equals(committedId)
+                && !b.getId().equals(ByteString.EMPTY));
+    }
+
+    public Map<ByteString, Block> getAllBlocks() {
+        return blocks;
+    }
 }
