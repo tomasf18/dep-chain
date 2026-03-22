@@ -21,6 +21,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class BasicHotStuffCoordinator {
+    public interface RequestCommitListener {
+        // same arguments as MessageHandler.markRequestExecuted, that is the main use case for this callback; but named to reflect the semantics of being called when a request is committed, rather than the internal implementation of marking it executed in the MessageHandler
+        void onRequestCommitted(String clientId, int requestId);
+    }
+
     protected final ServerContext serverContext;
     protected final BasicHotStuffUtils utils;
     protected final AtomicInteger currentView = new AtomicInteger(1); // incremented either by finishing a decision or by a NEXT_VIEW interrupt
@@ -43,6 +48,7 @@ public class BasicHotStuffCoordinator {
     private int consecutiveTimeouts = 0;
     private static final int BACKOFF_THRESHOLD = 2; // start backoff after 2 consecutive failures
 
+    private RequestCommitListener requestCommitListener; // callback to notify MessageHandler when a request is committed, so it can mark it as executed
 
     private boolean quorumReady = false;
     private ClientRequest lastProposedRequest = null; // track in-flight proposal so we can re-enqueue on timeout
@@ -398,6 +404,7 @@ public class BasicHotStuffCoordinator {
             mempool.discardIfPresent(command.getClientId(), command.getRequestId());
         }
         if (!command.getClientId().isEmpty()) {
+            notifyRequestCommitted(command.getClientId(), command.getRequestId());
             ClientResponse response = ClientResponse.newBuilder()
                     .setClientId(command.getClientId())
                     .setRequestId(command.getRequestId())
@@ -465,6 +472,16 @@ public class BasicHotStuffCoordinator {
     public synchronized void enqueueClientRequest(ClientRequest clientRequest) {
         mempool.enqueue(clientRequest);
         notify(); 
+    }
+
+    public synchronized void setRequestCommitListener(RequestCommitListener listener) {
+        this.requestCommitListener = listener;
+    }
+
+    private synchronized void notifyRequestCommitted(String clientId, int requestId) {
+        if (requestCommitListener != null) {
+            requestCommitListener.onRequestCommitted(clientId, requestId);
+        }
     }
 
     // General send vote function for replicas
