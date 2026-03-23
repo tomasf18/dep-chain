@@ -46,7 +46,7 @@ public class Crypto {
         mac.update(longToBytes(seq));
         byte[] expectedTag = mac.doFinal(plaintext);
         if (!MessageDigest.isEqual(expectedTag, receivedTag)) {
-            System.out.println("[CRYPTO | ERROR] - Message authentication verification failed.");
+            //System.out.println("[CRYPTO | ERROR] - Message authentication verification failed.");
             return null;
         }
         // System.out.println("[CRYPTO | INFO] - Message authentication verification succeeded.");

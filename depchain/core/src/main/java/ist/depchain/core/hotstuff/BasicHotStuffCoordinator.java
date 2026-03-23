@@ -405,8 +405,9 @@ public class BasicHotStuffCoordinator {
 
         // upcall to the server to execute the command and respond to clients
         serverContext.getCommandExecutor().executeCommand(commitedBlock.getCommand().getType(), commitedBlock.getCommand().getData());
+        tree.pruneSiblings(commitedBlock);
         System.out.println("[COORDINATOR | REPLICA] - Executed block " + blockId.toStringUtf8());
-        
+
         onCommit();
         
         Command command = commitedBlock.getCommand();
@@ -511,5 +512,27 @@ public class BasicHotStuffCoordinator {
                                         .build();
         Set<String> destinations = serverContext.getConfig().getBlockChainServers().keySet();
         serverContext.getPerfectLink().broadcast(destinations, wrapper.toByteArray());
+    }
+
+    // === Test inspection getters ===
+
+    public BasicHotStuffTree getTree() {
+        return tree;
+    }
+
+    public synchronized QC getLockedQC() {
+        return lockedQC;
+    }
+
+    public synchronized QC getPrepareQC() {
+        return prepareQC;
+    }
+
+    public int getCurrentView() {
+        return currentView.get();
+    }
+
+    public Set<ByteString> getExecutedBlockIds() {
+        return executedBlockIds;
     }
 }
