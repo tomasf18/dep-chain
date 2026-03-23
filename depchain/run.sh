@@ -1,9 +1,10 @@
 #!/bin/bash
 # Builds the project and spawns 3F+1 servers and N clients in tmux.
 # Run from the depchain/ directory (where config.json lives).
-# Usage: ./run.sh [-c] [-b] [-n N] [-f F]
+# Usage: ./run.sh [-c] [-b] [-k] [-n N] [-f F]
 #   -c      recompile before starting
-#   -b      build only (compile + key gen, no tmux session)
+#   -b      build only (compile, no tmux session)
+#   -k      regenerate EC keys (without -c, only keys are regenerated)
 #   -n N    number of clients (default: 2)
 #   -f F    number of tolerated faults (default: 1)
 
@@ -14,6 +15,7 @@ CONFIG="config-dev.json"
 SESSION="depchain"
 RECOMPILE=false
 BUILD_ONLY=false
+KEYGEN=false
 NUM_CLIENTS=2
 F=1
 
@@ -21,6 +23,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -c) RECOMPILE=true; shift ;;
         -b) BUILD_ONLY=true; RECOMPILE=true; shift ;;
+        -k) KEYGEN=true; shift ;;
         -t) CONFIG="config-test.json"; shift ;;
         -n) NUM_CLIENTS="$2"; shift 2 ;;
         -f) F="$2"; shift 2 ;;
@@ -88,8 +91,11 @@ generate_ec_keys() {
     echo "[INFO] EC keys generated and distributed."
 }
 
-if $RECOMPILE; then
+if $KEYGEN; then
     generate_ec_keys
+fi
+
+if $RECOMPILE; then
     echo "[INFO] Building project..."
     mvn clean install -DskipTests -q
     echo "[INFO] Build complete."
