@@ -1,11 +1,13 @@
 package ist.depchain.core;
 
+import ist.depchain.common.Transaction;
 import ist.depchain.common.ClientRequest;
 import ist.depchain.common.HotStuffMessage;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 import ist.depchain.common.ApplicationMessage;
 import ist.depchain.network.crypto.Crypto;
 import ist.depchain.network.crypto.KeyLoader;
+import ist.depchain.core.blockchain.TransactionValidator;
 
 import java.security.PublicKey;
 import java.util.Set;
@@ -48,23 +50,63 @@ public class MessageHandler {
         RequestKey requestKey = new RequestKey(clientId, requestId);
 
         if (!verifyClientSignature(clientRequest)) {
-            System.err.println("[MESSAGE_HANDLER | ERROR] - Invalid signature on client request from " + clientId);
+            System.err.println("[MESSAGE_HANDLER | ERROR] Invalid outer client request signature from " + clientId);
             return;
         }
 
         if (executedRequests.contains(requestKey)) {
-            System.err.println("[MESSAGE_HANDLER | WARN] - Replay detected: request already executed for client " + clientId
-                    + " request_id " + requestId);
+            System.err.println("[MESSAGE_HANDLER | WARN] Replay detected: already executed " + requestKey);
             return;
         }
 
         if (!pendingRequests.add(requestKey)) {
-            System.out.println("[MESSAGE_HANDLER | INFO] - Duplicate in-flight request ignored for client " + clientId
-                    + " request_id " + requestId);
+            System.out.println("[MESSAGE_HANDLER | INFO] Duplicate in-flight request ignored for " + requestKey);
             return;
         }
 
-        System.out.println("[MESSAGE_HANDLER | INFO] - Received client request " + requestId + " from " + sourceId);
+        switch (clientRequest.getPayloadCase()) {
+            case TRANSACTION -> handleTransactionRequest(clientRequest, requestKey);
+            case COMMAND -> {
+                // optional: keep Stage 1 compatibility during transition
+                System.out.println("[MESSAGE_HANDLER | INFO] Legacy command request accepted");
+                coordinator.enqueueClientRequest(clientRequest);
+            }
+            case PAYLOAD_NOT_SET -> {
+                pendingRequests.remove(requestKey);
+                System.err.println("[MESSAGE_HANDLER | ERROR] Empty client payload");
+            }
+        }
+    }
+
+    private void handleTransactionRequest(ClientRequest clientRequest, RequestKey requestKey) {
+        String clientId = clientRequest.getClientId();
+        var tx = Transaction.fromProto(clientRequest.getTransaction());
+
+        String keyPath = serverContext.getConfig().getTrustedProcessKeyPathString(clientId);
+        PublicKey clientPublicKey = KeyLoader.loadPublicKey(keyPath);
+        if (clientPublicKey == null) {
+            pendingRequests.remove(requestKey);
+            System.err.println("[MESSAGE_HANDLER | ERROR] No public key found for " + clientId);
+            return;
+        }
+
+        var result = TransactionValidator.validate(
+                tx,
+                clientPublicKey,
+                serverContext.getConfig().getSignatureAlgorithm(),
+                serverContext.getWorldState()
+        );
+
+        if (!result.valid()) {
+            pendingRequests.remove(requestKey);
+            System.err.println("[MESSAGE_HANDLER | ERROR] Rejected tx from " + clientId + ": " + result.error());
+            return;
+        }
+
+        System.out.println("[MESSAGE_HANDLER | INFO] Accepted tx request " + requestKey
+                + " from=" + tx.getFrom()
+                + " nonce=" + tx.getNonce());
+
         coordinator.enqueueClientRequest(clientRequest);
     }
 
@@ -84,11 +126,9 @@ public class MessageHandler {
         PublicKey clientPublicKey = KeyLoader.loadPublicKey(keyPath);
 
         if (clientPublicKey == null) {
-            System.err.println("[MESSAGE_HANDLER | ERROR] - No public key found for " + clientId);
             return false;
         }
 
-        // Rebuild the unsigned request to verify the signature
         ClientRequest unsigned = ClientRequest.newBuilder(clientRequest)
                 .clearSignature()
                 .build();
@@ -100,7 +140,6 @@ public class MessageHandler {
                     clientPublicKey,
                     serverContext.getConfig().getSignatureAlgorithm());
         } catch (Exception e) {
-            System.err.println("[MESSAGE_HANDLER | ERROR] - Signature verification failed for " + clientId + ": " + e.getMessage());
             return false;
         }
     }

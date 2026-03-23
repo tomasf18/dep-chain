@@ -9,12 +9,15 @@ import ist.depchain.common.ClientResponse;
 import ist.depchain.common.utils.Config;
 import ist.depchain.network.crypto.Authenticator;
 import ist.depchain.network.crypto.KeyLoader;
+import ist.depchain.common.utils.AddressUtils;
 
 import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.Map;
+
+import org.hyperledger.besu.datatypes.Address;
 
 public class ClientContext {
     private final Config config;
@@ -23,6 +26,8 @@ public class ClientContext {
     private final StubbornLink stubbornLink;
     private final AuthenticatedPerfectLink authenticatedPerfectLink;
     private final PrivateKey privateKey;
+    private final PublicKey publicKey;
+    private final Address selfAddress;
 
     private final AtomicInteger requestId = new AtomicInteger(0);
     // requestId -> (response digest -> set of distinct replica sender ids)
@@ -41,6 +46,11 @@ public class ClientContext {
         if (this.privateKey == null) {
             throw new RuntimeException("Failed to load private key from " + config.getSelfPrivateKeyPathString());
         }
+        this.publicKey = KeyLoader.loadPublicKey(config.getTrustedProcessKeyPathString(config.getSelfId()));
+        if (this.publicKey == null) {
+            throw new RuntimeException("Failed to load public key for " + config.getSelfId());
+        }
+        this.selfAddress = AddressUtils.deriveAddress(publicKey);
         this.responsesThreshold = config.getThreshold();
     }
     
@@ -121,6 +131,10 @@ public class ClientContext {
 
     public PrivateKey getPrivateKey() {
         return privateKey;
+    }
+
+    public Address getSelfAddress() {
+        return selfAddress;
     }
 
     public List<String> getCommitedLog() {

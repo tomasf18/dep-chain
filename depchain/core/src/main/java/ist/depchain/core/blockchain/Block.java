@@ -5,6 +5,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import ist.depchain.common.Transaction;
+
 public class Block {
     private final String blockHash;
     private final String previousBlockHash; // null for genesis
