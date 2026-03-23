@@ -39,24 +39,44 @@ message ApplicationMessage { // serves to simplify the message handling logic by
 }
 
 message Command {
-    string type = 1; // e.g., "append", "show", etc.
-    string data = 2; // e.g., for "append", the string to append
-    string client_id = 3; 
-    int32  request_id = 4;
+    string type = 1;
+    string data = 2;
+    string client_id = 3;
+    uint32 request_id = 4;
+}
+
+message TransactionPayload {
+  bytes from = 1;        // 20-byte Ethereum-style address
+  bytes to = 2;          // empty for deployment
+  bytes value = 3;       // big-endian BigInteger
+  bytes data = 4;        // calldata / deployment bytecode
+  bytes gas_price = 5;   // big-endian BigInteger
+  bytes gas_limit = 6;   // big-endian BigInteger
+  uint64 nonce = 7;
+  bytes signature = 8;   // ECDSA signature over unsigned tx bytes
 }
 
 message ClientRequest {
-    string client_id = 1;
-    int32 request_id = 2; // unique per client_id
-    Command command = 3;
-    bytes signature = 4; // digital signature over (client_id || request_id || command)
+  string client_id = 1;
+  uint32 request_id = 2;
+
+  oneof payload {
+    Command command = 3;                 // legacy Stage 1
+    TransactionPayload transaction = 4;  // Stage 2
+  }
+
+  bytes signature = 10; // signature over request envelope (without this field)
 }
 
 message ClientResponse {
-    string client_id = 1;
-    int32 request_id = 2; // matches the request_id of the ClientRequest
-    bool committed = 3;
-    bytes block_id = 4;
+  string client_id = 1;
+  uint32 request_id = 2;
+  bool committed = 3;
+  bytes block_id = 4;
+
+  bytes tx_hash = 5;
+  string status = 6;   // ACCEPTED / REJECTED / COMMITTED
+  string error = 7;    // empty if none
 }
 
 // Replica <-> Replica Messages (HotStuff)

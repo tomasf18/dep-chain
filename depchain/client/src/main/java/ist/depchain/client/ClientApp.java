@@ -24,32 +24,40 @@ public class ClientApp {
 
             Scanner in = new Scanner(System.in);
             while (true) {
-                System.out.println("\n === === === === === === === === ===");
-                System.out.println("  [" + config.getSelfId() + "] Select an action (or 'exit' to quit):");
-                System.out.println("  Enter '1' to: Append to log");
-                System.out.println("  Enter '2' to: View log");
-                System.out.println(" === === === === === === === === ===");
+                System.out.println("\n=== DepChain Client ===");
+                System.out.println("1 - Submit native transfer");
+                System.out.println("exit - Quit");
                 System.out.print("> ");
                 String line = in.nextLine();
 
                 switch (line) {
                     case "1":
-                        System.out.print("Enter message to append: ");
-                        String message = in.nextLine();
-                        clientLib.append(message);
+                        System.out.print("Destination address (0x...): ");
+                        String to = in.nextLine();
+
+                        System.out.print("Value: ");
+                        java.math.BigInteger value = new java.math.BigInteger(in.nextLine());
+
+                        System.out.print("Gas price: ");
+                        java.math.BigInteger gasPrice = new java.math.BigInteger(in.nextLine());
+
+                        System.out.print("Gas limit: ");
+                        java.math.BigInteger gasLimit = new java.math.BigInteger(in.nextLine());
+
+                        System.out.print("Nonce: ");
+                        long nonce = Long.parseLong(in.nextLine());
+
+                        clientLib.submitNativeTransfer(to, value, gasPrice, gasLimit, nonce);
                         break;
-                    case "2":
-                        clientLib.showLog();
-                        break;
+
                     case "exit":
                         System.out.println("[INFO] Exiting...");
                         client.stop();
                         in.close();
-                        System.out.println("[INFO] Successfully terminated");
                         return;
-                
+
                     default:
-                        break;
+                        System.out.println("Unknown option");
                 }
             }
         }

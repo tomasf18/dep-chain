@@ -21,6 +21,8 @@
     <protobuf.version>4.33.5</protobuf.version>
   </properties>
 
+
+
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -45,6 +47,8 @@
       <artifactId>junit-jupiter-params</artifactId>
       <scope>test</scope>
     </dependency>
+
+
   </dependencies>
 
   <build>
