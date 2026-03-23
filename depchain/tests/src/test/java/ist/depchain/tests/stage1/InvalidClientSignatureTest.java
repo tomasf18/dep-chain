@@ -1,4 +1,4 @@
-package ist.depchain.tests;
+package ist.depchain.tests.stage1;
 
 import com.google.protobuf.ByteString;
 import ist.depchain.client.ClientContext;

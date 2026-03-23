@@ -1,0 +1,210 @@
+package ist.depchain.core.blockchain;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import org.hyperledger.besu.datatypes.Address;
+import org.web3j.utils.Numeric;
+
+import ist.depchain.common.Transaction;
+
+/**
+ * JSON serialization and deserialization for Block objects.
+ * Format matches the genesis block format from the spec.
+ */
+public class BlockSerializer {
+
+    // --- Serialize ---
+
+    public static String toJson(Block block) {
+        return toJsonObject(block).toString();
+    }
+
+    public static JsonObject toJsonObject(Block block) {
+        JsonObject root = new JsonObject();
+        root.addProperty("block_hash", block.getBlockHash());
+
+        if (block.getPreviousBlockHash() != null) {
+            root.addProperty("previous_block_hash", block.getPreviousBlockHash());
+        } else {
+            root.add("previous_block_hash", JsonNull.INSTANCE);
+        }
+
+        root.addProperty("block_number", block.getBlockNumber());
+
+        if (block.getProposer() != null) {
+            root.addProperty("proposer", block.getProposer().toHexString());
+        } else {
+            root.add("proposer", JsonNull.INSTANCE);
+        }
+
+        // Transactions
+        JsonArray txArray = new JsonArray();
+        for (Transaction tx : block.getTransactions()) {
+            txArray.add(serializeTransaction(tx));
+        }
+        root.add("transactions", txArray);
+
+        // Receipts
+        if (!block.getReceipts().isEmpty()) {
+            JsonArray receiptArray = new JsonArray();
+            for (TransactionReceipt receipt : block.getReceipts()) {
+                receiptArray.add(serializeReceipt(receipt));
+            }
+            root.add("receipts", receiptArray);
+        }
+
+        return root;
+    }
+
+    private static JsonObject serializeTransaction(Transaction tx) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("from", tx.getFrom().toHexString());
+
+        if (tx.getTo() != null) {
+            obj.addProperty("to", tx.getTo().toHexString());
+        } else {
+            obj.add("to", JsonNull.INSTANCE);
+        }
+
+        obj.addProperty("value", tx.getValue().toString());
+        obj.addProperty("input", "0x" + Numeric.toHexStringNoPrefix(tx.getData()));
+        obj.addProperty("gas_price", tx.getGasPrice().toString());
+        obj.addProperty("gas_limit", tx.getGasLimit().toString());
+        obj.addProperty("nonce", tx.getNonce());
+
+        if (tx.getSignature() != null) {
+            obj.addProperty("signature", "0x" + Numeric.toHexStringNoPrefix(tx.getSignature()));
+        }
+
+        obj.addProperty("tx_hash", Numeric.toHexStringNoPrefix(tx.txHash()));
+
+        return obj;
+    }
+
+    private static JsonObject serializeReceipt(TransactionReceipt receipt) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("tx_hash", Numeric.toHexStringNoPrefix(receipt.getTxHash()));
+        obj.addProperty("success", receipt.isSuccess());
+        obj.addProperty("gas_used", receipt.getGasUsed().toString());
+        obj.addProperty("fee", receipt.getFee().toString());
+
+        if (receipt.getError() != null) {
+            obj.addProperty("error", receipt.getError());
+        }
+
+        if (receipt.getContractAddress() != null) {
+            obj.addProperty("contract_address", receipt.getContractAddress().toHexString());
+        }
+
+        return obj;
+    }
+
+    // --- Deserialize ---
+
+    public static Block fromJson(String json) {
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        return fromJsonObject(root);
+    }
+
+    public static Block fromJsonObject(JsonObject root) {
+        String blockHash = root.get("block_hash").getAsString();
+
+        String previousBlockHash = null;
+        if (root.has("previous_block_hash") && !root.get("previous_block_hash").isJsonNull()) {
+            previousBlockHash = root.get("previous_block_hash").getAsString();
+        }
+
+        int blockNumber = root.has("block_number") ? root.get("block_number").getAsInt() : 0;
+
+        Address proposer = null;
+        if (root.has("proposer") && !root.get("proposer").isJsonNull()) {
+            proposer = Address.fromHexString(root.get("proposer").getAsString());
+        }
+
+        // Transactions
+        List<Transaction> transactions = new ArrayList<>();
+        if (root.has("transactions") && !root.get("transactions").isJsonNull()) {
+            for (JsonElement elem : root.getAsJsonArray("transactions")) {
+                transactions.add(deserializeTransaction(elem.getAsJsonObject()));
+            }
+        }
+
+        // Receipts
+        List<TransactionReceipt> receipts = new ArrayList<>();
+        if (root.has("receipts") && !root.get("receipts").isJsonNull()) {
+            for (JsonElement elem : root.getAsJsonArray("receipts")) {
+                receipts.add(deserializeReceipt(elem.getAsJsonObject()));
+            }
+        }
+
+        return new Block(blockHash, previousBlockHash, transactions, receipts, blockNumber, proposer);
+    }
+
+    private static Transaction deserializeTransaction(JsonObject obj) {
+        Address from = Address.fromHexString(obj.get("from").getAsString());
+
+        Address to = null;
+        if (obj.has("to") && !obj.get("to").isJsonNull()) {
+            to = Address.fromHexString(obj.get("to").getAsString());
+        }
+
+        BigInteger value = BigInteger.ZERO;
+        if (obj.has("value") && !obj.get("value").isJsonNull()) {
+            value = new BigInteger(obj.get("value").getAsString());
+        }
+
+        byte[] data = new byte[0];
+        if (obj.has("input") && !obj.get("input").isJsonNull()) {
+            data = Numeric.hexStringToByteArray(obj.get("input").getAsString());
+        }
+
+        BigInteger gasPrice = BigInteger.ONE;
+        if (obj.has("gas_price") && !obj.get("gas_price").isJsonNull()) {
+            gasPrice = new BigInteger(obj.get("gas_price").getAsString());
+        }
+
+        BigInteger gasLimit = BigInteger.valueOf(21_000);
+        if (obj.has("gas_limit") && !obj.get("gas_limit").isJsonNull()) {
+            gasLimit = new BigInteger(obj.get("gas_limit").getAsString());
+        }
+
+        long nonce = 0;
+        if (obj.has("nonce") && !obj.get("nonce").isJsonNull()) {
+            nonce = obj.get("nonce").getAsLong();
+        }
+
+        byte[] signature = null;
+        if (obj.has("signature") && !obj.get("signature").isJsonNull()) {
+            signature = Numeric.hexStringToByteArray(obj.get("signature").getAsString());
+        }
+
+        return new Transaction(from, to, value, data, gasPrice, gasLimit, nonce, signature);
+    }
+
+    private static TransactionReceipt deserializeReceipt(JsonObject obj) {
+        byte[] txHash = Numeric.hexStringToByteArray(obj.get("tx_hash").getAsString());
+        boolean success = obj.get("success").getAsBoolean();
+        BigInteger gasUsed = new BigInteger(obj.get("gas_used").getAsString());
+        BigInteger fee = new BigInteger(obj.get("fee").getAsString());
+
+        String error = null;
+        if (obj.has("error") && !obj.get("error").isJsonNull()) {
+            error = obj.get("error").getAsString();
+        }
+
+        Address contractAddress = null;
+        if (obj.has("contract_address") && !obj.get("contract_address").isJsonNull()) {
+            contractAddress = Address.fromHexString(obj.get("contract_address").getAsString());
+        }
+
+        return new TransactionReceipt(txHash, success, gasUsed, fee, error, null, contractAddress);
+    }
+}

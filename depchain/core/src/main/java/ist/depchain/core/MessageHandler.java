@@ -66,14 +66,13 @@ public class MessageHandler {
 
         switch (clientRequest.getPayloadCase()) {
             case TRANSACTION -> handleTransactionRequest(clientRequest, requestKey);
-            case COMMAND -> {
-                // optional: keep Stage 1 compatibility during transition
-                System.out.println("[MESSAGE_HANDLER | INFO] Legacy command request accepted");
-                coordinator.enqueueClientRequest(clientRequest);
-            }
             case PAYLOAD_NOT_SET -> {
                 pendingRequests.remove(requestKey);
                 System.err.println("[MESSAGE_HANDLER | ERROR] Empty client payload");
+            }
+            default -> {
+                pendingRequests.remove(requestKey);
+                System.err.println("[MESSAGE_HANDLER | ERROR] Unsupported payload type: " + clientRequest.getPayloadCase());
             }
         }
     }
@@ -90,12 +89,7 @@ public class MessageHandler {
             return;
         }
 
-        var result = TransactionValidator.validate(
-                tx,
-                clientPublicKey,
-                serverContext.getConfig().getSignatureAlgorithm(),
-                serverContext.getWorldState()
-        );
+        var result = TransactionValidator.validate(tx, clientPublicKey, serverContext.getConfig().getSignatureAlgorithm(), serverContext.getWorldState());
 
         if (!result.valid()) {
             pendingRequests.remove(requestKey);
@@ -103,9 +97,7 @@ public class MessageHandler {
             return;
         }
 
-        System.out.println("[MESSAGE_HANDLER | INFO] Accepted tx request " + requestKey
-                + " from=" + tx.getFrom()
-                + " nonce=" + tx.getNonce());
+        System.out.println("[MESSAGE_HANDLER | INFO] Accepted tx request " + requestKey + " from=" + tx.getFrom() + " nonce=" + tx.getNonce());
 
         coordinator.enqueueClientRequest(clientRequest);
     }
@@ -129,23 +121,16 @@ public class MessageHandler {
             return false;
         }
 
-        ClientRequest unsigned = ClientRequest.newBuilder(clientRequest)
-                .clearSignature()
-                .build();
+        ClientRequest unsigned = ClientRequest.newBuilder(clientRequest).clearSignature().build();
 
         try {
-            return Crypto.verifySignature(
-                    unsigned.toByteArray(),
-                    clientRequest.getSignature().toByteArray(),
-                    clientPublicKey,
-                    serverContext.getConfig().getSignatureAlgorithm());
+            return Crypto.verifySignature(unsigned.toByteArray(), clientRequest.getSignature().toByteArray(), clientPublicKey, serverContext.getConfig().getSignatureAlgorithm());
         } catch (Exception e) {
             return false;
         }
     }
 
     private void handleHotStuffMessage(String sourceId, HotStuffMessage hotstuffMsg) {
-        System.out.println("[MESSAGE_HANDLER | INFO] - Received HotStuffMessage from " + sourceId + " with type: " + hotstuffMsg.getType());
         coordinator.processMessage(sourceId, hotstuffMsg);
     }
 

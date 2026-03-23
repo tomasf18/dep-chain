@@ -1,4 +1,4 @@
-package ist.depchain.tests;
+package ist.depchain.tests.stage1;
 
 import ist.depchain.common.utils.Config;
 import ist.depchain.network.abstractions.UdpFairLossLink;

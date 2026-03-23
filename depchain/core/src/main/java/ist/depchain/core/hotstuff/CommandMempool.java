@@ -2,6 +2,8 @@ package ist.depchain.core.hotstuff;
 
 import ist.depchain.common.ClientRequest;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Queue;
 import java.util.LinkedList;
 import java.util.Set;
@@ -35,6 +37,20 @@ public class CommandMempool {
             pendingKeys.remove(makeKey(req));
         }
         return req;
+    }
+
+    /**
+     * Drain up to {@code maxSize} requests from the front of the queue.
+     * Returns an empty list if the mempool is empty.
+     */
+    public synchronized List<ClientRequest> drainBatch(int maxSize) {
+        List<ClientRequest> batch = new ArrayList<>(Math.min(maxSize, pending.size()));
+        for (int i = 0; i < maxSize && !pending.isEmpty(); i++) {
+            ClientRequest req = pending.poll();
+            pendingKeys.remove(makeKey(req));
+            batch.add(req);
+        }
+        return batch;
     }
 
     public synchronized void discardIfPresent(String clientId, int requestId) {

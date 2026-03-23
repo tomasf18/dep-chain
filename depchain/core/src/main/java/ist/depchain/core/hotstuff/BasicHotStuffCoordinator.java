@@ -5,12 +5,17 @@ import com.google.protobuf.ByteString;
 import ist.depchain.common.ApplicationMessage;
 import ist.depchain.common.Block;
 import ist.depchain.common.ClientRequest;
+import ist.depchain.common.ClientRequestMeta;
 import ist.depchain.common.ClientResponse;
-import ist.depchain.common.Command;
 import ist.depchain.common.HotStuffMessage;
 import ist.depchain.common.QC;
+import ist.depchain.common.Transaction;
+import ist.depchain.common.TransactionPayload;
 import ist.depchain.core.ServerContext;
+import ist.depchain.core.blockchain.BlockBuilder;
+import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.byzantine.MaliciousUtils;
+import org.hyperledger.besu.datatypes.Address;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,7 +57,8 @@ public class BasicHotStuffCoordinator {
     private final Set<ByteString> executedBlockIds = ConcurrentHashMap.newKeySet(); // blocks whose commands have been executed; guards against double-execution on DECIDE retransmission
 
     private boolean quorumReady = false;
-    private ClientRequest lastProposedRequest = null; // track in-flight proposal so we can re-enqueue on timeout
+    private List<ClientRequest> lastProposedBatch = null; // track in-flight proposal so we can re-enqueue on timeout
+    private static final int MAX_BATCH_SIZE = 10;
 
     public BasicHotStuffCoordinator(ServerContext serverContext, boolean isByzantine) {
         this.serverContext = serverContext;
@@ -89,14 +95,14 @@ public class BasicHotStuffCoordinator {
             synchronized (this) {
                 try {
                     while (!quorumReady || mempool.isEmpty()) {
-                        if (quorumReady) {
-                            System.out.println("[COORDINATOR | LEADER] - Quorum ready but waiting for client request to propose for view " + currentView.get());
-                        } else if (!mempool.isEmpty()) {
-                            System.out.println("[COORDINATOR | LEADER] - Client request available but waiting for quorum to be ready for view " + currentView.get());
-                        }
+                        // if (quorumReady) {
+                        //     System.out.println("[COORDINATOR | LEADER] - Quorum ready but waiting for client request to propose for view " + currentView.get());
+                        // } else if (!mempool.isEmpty()) {
+                        //     System.out.println("[COORDINATOR | LEADER] - Client request available but waiting for quorum to be ready for view " + currentView.get());
+                        // }
                         wait(); 
                     }
-                    System.out.println("[COORDINATOR | LEADER] - Quorum ready and client request available, proposing new block for view " + currentView.get());
+                    // System.out.println("[COORDINATOR | LEADER] - Quorum ready and client request available, proposing new block for view " + currentView.get());
                     doPropose();
                     quorumReady = false;
                 } catch (InterruptedException e) {
@@ -108,7 +114,7 @@ public class BasicHotStuffCoordinator {
     }
 
     public synchronized void processMessage(String sourceId, HotStuffMessage m) {
-        System.out.println("[COORDINATOR | INFO] - Received message of type " + m.getType() + " from " + sourceId + " for view " + m.getViewNumber());
+        // System.out.println("[COORDINATOR | INFO] - Received message of type " + m.getType() + " from " + sourceId + " for view " + m.getViewNumber());
         
         // only restart the timer for messages that represent progress in the current view, future-view messages are buffered but should noti delay our own timeout
         boolean isCurrentView = (m.getViewNumber() == currentView.get());
@@ -118,7 +124,7 @@ public class BasicHotStuffCoordinator {
         }
 
         if (m.getViewNumber() < currentView.get() && m.getType() != HotStuffMessage.Type.NEW_VIEW) {
-            System.out.println("[COORDINATOR | INFO] - Ignoring old message from " + sourceId + " for view " + m.getViewNumber() + ", current view is " + currentView.get());
+            // System.out.println("[COORDINATOR | INFO] - Ignoring old message from " + sourceId + " for view " + m.getViewNumber() + ", current view is " + currentView.get());
             return;
         }
 
@@ -163,7 +169,7 @@ public class BasicHotStuffCoordinator {
     public synchronized void restartTimer() {
         if (viewTimerFuture != null) viewTimerFuture.cancel(false);
         viewTimerFuture = timerExecutor.schedule(() -> {
-            System.out.println("[COORDINATOR | TIMEOUT] - Starting new view");
+            // System.out.println("[COORDINATOR | TIMEOUT] - Starting new view");
             startNextView();
         }, currentTimeoutMs, TimeUnit.MILLISECONDS);
     }
@@ -191,11 +197,11 @@ public class BasicHotStuffCoordinator {
             newViewMsgs.computeIfAbsent(view, k -> new HashMap<>()).put(sourceId, m);
 
             int count = newViewMsgs.get(view).size();
-            System.out.println("[COORDINATOR | LEADER] - Received " + count + "/" + hotStuffQuorum + " NEW_VIEW messages for view " + view + " (targeting view " + targetView + ")");
+            // System.out.println("[COORDINATOR | LEADER] - Received " + count + "/" + hotStuffQuorum + " NEW_VIEW messages for view " + view + " (targeting view " + targetView + ")");
 
             // but only signal the proposalLoop if we've actually advanced to targetView already; if not, the messages are buffered, startNextView() checks them on arrival
             if (reachedQuorum(count) && currentView.get() == targetView) {
-                System.out.println("[COORDINATOR | LEADER] - Quorum reached for view " + targetView + ", ready to propose");
+                // System.out.println("[COORDINATOR | LEADER] - Quorum reached for view " + targetView + ", ready to propose");
                 quorumReady = true;
                 notify();
             }
@@ -210,35 +216,38 @@ public class BasicHotStuffCoordinator {
         for (Map.Entry<String, HotStuffMessage> entry : msgs.entrySet()) {
             HotStuffMessage m = entry.getValue();
             if (!utils.verifyQC(m.getJustify())) continue;
-            System.out.println("[COORDINATOR | LEADER] - Considering NEW_VIEW message with valid justify QC from " + entry.getKey() + " with justify QC view number " + m.getJustify().getViewNumber());
             if (m.getJustify().getViewNumber() > highQC.getViewNumber()) {
                 highQC = m.getJustify();
             }
         }
 
-        // get the parent block from the highQC, defaulting to genesis if not found
         Block parent = tree.getBlock(highQC.getBlockId());
         if (parent == null) {
-            // if the block isn't in our tree, use genesis block (can happen if the highQC is from a view we were not part of, and thus we don't have the blocks for it; but it's still safe to build on top of genesis, since any QC extends from genesis)
-            // e.g., if there is much latency and we receive NEW_VIEW messages for view 5 while we're still on view 1, the highQC in those messages may be from view 4, and we won't have the corresponding block in our tree
             parent = tree.getGenesisBlock();
-            System.out.println("[COORDINATOR | LEADER] - Block for highQC not found in tree, using genesis as parent");
         }
 
-        ClientRequest clientRequest = mempool.dequeue(); // guaranteed non-null
-        lastProposedRequest = clientRequest;
-        Command command = clientRequest.getCommand().toBuilder()
-            .setClientId(clientRequest.getClientId())
-            .setRequestId(clientRequest.getRequestId())
-            .build();
+        // Drain a batch of client requests from the mempool
+        List<ClientRequest> batch = mempool.drainBatch(MAX_BATCH_SIZE);
+        lastProposedBatch = batch;
 
-        Block curProposal = utils.createLeaf(parent, command);
+        // Build multi-tx block from transaction payloads
+        List<TransactionPayload> txPayloads = new ArrayList<>();
+        List<ClientRequestMeta> metaList = new ArrayList<>();
+        for (ClientRequest req : batch) {
+            txPayloads.add(req.getTransaction());
+            metaList.add(ClientRequestMeta.newBuilder()
+                    .setClientId(req.getClientId())
+                    .setRequestId(req.getRequestId())
+                    .build());
+        }
+        Block curProposal = utils.createLeaf(parent, txPayloads, metaList);
+
         tree.putBlock(curProposal);
 
         HotStuffMessage prepareMsg = utils.msg(HotStuffMessage.Type.PREPARE, curProposal, highQC, currentView.get());
         broadcast(prepareMsg);
 
-        newViewMsgs.remove(oldView); 
+        newViewMsgs.remove(oldView);
     }
 
     /** PRE-COMMIT phase as Leader **/
@@ -252,7 +261,7 @@ public class BasicHotStuffCoordinator {
         Map<String, HotStuffMessage> votes = voteCollector.get(HotStuffMessage.Type.PREPARE).computeIfAbsent(blockId, k -> new HashMap<>());
         votes.put(sourceId, vote);
 
-        System.out.println("[COORDINATOR | LEADER] - Received PREPARE vote from " + sourceId + " for block " + blockId.toStringUtf8() + " in view " + vote.getViewNumber() + ". Total votes for this block: " + votes.size() + "/" + hotStuffQuorum);
+        // System.out.println("[COORDINATOR | LEADER] - Received PREPARE vote from " + sourceId + " for block " + blockId.toStringUtf8() + " in view " + vote.getViewNumber() + ". Total votes for this block: " + votes.size() + "/" + hotStuffQuorum);
         if (amILeaderOfView(vote.getViewNumber()) && reachedQuorum(votes.size())) {
             this.prepareQC = utils.createQC(votes.values());
 
@@ -309,17 +318,16 @@ public class BasicHotStuffCoordinator {
         if (!utils.matchingMSG(m, HotStuffMessage.Type.PREPARE, currentView.get()) || !getLeaderForView(currentView.get()).equals(sourceId))
             return;
 
-        System.out.println("[COORDINATOR | REPLICA] - PREPARE message is for current view and from correct leader, processing...");
+        // System.out.println("[COORDINATOR | REPLICA] - PREPARE message is for current view and from correct leader, processing...");
 
         Block node = m.getBlock();
         QC justify = m.getJustify();
 
         if (!utils.verifyQC(justify)) {
-            System.out.println("[COORDINATOR | REPLICA] - Received PREPARE with invalid QC from " + sourceId);
+            // System.out.println("[COORDINATOR | REPLICA] - Received PREPARE with invalid QC from " + sourceId);
             return;
-        } else {
-            System.out.println("[COORDINATOR | REPLICA] - Received PREPARE with valid QC from " + sourceId + ", justify QC view number: " + justify.getViewNumber());
         }
+        // System.out.println("[COORDINATOR | REPLICA] - Received PREPARE with valid QC from " + sourceId + ", justify QC view number: " + justify.getViewNumber());
 
         boolean extendsJustify = utils.extendsFrom(node, justify.getBlockId());
         boolean safeNode = utils.safeNode(node, justify, lockedQC);
@@ -329,32 +337,32 @@ public class BasicHotStuffCoordinator {
 
             sendVote(HotStuffMessage.Type.PREPARE, node, null);
 
-            System.out.println("[COORDINATOR | REPLICA] - Voted PREPARE for Block: " + node.getId().toStringUtf8());
-        } else {
-            System.out.println("[COORDINATOR | REPLICA] - Received PREPARE that does not extend justify or is not safe, ignoring. extendsJustify: " + extendsJustify + ", safeNode: " + safeNode);
+            // System.out.println("[COORDINATOR | REPLICA] - Voted PREPARE for Block: " + node.getId().toStringUtf8());
         }
+        // else {
+        //     System.out.println("[COORDINATOR | REPLICA] - Received PREPARE that does not extend justify or is not safe, ignoring. extendsJustify: " + extendsJustify + ", safeNode: " + safeNode);
+        // }
     }
 
     /** PRE-COMMIT phase as Replica **/
     public void onReceivePreCommit(String sourceId, HotStuffMessage m) {
-        System.out.println("[COORDINATOR | REPLICA] - Received PRE-COMMIT from " + sourceId + " for view " + m.getViewNumber());
+        // System.out.println("[COORDINATOR | REPLICA] - Received PRE-COMMIT from " + sourceId + " for view " + m.getViewNumber());
         if (!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PREPARE, currentView.get())
                 || !getLeaderForView(currentView.get()).equals(sourceId))
             return;
 
         QC newPrepareQC = m.getJustify();
         if (!utils.verifyQC(newPrepareQC)) {
-            System.out.println("[COORDINATOR | REPLICA] - Received PRE-COMMIT with invalid QC from " + sourceId);
+            // System.out.println("[COORDINATOR | REPLICA] - Received PRE-COMMIT with invalid QC from " + sourceId);
             return;
-        } else {
-            System.out.println("[COORDINATOR | REPLICA] - Received PRE-COMMIT with valid QC from " + sourceId + ", QC view number: " + newPrepareQC.getViewNumber());
         }
-        this.prepareQC = newPrepareQC; 
-        
+        // System.out.println("[COORDINATOR | REPLICA] - Received PRE-COMMIT with valid QC from " + sourceId + ", QC view number: " + newPrepareQC.getViewNumber());
+        this.prepareQC = newPrepareQC;
+
         Block node = tree.getBlock(prepareQC.getBlockId());
         sendVote(HotStuffMessage.Type.PRE_COMMIT, node, prepareQC);
 
-        System.out.println("[COORDINATOR | REPLICA] - Voted PRE-COMMIT for view " + currentView.get());
+        // System.out.println("[COORDINATOR | REPLICA] - Voted PRE-COMMIT for view " + currentView.get());
     }
 
     /** COMMIT phase as Replica **/
@@ -365,19 +373,18 @@ public class BasicHotStuffCoordinator {
 
         QC newLockedQC = m.getJustify();
         if (!utils.verifyQC(newLockedQC)) {
-            System.out.println("[COORDINATOR | REPLICA] - Received COMMIT with invalid QC from " + sourceId);
+            // System.out.println("[COORDINATOR | REPLICA] - Received COMMIT with invalid QC from " + sourceId);
             return;
-        } else {
-            System.out.println("[COORDINATOR | REPLICA] - Received COMMIT with valid QC from " + sourceId + ", QC view number: " + newLockedQC.getViewNumber());
         }
+        // System.out.println("[COORDINATOR | REPLICA] - Received COMMIT with valid QC from " + sourceId + ", QC view number: " + newLockedQC.getViewNumber());
         this.lockedQC = newLockedQC;
 
-        System.out.println("[COORDINATOR | REPLICA] - Locked QC for view " + currentView.get());
+        // System.out.println("[COORDINATOR | REPLICA] - Locked QC for view " + currentView.get());
 
         Block node = tree.getBlock(lockedQC.getBlockId());
         sendVote(HotStuffMessage.Type.COMMIT, node, lockedQC);
 
-        System.out.println("[COORDINATOR | REPLICA] - Voted COMMIT for view " + currentView.get());
+        // System.out.println("[COORDINATOR | REPLICA] - Voted COMMIT for view " + currentView.get());
     }
 
     /** DECIDE phase as Replica **/
@@ -387,10 +394,7 @@ public class BasicHotStuffCoordinator {
             return;
 
         if (!utils.verifyQC(m.getJustify())) {
-            System.out.println("[COORDINATOR | REPLICA] - Received DECIDE with invalid QC from " + sourceId);
             return;
-        } else {
-            System.out.println("[COORDINATOR | REPLICA] - Received DECIDE with valid QC from " + sourceId + ", QC view number: " + m.getJustify().getViewNumber());
         }
 
         Block commitedBlock = tree.getBlock(m.getJustify().getBlockId());
@@ -399,34 +403,90 @@ public class BasicHotStuffCoordinator {
         // guard against double-execution: only execute once per block
         boolean isFirstExecution = executedBlockIds.add(blockId);
         if (!isFirstExecution) {
-            System.out.println("[COORDINATOR | REPLICA] - Block " + blockId.toStringUtf8() + " already executed, ignoring duplicate DECIDE");
             return;
         }
 
-        // upcall to the server to execute the command and respond to clients
-        serverContext.getCommandExecutor().executeCommand(commitedBlock.getCommand().getType(), commitedBlock.getCommand().getData());
-        tree.pruneSiblings(commitedBlock);
-        System.out.println("[COORDINATOR | REPLICA] - Executed block " + blockId.toStringUtf8());
+        executeStage2Block(commitedBlock, blockId, sourceId);
 
+        tree.pruneSiblings(commitedBlock);
         onCommit();
-        
-        Command command = commitedBlock.getCommand();
-        synchronized (this) {
-            lastProposedRequest = null; // proposal succeeded, no need to re-enqueue
-            mempool.discardIfPresent(command.getClientId(), command.getRequestId());
+        startNextView();
+    }
+
+    /**
+     * Stage 2: execute all transactions in the decided block, build an application Block,
+     * persist it, and send per-transaction ClientResponses.
+     */
+    private void executeStage2Block(Block protoBlock, ByteString blockId, String leaderId) {
+        // 1. Convert protobuf transactions to application Transaction objects
+        List<Transaction> txList = new ArrayList<>();
+        for (TransactionPayload payload : protoBlock.getTransactionsList()) {
+            txList.add(Transaction.fromProto(payload));
         }
-        if (!command.getClientId().isEmpty()) {
-            notifyRequestCommitted(command.getClientId(), command.getRequestId());
+
+        // 2. Determine the leader/proposer address for gas fee crediting
+        Address proposerAddress = serverContext.deriveAddressForProcess(leaderId);
+
+        // 3. Build deterministic application-level block (sorts by fee, computes hash)
+        ist.depchain.core.blockchain.Block previousAppBlock = serverContext.getBlockChain().getLatestBlock();
+        ist.depchain.core.blockchain.Block appBlock = BlockBuilder.build(txList, previousAppBlock, proposerAddress);
+
+        // 4. Execute each transaction in the deterministic order
+        List<TransactionReceipt> receipts = new ArrayList<>();
+        for (Transaction tx : appBlock.getTransactions()) {
+            TransactionReceipt receipt = serverContext.getTransactionExecutor().execute(tx, proposerAddress);
+            receipts.add(receipt);
+        }
+
+        // 5. Finalize block with receipts and persist
+        ist.depchain.core.blockchain.Block finalBlock = BlockBuilder.finalize(appBlock, receipts);
+        serverContext.getBlockChain().addBlock(finalBlock);
+
+        System.out.println("[COORDINATOR] Committed block #" + finalBlock.getBlockNumber()
+                + " with " + txList.size() + " txs, hash=" + finalBlock.getBlockHash());
+
+        // 6. Discard committed requests from mempool and notify MessageHandler
+        List<ClientRequestMeta> metaList = protoBlock.getRequestMetaList();
+        synchronized (this) {
+            lastProposedBatch = null;
+            for (ClientRequestMeta meta : metaList) {
+                mempool.discardIfPresent(meta.getClientId(), meta.getRequestId());
+            }
+        }
+
+        // 7. Send per-transaction ClientResponses
+        //    Match each receipt to its request metadata by index
+        //    (BlockBuilder reorders transactions, so we map by tx hash)
+        Map<String, TransactionReceipt> receiptByTxHash = new HashMap<>();
+        List<Transaction> orderedTxs = appBlock.getTransactions();
+        for (int i = 0; i < orderedTxs.size(); i++) {
+            String txHashHex = org.web3j.utils.Numeric.toHexStringNoPrefix(orderedTxs.get(i).txHash());
+            receiptByTxHash.put(txHashHex, receipts.get(i));
+        }
+
+        for (int i = 0; i < metaList.size(); i++) {
+            ClientRequestMeta meta = metaList.get(i);
+            Transaction originalTx = txList.get(i); // original order matches meta order
+            String txHashHex = org.web3j.utils.Numeric.toHexStringNoPrefix(originalTx.txHash());
+            TransactionReceipt receipt = receiptByTxHash.get(txHashHex);
+
+            notifyRequestCommitted(meta.getClientId(), meta.getRequestId());
+
+            String status = (receipt != null && receipt.isSuccess()) ? "COMMITTED" : "REJECTED";
+            String error = (receipt != null && receipt.getError() != null) ? receipt.getError() : "";
+
             ClientResponse response = ClientResponse.newBuilder()
-                    .setClientId(command.getClientId())
-                    .setRequestId(command.getRequestId())
+                    .setClientId(meta.getClientId())
+                    .setRequestId(meta.getRequestId())
                     .setCommitted(true)
                     .setBlockId(blockId)
+                    .setTxHash(ByteString.copyFrom(originalTx.txHash()))
+                    .setStatus(status)
+                    .setError(error)
                     .build();
-            serverContext.getPerfectLink().send(command.getClientId(), response.toByteArray());
-        }
 
-        startNextView();
+            serverContext.getPerfectLink().send(meta.getClientId(), response.toByteArray());
+        }
     }
 
     /** HELPER FUNCTIONS **/
@@ -437,10 +497,12 @@ public class BasicHotStuffCoordinator {
             currentTimeoutMs = Math.min(currentTimeoutMs * 2, MAX_TIMEOUT_MS);
         }
 
-        // Re-enqueue the proposed request if the view ended without a successful DECIDE
-        if (lastProposedRequest != null) {
-            mempool.enqueue(lastProposedRequest);
-            lastProposedRequest = null;
+        // Re-enqueue the proposed batch if the view ended without a successful DECIDE
+        if (lastProposedBatch != null) {
+            for (ClientRequest req : lastProposedBatch) {
+                mempool.enqueue(req);
+            }
+            lastProposedBatch = null;
         }
 
         int oldView = currentView.get();
@@ -454,14 +516,14 @@ public class BasicHotStuffCoordinator {
             .build();
         String nextLeader = getLeaderForView(newView);
 
-        System.out.println("[COORDINATOR | REPLICA] - Moving to view " + newView + " with leader " + nextLeader);
+        // System.out.println("[COORDINATOR | REPLICA] - Moving to view " + newView + " with leader " + nextLeader);
         serverContext.getPerfectLink().send(nextLeader, wrapper.toByteArray());
 
         // if we are the leader of the new view, check if messages arrived early and were buffered before we advanced
         if (amILeaderOfView(newView)) {
             Map<String, HotStuffMessage> buffered = newViewMsgs.get(oldView);
             if (buffered != null && reachedQuorum(buffered.size())) {
-                System.out.println("[COORDINATOR | LEADER] - Found buffered quorum on view advance to " + newView);
+                // System.out.println("[COORDINATOR | LEADER] - Found buffered quorum on view advance to " + newView);
                 quorumReady = true;
                 notify();
             }
@@ -534,5 +596,9 @@ public class BasicHotStuffCoordinator {
 
     public Set<ByteString> getExecutedBlockIds() {
         return executedBlockIds;
+    }
+
+    public ServerContext getServerContext() {
+        return serverContext;
     }
 }

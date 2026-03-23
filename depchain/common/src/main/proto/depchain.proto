@@ -99,7 +99,15 @@ message HotStuffMessage{
 message Block {
     bytes id = 1;          // Unique digest of block - Cryptographic Security reasons
     bytes parent_id = 2;   // [Line 12] - b.parent
-    Command command = 3;   // [Line 13] - b.cmd, command included in this block
+    Command command = 3;   // [Line 13] - b.cmd (legacy Stage 1, single command)
+    repeated TransactionPayload transactions = 4; // Stage 2: batch of transactions
+    repeated ClientRequestMeta request_meta = 5;  // Maps each tx back to (clientId, requestId) for replies
+}
+
+// Lightweight metadata to track which client request each transaction belongs to
+message ClientRequestMeta {
+    string client_id = 1;
+    uint32 request_id = 2;
 }
 
 message QC {

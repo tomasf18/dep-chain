@@ -46,7 +46,7 @@ public class ClientContext {
         if (this.privateKey == null) {
             throw new RuntimeException("Failed to load private key from " + config.getSelfPrivateKeyPathString());
         }
-        this.publicKey = KeyLoader.loadPublicKey(config.getTrustedProcessKeyPathString(config.getSelfId()));
+        this.publicKey = KeyLoader.loadPublicKey(config.getSelfPublicKeyPathString());
         if (this.publicKey == null) {
             throw new RuntimeException("Failed to load public key for " + config.getSelfId());
         }

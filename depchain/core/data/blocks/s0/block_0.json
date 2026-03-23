@@ -1,0 +1,15 @@
+{
+  "block_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "block_number": 0,
+  "transactions": [
+    {
+      "from": "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+      "value": "0",
+      "input": "0x",
+      "gas_price": "1",
+      "gas_limit": "10000000",
+      "nonce": 0,
+      "tx_hash": "b1f0c3fc04eb127590d9e647bc6f822dc2fb91ebb40b48bd146c608f26334aa1"
+    }
+  ]
+}

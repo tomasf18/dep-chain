@@ -1,4 +1,4 @@
-package ist.depchain.tests;
+package ist.depchain.tests.stage1;
 
 import ist.depchain.client.ClientContext;
 import ist.depchain.client.ClientLibrary;

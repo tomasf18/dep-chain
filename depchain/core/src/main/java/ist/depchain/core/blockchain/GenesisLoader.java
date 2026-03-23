@@ -2,6 +2,9 @@ package ist.depchain.core.blockchain;
 
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,8 +39,30 @@ public class GenesisLoader {
     public static Block loadGenesis(String genesisFilePath, DepChainWorldState worldState) throws IOException {
         Gson gson = new Gson();
         JsonObject root;
-        try (FileReader reader = new FileReader(genesisFilePath)) {
-            root = gson.fromJson(reader, JsonObject.class);
+
+        // Try filesystem first, then classpath
+        java.io.File file = new java.io.File(genesisFilePath);
+        if (file.exists()) {
+            try (Reader reader = new FileReader(file)) {
+                root = gson.fromJson(reader, JsonObject.class);
+            }
+        } else {
+            // Try classpath (works from any working directory)
+            String resourceName = genesisFilePath;
+            // Strip leading path components to get just the filename for classpath lookup
+            int lastSlash = resourceName.lastIndexOf('/');
+            if (lastSlash >= 0) resourceName = resourceName.substring(lastSlash + 1);
+            int lastBackslash = resourceName.lastIndexOf('\\');
+            if (lastBackslash >= 0) resourceName = resourceName.substring(lastBackslash + 1);
+
+            InputStream is = GenesisLoader.class.getClassLoader().getResourceAsStream(resourceName);
+            if (is == null) {
+                throw new IOException("Genesis file not found on filesystem (" + genesisFilePath
+                        + ") or classpath (" + resourceName + ")");
+            }
+            try (Reader reader = new InputStreamReader(is)) {
+                root = gson.fromJson(reader, JsonObject.class);
+            }
         }
 
         validateRoot(root);

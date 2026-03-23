@@ -5,8 +5,9 @@ import ist.depchain.common.HotStuffMessage;
 import ist.depchain.common.HotStuffMessage.Type;
 import ist.depchain.core.hotstuff.tsignatures.BLSThresholdSig;
 import ist.depchain.common.Block;
+import ist.depchain.common.ClientRequestMeta;
 import ist.depchain.common.QC;
-import ist.depchain.common.Command;
+import ist.depchain.common.TransactionPayload;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -64,14 +65,16 @@ public class BasicHotStuffUtils {
 
     /* Tree & QC */
 
-    // [Line 11-14] - Create a new block (LEAF)
-    public Block createLeaf(Block parent, Command cmd) {
+    // [Line 11-14] - Create a new block (LEAF) carrying transactions + request metadata
+    public Block createLeaf(Block parent, List<TransactionPayload> transactions,
+                            List<ClientRequestMeta> requestMeta) {
         ByteString newId = ByteString.copyFromUtf8(UUID.randomUUID().toString());
-        return Block.newBuilder()
+        Block.Builder builder = Block.newBuilder()
                 .setParentId(parent.getId())
                 .setId(newId)
-                .setCommand(cmd)
-                .build();
+                .addAllTransactions(transactions)
+                .addAllRequestMeta(requestMeta);
+        return builder.build();
     }
 
     // [Line 15-20] - Create QC

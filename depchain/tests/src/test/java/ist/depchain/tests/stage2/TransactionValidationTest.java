@@ -1,4 +1,4 @@
-package ist.depchain.tests;
+package ist.depchain.tests.stage2;
 
 import static org.junit.jupiter.api.Assertions.*;
 

@@ -1,4 +1,4 @@
-package ist.depchain.tests;
+package ist.depchain.tests.stage1;
 
 import ist.depchain.client.ClientContext;
 import ist.depchain.client.ClientLibrary;
@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class ByzantineSilentLeaderTest {
+public class ByzantineCorruptReplicaTest {
     private static final String CONFIG_FILE = "../config-test.json";
     private ClientContext clientContext;
     private ClientLibrary clientLibrary;
@@ -39,38 +39,39 @@ public class ByzantineSilentLeaderTest {
     }
 
     @Test
-    @DisplayName("Verify that honest replicas will timeout and request a NEW_VIEW, rotating the byzantine leader and eventually handle the pending request")
-    public void testByzantineLeader() throws Exception {
+    @DisplayName("Verify that a test still goes through if one replica is byzantine and changes the content of the message")
+    public void testByzantineReplica() throws Exception {
         System.out.println("[TEST] - Byzantine Replica");
 
         System.out.println("[TEST] - Starting Replicas");
         startReplica("s0", "false");
-        startReplica("s1", "true");
-        startReplica("s2", "false");
+        startReplica("s1", "false");
+        startReplica("s2", "true");
         startReplica("s3", "false");
 
         System.out.println("[TEST] - Waiting for Replicas Handshake");
         // 5 seconds waiting necessary for the Handshake to be made as the method handshakeAll() runs on a separate thread
-        TimeUnit.SECONDS.sleep(20);
+        TimeUnit.SECONDS.sleep(5);
 
-        String request = "Testing project for Byzantine Leader Test";
+        String request = "Testing project for Byzantine Replica Test";
         System.out.println("[TEST] - Client sending request: " + request);
 
         int currentId = clientContext.getRequestId().get() + 1;
         clientLibrary.append(request);
 
-        // HotStuff protocol has lots of phases, we wait at maximum 30 seconds as messages could be lost and therefore delaying the overall performance/end of the protocol
+        // Dynamic Wait
         System.out.println("[TEST] - Final Verification");
         boolean success = waitForCommit(1, 200, currentId);
         assertTrue(success, "Request wasn't commited in the expect time");
 
-        // Content validation
+        // Content Validation
         List<String> log = clientContext.getCommitedLog();
         assertTrue(log.contains(request), "Request log contains not commited");
         assertFalse(log.contains("MALICIOUS DATA ALTERED BY BYZANTINE"), "Malicious replica inserted false message");
 
         System.out.println("[TEST] - Client received 2f+1 ACKs and request " + currentId + " has been commited");
 
+        // Logs
         clientLibrary.showLog();
         TimeUnit.SECONDS.sleep(60);
     }
@@ -78,7 +79,7 @@ public class ByzantineSilentLeaderTest {
     private static void startReplica(String serverId, String isByzantine){
         Thread t = new Thread(() -> {
             try{
-                ServerApp.main(new String[]{CONFIG_FILE, serverId, isByzantine, "SILENT"});
+                ServerApp.main(new String[]{CONFIG_FILE, serverId, isByzantine, "CORRUPT"});
             }catch (Exception e){
                 System.out.println("[TEST] - Error starting replica " + serverId + " in ByzantineTest");
                 e.printStackTrace();

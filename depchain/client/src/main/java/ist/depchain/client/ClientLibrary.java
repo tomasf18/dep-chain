@@ -61,6 +61,8 @@ public class ClientLibrary {
                 .build();
 
         clientContext.getPendingRequests().put(reqId, new ConcurrentHashMap<>());
+        clientContext.registerRequestInMap(reqId,
+                "tx:" + signedTx.getFrom() + ":" + toHex + ":" + value + ":" + nonce);
         Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
         clientContext.getAuthenticatedPerfectLink().broadcast(destinations, appMsg.toByteArray());
 
