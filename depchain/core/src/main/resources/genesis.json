@@ -6,6 +6,8 @@
       "from": "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
       "to": null,
       "input": "0x",
+      "gas_price": "1",
+      "gas_limit": "10000000",
       "nonce": 0
     }
   ],

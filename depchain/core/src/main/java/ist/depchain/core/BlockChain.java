@@ -36,9 +36,9 @@ public class BlockChain {
     }
 
     /**
-     * Legacy append for backward compatibility with Stage 1 consensus.
-     * Wraps a string command as a single-tx block.
-     */
+     * Legacy append for backward compatibility with Stage 1 consensus only.
+     * DO NOT USE this for Stage 2.
+     */ 
     public void append(String data) {
         String prevHash = blocks.isEmpty() ? null : getLatestBlock().getBlockHash();
         Block block = new Block(

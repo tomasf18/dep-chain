@@ -6,12 +6,18 @@ import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.units.bigints.UInt256;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.datatypes.Wei;
+import org.hyperledger.besu.evm.account.AccountState;
 import org.hyperledger.besu.evm.account.MutableAccount;
 import org.hyperledger.besu.evm.fluent.SimpleWorld;
 
 /**
  * Wraps Besu's SimpleWorld to manage blockchain account state.
- * Supports EOA accounts (balance + nonce) and contract accounts (+ code + storage).
+ * Supports:
+ *  - EOAs: address + native DepCoin balance + nonce
+ *  - Contract accounts: address + native balance + nonce + code + storage
+ *
+ * Internally, balances use Besu's Wei wrapper only as a numeric container.
+ * Semantically, these values represent the smallest unit of DepCoin.
  */
 public class DepChainWorldState {
     private final SimpleWorld world;
@@ -41,7 +47,7 @@ public class DepChainWorldState {
     // --- Balance operations ---
 
     public BigInteger getBalance(Address address) {
-        var account = world.get(address);
+        AccountState account = world.get(address);
         if (account == null) return BigInteger.ZERO;
         return account.getBalance().toBigInteger();
     }
@@ -70,7 +76,7 @@ public class DepChainWorldState {
     // --- Nonce operations ---
 
     public long getNonce(Address address) {
-        var account = world.get(address);
+        AccountState account = world.get(address);
         if (account == null) return 0;
         return account.getNonce();
     }
@@ -86,7 +92,7 @@ public class DepChainWorldState {
     // --- Contract operations ---
 
     public Bytes getCode(Address address) {
-        var account = world.get(address);
+        AccountState account = world.get(address);
         if (account == null) return Bytes.EMPTY;
         return account.getCode();
     }
@@ -100,7 +106,7 @@ public class DepChainWorldState {
     }
 
     public UInt256 getStorageValue(Address address, UInt256 slot) {
-        var account = world.get(address);
+        AccountState account = world.get(address);
         if (account == null) return UInt256.ZERO;
         return account.getStorageValue(slot);
     }

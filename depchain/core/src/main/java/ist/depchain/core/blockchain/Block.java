@@ -1,5 +1,6 @@
 package ist.depchain.core.blockchain;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -13,22 +14,19 @@ public class Block {
     public Block(String blockHash, String previousBlockHash, List<Transaction> transactions, int blockNumber) {
         this.blockHash = blockHash;
         this.previousBlockHash = previousBlockHash;
-        this.transactions = transactions;
+        this.transactions = transactions == null
+                ? Collections.emptyList()
+                : Collections.unmodifiableList(new ArrayList<>(transactions));
         this.blockNumber = blockNumber;
-    }
-
-    /**
-     * Returns transactions sorted by fee descending (highest fee first).
-     */
-    public List<Transaction> getOrderedTransactions() {
-        List<Transaction> sorted = new java.util.ArrayList<>(transactions);
-        sorted.sort(Comparator.comparing(Transaction::getMaxFee).reversed());
-        return Collections.unmodifiableList(sorted);
     }
 
     // Getters
     public String getBlockHash() { return blockHash; }
     public String getPreviousBlockHash() { return previousBlockHash; }
+    /**
+     * Returns transactions in the exact order stored in the block.
+     * Ordering policy is decided by the block builder / leader, not by Block itself.
+     */
     public List<Transaction> getTransactions() { return Collections.unmodifiableList(transactions); }
     public int getBlockNumber() { return blockNumber; }
 }
