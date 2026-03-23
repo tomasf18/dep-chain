@@ -32,6 +32,13 @@
     </dependencies>
   </dependencyManagement>
 
+  <repositories>
+    <repository>
+      <id>hyperledger-besu</id>
+      <url>https://hyperledger.jfrog.io/artifactory/besu-maven/</url>
+    </repository>
+  </repositories>
+
   <dependencies>
     <!-- Internal dependencies -->
     <dependency>
@@ -52,6 +59,45 @@
       <version>5.18.1</version>
       <scope>compile</scope>
     </dependency>
+
+    <!-- Hyperledger Besu EVM -->
+    <dependency>
+      <groupId>org.hyperledger.besu</groupId>
+      <artifactId>evm</artifactId>
+      <version>25.6.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.hyperledger.besu</groupId>
+      <artifactId>besu-datatypes</artifactId>
+      <version>25.2.1</version>
+    </dependency>
+
+    <!-- Apache Tuweni (bytes/units for Besu) -->
+    <dependency>
+      <groupId>org.apache.tuweni</groupId>
+      <artifactId>tuweni-bytes</artifactId>
+      <version>2.3.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.tuweni</groupId>
+      <artifactId>tuweni-units</artifactId>
+      <version>2.3.1</version>
+    </dependency>
+
+    <!-- Web3j crypto (hashing, key utils) -->
+    <dependency>
+      <groupId>org.web3j</groupId>
+      <artifactId>crypto</artifactId>
+      <version>5.0.2</version>
+    </dependency>
+
+    <!-- SLF4J NOP (suppress Besu logging noise) -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-nop</artifactId>
+      <version>2.0.17</version>
+    </dependency>
+
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
