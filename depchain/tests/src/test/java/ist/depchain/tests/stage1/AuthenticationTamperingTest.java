@@ -1,6 +1,7 @@
 package ist.depchain.tests.stage1;
 
 import ist.depchain.client.ClientContext;
+import ist.depchain.client.MessageHandler;
 import ist.depchain.client.ClientLibrary;
 import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
@@ -38,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class AuthenticationTamperingTest {
     private static final String CONFIG_FILE = "../config-tamper.json";
     private ClientContext clientContext;
+    private MessageHandler messageHandler;
     private ClientLibrary clientLibrary;
 
     @BeforeEach
@@ -49,7 +51,8 @@ public class AuthenticationTamperingTest {
         System.out.println("[TEST] - Starting Client");
         Config config = Config.loadConfiguration(CONFIG_FILE, "client1");
         clientContext = new ClientContext(config);
-        clientLibrary = new ClientLibrary(clientContext);
+        MessageHandler messageHandler = new MessageHandler(clientContext);
+        clientLibrary = new ClientLibrary(clientContext, messageHandler);
         clientContext.start();
     }
 
@@ -99,7 +102,7 @@ public class AuthenticationTamperingTest {
             throws InterruptedException {
         for (int i = 0; i < timeoutSeconds; i++) {
             if (clientContext.getCommitedLog().size() >= expectedSize
-                    && !clientContext.getPendingRequests().containsKey(requestId))
+                    && !messageHandler.getPendingRequests().containsKey(requestId))
                 return true;
             TimeUnit.SECONDS.sleep(1);
         }

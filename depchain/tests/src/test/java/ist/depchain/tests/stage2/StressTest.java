@@ -2,6 +2,7 @@ package ist.depchain.tests.stage2;
 
 import ist.depchain.client.ClientContext;
 import ist.depchain.client.ClientLibrary;
+import ist.depchain.client.MessageHandler;
 import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.blockchain.DepChainWorldState;
@@ -46,6 +47,7 @@ public class StressTest {
     private static final int       NUM_TXS_EACH     = 20; // 40 txs total
 
     private ClientContext  ctx1, ctx2;
+    private MessageHandler msgHandler1, msgHandler2;
     private ClientLibrary  lib1, lib2;
 
     @BeforeEach
@@ -57,8 +59,10 @@ public class StressTest {
 
         ctx1 = new ClientContext(Config.loadConfiguration(CONFIG_FILE, "client1"));
         ctx2 = new ClientContext(Config.loadConfiguration(CONFIG_FILE, "client2"));
-        lib1 = new ClientLibrary(ctx1);
-        lib2 = new ClientLibrary(ctx2);
+        msgHandler1 = new MessageHandler(ctx1);
+        msgHandler2 = new MessageHandler(ctx2);
+        lib1 = new ClientLibrary(ctx1, msgHandler1);
+        lib2 = new ClientLibrary(ctx2, msgHandler2);
 
         Address addr1 = Address.fromHexString(CLIENT1_ADDR);
         Address addr2 = Address.fromHexString(CLIENT2_ADDR);
@@ -80,9 +84,7 @@ public class StressTest {
 
     @AfterEach
     void teardown() {
-        if (ctx1 != null) ctx1.stop();
-        if (ctx2 != null) ctx2.stop();
-        ServerApp.stopAll();
+        System.out.println("[STRESS] Ending StressTest");
     }
 
     @Test

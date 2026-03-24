@@ -15,15 +15,20 @@ import org.hyperledger.besu.datatypes.Address;
 import ist.depchain.common.ApplicationMessage;
 import ist.depchain.common.ClientRequest;
 import ist.depchain.common.Transaction;
-import ist.depchain.network.crypto.Crypto;
+import ist.depchain.common.utils.Crypto;
+import ist.depchain.common.utils.TransactionSigner;
 
 public class ClientLibrary {
     private final ClientContext clientContext;
+    private final MessageHandler messageHandler;
 
-    public ClientLibrary(ClientContext clientContext) {
+    public ClientLibrary(ClientContext clientContext, MessageHandler messageHandler) {
         this.clientContext = clientContext;
+        this.messageHandler = messageHandler;
+
     }
 
+    // append() and showLog() are placeholders to keep compatibility with stage 1 tests for now
     public void append(String data) {
     }
 
@@ -36,35 +41,14 @@ public class ClientLibrary {
      * Signs and broadcasts a native DepCoin transfer, then blocks until the
      * transaction is committed (f+1 matching responses) or rejected by the
      * replicas (f+1 rejection responses).
-     *
-     * <p>The nonce is managed internally: it is read before the call and
-     * incremented only after a confirmed commit. On rejection or timeout a
-     * {@link RuntimeException} is thrown and the nonce is left unchanged so
-     * the caller can retry or inspect the error.
-     *
-     * @throws RuntimeException if the transaction is rejected by the replicas
-     *                          or no commit is confirmed within the timeout
      */
     public void submitNativeTransfer(String toHex, BigInteger value, BigInteger gasPrice, BigInteger gasLimit) {
         Address to = Address.fromHexString(toHex);
-        long nonce = clientContext.peekNonce();
+        long nonce = clientContext.getNonce();
 
-        Transaction unsignedTx = new Transaction(
-                clientContext.getSelfAddress(),
-                to,
-                value,
-                new byte[0],
-                gasPrice,
-                gasLimit,
-                nonce,
-                null
-        );
+        Transaction unsignedTx = new Transaction(clientContext.getSelfAddress(), to, value, new byte[0], gasPrice, gasLimit, nonce, null);
 
-        Transaction signedTx = TransactionSigner.sign(
-                unsignedTx,
-                clientContext.getPrivateKey(),
-                clientContext.getConfig().getSignatureAlgorithm()
-        );
+        Transaction signedTx = TransactionSigner.sign(unsignedTx, clientContext.getPrivateKey(), clientContext.getConfig().getSignatureAlgorithm());
 
         int reqId = clientContext.getRequestId().incrementAndGet();
 
@@ -80,11 +64,10 @@ public class ClientLibrary {
                 .setClientRequest(signedReq)
                 .build();
 
-        clientContext.getPendingRequests().put(reqId, new ConcurrentHashMap<>());
-        clientContext.registerRequestInMap(reqId,
-                "tx:" + signedTx.getFrom() + ":" + toHex + ":" + value + ":" + nonce);
+        messageHandler.getPendingRequests().put(reqId, new ConcurrentHashMap<>());
+        clientContext.registerRequestInMap(reqId, "tx:" + signedTx.getFrom() + ":" + toHex + ":" + value + ":" + nonce);
 
-        CompletableFuture<Void> committed = clientContext.registerFuture(reqId);
+        CompletableFuture<Void> committed = messageHandler.registerFuture(reqId);
 
         Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
         clientContext.getAuthenticatedPerfectLink().broadcast(destinations, appMsg.toByteArray());
@@ -107,7 +90,6 @@ public class ClientLibrary {
             throw new RuntimeException(
                     "Interrupted waiting for commit (reqId=" + reqId + ")", e);
         } catch (ExecutionException e) {
-            // future.completeExceptionally() was called - rejection from replicas
             throw new RuntimeException(e.getCause().getMessage(), e.getCause());
         }
     }

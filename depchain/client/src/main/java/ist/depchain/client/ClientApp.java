@@ -2,6 +2,7 @@ package ist.depchain.client;
 
 import ist.depchain.common.utils.Config;
 import java.util.Scanner;
+import java.math.BigInteger;
 
 public class ClientApp {
     public static void main(String[] args) {
@@ -17,7 +18,8 @@ public class ClientApp {
         try {
             Config config = Config.loadConfiguration(configFile, clientId);
             ClientContext client = new ClientContext(config);
-            ClientLibrary clientLib = new ClientLibrary(client);
+            MessageHandler messageHandler = new MessageHandler(client);
+            ClientLibrary clientLib = new ClientLibrary(client, messageHandler);
             client.start();
 
             System.out.println("[INFO] Successfully started");
@@ -25,7 +27,7 @@ public class ClientApp {
             Scanner in = new Scanner(System.in);
             while (true) {
                 System.out.println("\n=== DepChain Client ===");
-                System.out.println("1 - Submit native transfer");
+                System.out.println("1 - Submit transfer");
                 System.out.println("exit - Quit");
                 System.out.print("> ");
                 String line = in.nextLine();
@@ -36,13 +38,13 @@ public class ClientApp {
                         String to = in.nextLine();
 
                         System.out.print("Value: ");
-                        java.math.BigInteger value = new java.math.BigInteger(in.nextLine());
+                        BigInteger value = new BigInteger(in.nextLine());
 
                         System.out.print("Gas price: ");
-                        java.math.BigInteger gasPrice = new java.math.BigInteger(in.nextLine());
+                        BigInteger gasPrice = new BigInteger(in.nextLine());
 
                         System.out.print("Gas limit: ");
-                        java.math.BigInteger gasLimit = new java.math.BigInteger(in.nextLine());
+                        BigInteger gasLimit = new BigInteger(in.nextLine());
 
                         clientLib.submitNativeTransfer(to, value, gasPrice, gasLimit);
                         break;

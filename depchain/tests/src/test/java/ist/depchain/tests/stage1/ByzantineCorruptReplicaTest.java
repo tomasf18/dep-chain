@@ -1,6 +1,7 @@
 package ist.depchain.tests.stage1;
 
 import ist.depchain.client.ClientContext;
+import ist.depchain.client.MessageHandler;
 import ist.depchain.client.ClientLibrary;
 import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
@@ -18,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class ByzantineCorruptReplicaTest {
     private static final String CONFIG_FILE = "../config-test.json";
     private ClientContext clientContext;
+    private MessageHandler messageHandler;
     private ClientLibrary clientLibrary;
 
     @BeforeEach
@@ -25,7 +27,8 @@ public class ByzantineCorruptReplicaTest {
         System.out.println("[TEST] - Starting Client");
         Config clientConfig = Config.loadConfiguration(CONFIG_FILE, "client1");
         clientContext = new ClientContext(clientConfig);
-        clientLibrary = new ClientLibrary(clientContext);
+        messageHandler = new MessageHandler(clientContext);
+        clientLibrary = new ClientLibrary(clientContext, messageHandler);
         clientContext.start();
     }
 
@@ -91,7 +94,7 @@ public class ByzantineCorruptReplicaTest {
 
     private boolean waitForCommit(int expectedSize, int timeOutSeconds, int requestId) throws InterruptedException {
         for (int i = 0; i < timeOutSeconds; i++) {
-            if(this.clientContext.getCommitedLog().size() >= expectedSize && !clientContext.getPendingRequests().containsKey(requestId)){
+            if(this.clientContext.getCommitedLog().size() >= expectedSize && !messageHandler.getPendingRequests().containsKey(requestId)){
                 return true;
             }
             TimeUnit.SECONDS.sleep(1);

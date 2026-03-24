@@ -1,6 +1,7 @@
 package ist.depchain.tests.stage2;
 
 import ist.depchain.client.ClientContext;
+import ist.depchain.client.MessageHandler;
 import ist.depchain.client.ClientLibrary;
 import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
@@ -37,6 +38,7 @@ public class NativeTransferHotStuffTest {
     private static final BigInteger GAS_LIMIT = BigInteger.valueOf(21_000);
 
     private ClientContext clientContext;
+    private MessageHandler messageHandler;
     private ClientLibrary clientLibrary;
 
     @BeforeEach
@@ -52,7 +54,8 @@ public class NativeTransferHotStuffTest {
 
         Config clientConfig = Config.loadConfiguration(CONFIG_FILE, "client1");
         clientContext = new ClientContext(clientConfig);
-        clientLibrary = new ClientLibrary(clientContext);
+        messageHandler = new MessageHandler(clientContext);
+        clientLibrary = new ClientLibrary(clientContext, messageHandler);
 
         Address clientAddress = clientContext.getSelfAddress();
         System.out.println("[TEST] Client address: " + clientAddress.toHexString());
@@ -83,10 +86,6 @@ public class NativeTransferHotStuffTest {
     @AfterEach
     public void teardown() {
         System.out.println("[TEST] Ending NativeTransferHotStuffTest");
-        if (clientContext != null) {
-            clientContext.stop();
-        }
-        ServerApp.stopAll();
     }
 
     @Test

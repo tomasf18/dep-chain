@@ -2,6 +2,7 @@ package ist.depchain.tests.stage1;
 
 import ist.depchain.client.ClientContext;
 import ist.depchain.client.ClientLibrary;
+import ist.depchain.client.MessageHandler;
 import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class MultipleClientsTest {
     private static final String CONFIG_FILE = "../config-test.json";
     private ClientContext clientContext1;
+    private MessageHandler messageHandler1;
     private ClientContext clientContext2;
+    private MessageHandler messageHandler2;
     private ClientLibrary clientLibrary1;
     private ClientLibrary clientLibrary2;
 
@@ -36,12 +39,14 @@ public class MultipleClientsTest {
     void testConcurrentClients() throws InterruptedException {
         Config config1 = Config.loadConfiguration(CONFIG_FILE, "client1");
         clientContext1 = new ClientContext(config1);
-        clientLibrary1 = new ClientLibrary(clientContext1);
+        messageHandler1 = new MessageHandler(clientContext1);
+        clientLibrary1 = new ClientLibrary(clientContext1, messageHandler1);
         clientContext1.start();
 
         Config config2 = Config.loadConfiguration(CONFIG_FILE, "client2");
         clientContext2 = new ClientContext(config2);
-        clientLibrary2 = new ClientLibrary(clientContext2);
+        messageHandler2 = new MessageHandler(clientContext2);
+        clientLibrary2 = new ClientLibrary(clientContext2, messageHandler2);
         clientContext2.start();
 
         String[] requestsC1 = {"C1-Request1", "C1-Request2", "C1-Request3", "C1-Request4"};

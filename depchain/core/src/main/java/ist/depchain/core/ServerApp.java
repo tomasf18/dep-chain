@@ -42,7 +42,7 @@ public class ServerApp {
         ServerContext server = new ServerContext(config);
         BasicHotStuffCoordinator hotStuffCoordinator;
         if (byzantineFlag) {
-            ist.depchain.core.byzantine.ByzantineCoordinator byzantineCoordinator = new ByzantineCoordinator(server);
+            ByzantineCoordinator byzantineCoordinator = new ByzantineCoordinator(server);
             try {
                 byzantineCoordinator.setAttack(ByzantineCoordinator.AttackType.valueOf(attackType));
             }catch (IllegalArgumentException e) {

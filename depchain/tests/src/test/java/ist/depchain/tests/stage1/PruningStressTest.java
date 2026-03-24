@@ -2,6 +2,7 @@ package ist.depchain.tests.stage1;
 
 import com.google.protobuf.ByteString;
 import ist.depchain.client.ClientContext;
+import ist.depchain.client.MessageHandler;
 import ist.depchain.client.ClientLibrary;
 import ist.depchain.common.Block;
 import ist.depchain.common.utils.Config;
@@ -37,6 +38,7 @@ public class PruningStressTest {
     private static final int NUM_REQUESTS = 30;
 
     private ClientContext clientContext;
+    private MessageHandler messageHandler;
     private ClientLibrary clientLibrary;
 
     @BeforeEach
@@ -53,7 +55,8 @@ public class PruningStressTest {
         System.out.println("[TEST] - Starting Client");
         Config config = Config.loadConfiguration(CONFIG_FILE, "client1");
         clientContext = new ClientContext(config);
-        clientLibrary = new ClientLibrary(clientContext);
+        messageHandler = new MessageHandler(clientContext);
+        clientLibrary = new ClientLibrary(clientContext, messageHandler);
         clientContext.start();
     }
 

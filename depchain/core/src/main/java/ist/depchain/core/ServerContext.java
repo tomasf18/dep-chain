@@ -24,7 +24,7 @@ public class ServerContext {
 
     private final UdpFairLossLink fairLossLink;
     private final StubbornLink stubbornLink;
-    private final AuthenticatedPerfectLink perfectLink;
+    private final AuthenticatedPerfectLink authenticatedPerfectLink;
 
     private BlockChain blockChain;
     private DepChainWorldState worldState;
@@ -37,7 +37,7 @@ public class ServerContext {
         this.config = config;
         fairLossLink = new UdpFairLossLink(config);
         stubbornLink = new StubbornLink(config, fairLossLink);
-        perfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config));
+        authenticatedPerfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config));
         blockChain = new BlockChain("data/blocks/" + config.getSelfId());
         worldState = new DepChainWorldState();
         transactionExecutor = new TransactionExecutor(worldState);
@@ -61,11 +61,11 @@ public class ServerContext {
     }
 
     public void start() throws Exception {
-        perfectLink.start();
+        authenticatedPerfectLink.start();
     }
 
     public void stop() throws Exception {
-        perfectLink.stop();
+        authenticatedPerfectLink.stop();
     }
 
     /* Getters */
@@ -74,7 +74,7 @@ public class ServerContext {
     }
 
     public AuthenticatedPerfectLink getPerfectLink() {
-        return perfectLink;
+        return authenticatedPerfectLink;
     }
 
     public BlockChain getBlockChain() {

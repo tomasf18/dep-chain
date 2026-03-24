@@ -1,6 +1,7 @@
 package ist.depchain.tests.stage1;
 
 import ist.depchain.client.ClientContext;
+import ist.depchain.client.MessageHandler;
 import ist.depchain.client.ClientLibrary;
 import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
@@ -37,6 +38,7 @@ public class ExceedFaultThresholdTest {
     private static final int OBSERVATION_WINDOW_S = 60;
 
     private ClientContext clientContext;
+    private MessageHandler messageHandler;
     private ClientLibrary clientLibrary;
 
     @BeforeEach
@@ -52,7 +54,8 @@ public class ExceedFaultThresholdTest {
         System.out.println("[TEST] - Starting Client");
         Config config = Config.loadConfiguration(CONFIG_FILE, "client1");
         clientContext = new ClientContext(config);
-        clientLibrary = new ClientLibrary(clientContext);
+        messageHandler = new MessageHandler(clientContext);
+        clientLibrary = new ClientLibrary(clientContext, messageHandler);
         clientContext.start();
     }
 

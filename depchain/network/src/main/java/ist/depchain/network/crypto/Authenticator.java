@@ -3,6 +3,7 @@ package ist.depchain.network.crypto;
 import com.google.protobuf.ByteString;
 import ist.depchain.common.Envelope;
 import ist.depchain.common.utils.Config;
+import ist.depchain.common.utils.Crypto;
 import ist.depchain.network.interfaces.MessageAuthenticator;
 
 import javax.crypto.*;

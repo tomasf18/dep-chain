@@ -5,7 +5,7 @@ import java.security.PublicKey;
 import org.hyperledger.besu.datatypes.Address;
 
 import ist.depchain.common.utils.AddressUtils;
-import ist.depchain.network.crypto.Crypto;
+import ist.depchain.common.utils.Crypto;
 import ist.depchain.common.Transaction;
 
 /**

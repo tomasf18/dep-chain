@@ -1,12 +1,12 @@
 package ist.depchain.core;
 
 import ist.depchain.common.Transaction;
+import ist.depchain.common.utils.Crypto;
 import ist.depchain.common.ClientRequest;
 import ist.depchain.common.ClientResponse;
 import ist.depchain.common.HotStuffMessage;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 import ist.depchain.common.ApplicationMessage;
-import ist.depchain.network.crypto.Crypto;
 import ist.depchain.network.crypto.KeyLoader;
 import ist.depchain.core.blockchain.TransactionValidator;
 

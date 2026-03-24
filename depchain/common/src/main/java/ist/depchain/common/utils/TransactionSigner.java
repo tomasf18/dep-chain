@@ -1,9 +1,8 @@
-package ist.depchain.client;
+package ist.depchain.common.utils;
 
 import java.security.PrivateKey;
 
 import ist.depchain.common.Transaction;
-import ist.depchain.network.crypto.Crypto;
 
 public final class TransactionSigner {
     private TransactionSigner() {}

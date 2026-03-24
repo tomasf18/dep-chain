@@ -2,13 +2,15 @@ package ist.depchain.tests.stage1;
 
 import com.google.protobuf.ByteString;
 import ist.depchain.client.ClientContext;
+import ist.depchain.client.MessageHandler;
 import ist.depchain.client.ClientLibrary;
 import ist.depchain.common.ApplicationMessage;
 import ist.depchain.common.ClientRequest;
 import ist.depchain.common.Command;
 import ist.depchain.common.utils.Config;
+import ist.depchain.common.utils.Crypto;
 import ist.depchain.core.ServerApp;
-import ist.depchain.network.crypto.Crypto;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class ReplayAttackTest {
     private static final String CONFIG_FILE = "../config-test.json";
     private ClientContext clientContext;
+    private MessageHandler messageHandler;
     private ClientLibrary clientLibrary;
 
     @BeforeEach
@@ -48,7 +51,8 @@ public class ReplayAttackTest {
         System.out.println("[TEST] - Starting Client");
         Config config = Config.loadConfiguration(CONFIG_FILE, "client1");
         clientContext = new ClientContext(config);
-        clientLibrary = new ClientLibrary(clientContext);
+        messageHandler = new MessageHandler(clientContext);
+        clientLibrary = new ClientLibrary(clientContext, messageHandler);
         clientContext.start();
     }
 
@@ -127,7 +131,7 @@ public class ReplayAttackTest {
             throws InterruptedException {
         for (int i = 0; i < timeoutSeconds; i++) {
             if (clientContext.getCommitedLog().size() >= expectedSize
-                    && !clientContext.getPendingRequests().containsKey(requestId))
+                    && !messageHandler.getPendingRequests().containsKey(requestId))
                 return true;
             TimeUnit.SECONDS.sleep(1);
         }

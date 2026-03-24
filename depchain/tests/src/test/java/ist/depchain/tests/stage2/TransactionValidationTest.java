@@ -11,8 +11,7 @@ import org.hyperledger.besu.datatypes.Address;
 import org.junit.jupiter.api.Test;
 
 import ist.depchain.common.utils.AddressUtils;
-import ist.depchain.network.crypto.Crypto;
-
+import ist.depchain.common.utils.Crypto;
 import ist.depchain.common.Transaction;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionValidator;
