@@ -15,6 +15,14 @@ public class ServerApp {
         return coordinators.get(serverId);
     }
 
+    public static void stopAll() {
+        for (Map.Entry<String, BasicHotStuffCoordinator> entry : coordinators.entrySet()) {
+            entry.getValue().stop();
+            try { entry.getValue().getServerContext().stop(); } catch (Exception ignored) {}
+        }
+        coordinators.clear();
+    }
+
     public static void main(String[] args) {
         if (args.length < 2) {
             System.out.println("Usage: mvn exec:java -Dexec.args='<configFile> <serverId> <byzantine_flag> <attack_type>'");

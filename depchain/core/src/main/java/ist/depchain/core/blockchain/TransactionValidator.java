@@ -31,11 +31,29 @@ public class TransactionValidator {
         }
     }
 
+    /**
+     * Validate a transaction using the world-state nonce as expected nonce.
+     * Use the overload with {@code expectedNonce} when a pending-nonce tracker
+     * is in use (e.g. in MessageHandler) so sequential submissions are accepted
+     * before the previous transaction has been committed.
+     */
     public static ValidationResult validate(
             Transaction tx,
             PublicKey clientPublicKey,
             String signatureAlgorithm,
             DepChainWorldState worldState) {
+        long expectedNonce = worldState.accountExists(tx.getFrom())
+                ? worldState.getNonce(tx.getFrom())
+                : 0;
+        return validate(tx, clientPublicKey, signatureAlgorithm, worldState, expectedNonce);
+    }
+
+    public static ValidationResult validate(
+            Transaction tx,
+            PublicKey clientPublicKey,
+            String signatureAlgorithm,
+            DepChainWorldState worldState,
+            long expectedNonce) {
 
         if (tx == null) {
             return ValidationResult.fail("missing transaction");
@@ -68,8 +86,8 @@ public class TransactionValidator {
             return ValidationResult.fail("unknown sender account");
         }
 
-        if (tx.getNonce() != worldState.getNonce(tx.getFrom())) {
-            return ValidationResult.fail("invalid nonce");
+        if (tx.getNonce() != expectedNonce) {
+            return ValidationResult.fail("invalid nonce: expected " + expectedNonce + ", got " + tx.getNonce());
         }
 
         if (tx.getGasPrice().signum() <= 0) {

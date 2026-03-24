@@ -20,29 +20,36 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration test: submits multiple native DepCoin transfers through the full
- * BasicHotStuff consensus (4 replicas, 4 HotStuff phases) and verifies that
- * all transfers are committed and the receiver balance is correct.
+ * Integration test: verifies that when a client submits multiple transactions
+ * that collectively exceed its balance, only the highest-fee transactions
+ * execute successfully while the rest fail mid-block.
  *
- * This test exercises the complete Stage 2 pipeline end-to-end:
- *   Client → MessageHandler (validate tx) → Mempool → doPropose (batch)
- *   → PREPARE → PRE-COMMIT → COMMIT → DECIDE → executeStage2Block
- *   → TransactionExecutor → BlockChain persist → ClientResponse
+ * All transactions are still committed to the chain (committed=true in the
+ * ClientResponse), since consensus commitment and execution success are
+ * independent concepts. Failed transactions consume no balance.
+ *
+ * Fee ordering guarantees deterministic execution order across replicas:
+ *   tx0 (gasPrice=3, fee=63_000) → tx1 (gasPrice=2, fee=42_000) → tx2 (gasPrice=1, fee=21_000)
+ *
+ * With client balance=100_000:
+ *   tx0 upfront = 30_000 + 63_000 = 93_000 → succeeds, balance = 7_000
+ *   tx1 upfront = 30_000 + 42_000 = 72_000 > 7_000 → fails
+ *   tx2 upfront = 30_000 + 21_000 = 51_000 > 7_000 → fails
  */
-public class NativeTransferHotStuffTest {
+public class BalanceExhaustionHotStuffTest {
     private static final String CONFIG_FILE = "../config-test.json";
     private static final String[] REPLICAS = {"s0", "s1", "s2", "s3"};
 
     private static final String RECEIVER_HEX = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    private static final BigInteger GAS_PRICE = BigInteger.ONE;
     private static final BigInteger GAS_LIMIT = BigInteger.valueOf(21_000);
+    private static final BigInteger CLIENT_BALANCE = BigInteger.valueOf(100_000);
 
     private ClientContext clientContext;
     private ClientLibrary clientLibrary;
 
     @BeforeEach
     public void setup() throws Exception {
-        System.out.println("[TEST] Starting NativeTransferHotStuffTest");
+        System.out.println("[TEST] Starting BalanceExhaustionHotStuffTest");
 
         for (String replica : REPLICAS) {
             startReplica(replica);
@@ -64,9 +71,9 @@ public class NativeTransferHotStuffTest {
 
             DepChainWorldState ws = coord.getServerContext().getWorldState();
             if (!ws.accountExists(clientAddress)) {
-                ws.createEOA(clientAddress, 0, BigInteger.valueOf(10_000_000));
+                ws.createEOA(clientAddress, 0, CLIENT_BALANCE);
             } else {
-                ws.addBalance(clientAddress, BigInteger.valueOf(10_000_000));
+                ws.addBalance(clientAddress, CLIENT_BALANCE);
             }
         }
 
@@ -83,49 +90,48 @@ public class NativeTransferHotStuffTest {
 
     @AfterEach
     public void teardown() {
-        System.out.println("[TEST] Ending NativeTransferHotStuffTest");
+        System.out.println("[TEST] Ending BalanceExhaustionHotStuffTest");
         if (clientContext != null) {
             clientContext.stop();
         }
-        ServerApp.stopAll();
+        //ServerApp.stopAll();
     }
 
     @Test
-    @DisplayName("Multiple sequential native transfers all committed")
-    void testMultipleSequentialTransfers() throws InterruptedException {
+    @DisplayName("Only highest-fee tx executes when balance covers exactly one tx")
+    void testInsufficientBalanceCausesPartialBlockExecution() throws InterruptedException {
         TimeUnit.SECONDS.sleep(5);
 
-        int numTransfers = 10;
-        int[] reqIds = new int[numTransfers];
-        long totalValue = 0;
+        int numTxs = 3;
+        int[] reqIds = new int[numTxs];
 
-        for (int i = 0; i < numTransfers; i++) {
+        // Descending gasPrice forces fee order: tx0 first, tx2 last
+        BigInteger[] gasPrices = {BigInteger.valueOf(3), BigInteger.valueOf(2), BigInteger.ONE};
+        for (int i = 0; i < numTxs; i++) {
             reqIds[i] = clientContext.getRequestId().get() + 1;
-            long nonce = i;
-            BigInteger value = BigInteger.valueOf(100L * (i + 1));
-            totalValue += 100L * (i + 1);
-
-            System.out.println("[TEST] Submitting transfer " + (i + 1) + " (reqId=" + reqIds[i]
-                    + ", value=" + value + ", nonce=" + nonce + ")");
-            clientLibrary.submitNativeTransfer(RECEIVER_HEX, value, GAS_PRICE, GAS_LIMIT, nonce);
-
+            System.out.println("[TEST] Submitting tx " + i + " (reqId=" + reqIds[i]
+                    + ", gasPrice=" + gasPrices[i] + ", nonce=" + i + ")");
+            clientLibrary.submitNativeTransfer(RECEIVER_HEX, BigInteger.valueOf(30_000),
+                    gasPrices[i], GAS_LIMIT, i);
             TimeUnit.MILLISECONDS.sleep(500);
         }
 
-        boolean allCommitted = waitForCommit(numTransfers, 180, reqIds[numTransfers - 1]);
-        assertTrue(allCommitted, "All " + numTransfers + " transfers should be committed");
+        // All 3 get committed=true responses (execution failure ≠ consensus failure)
+        boolean allCommitted = waitForCommit(numTxs, 180, reqIds[numTxs - 1]);
+        assertTrue(allCommitted, "All 3 txs should receive committed responses");
 
         List<String> log = clientContext.getCommitedLog();
-        assertEquals(numTransfers, log.size(),
-                "Committed log should have " + numTransfers + " entries, got " + log.size());
+        assertEquals(numTxs, log.size(), "Committed log should have 3 entries");
 
+        // Only tx0 (value=30_000) actually transferred funds
         DepChainWorldState ws = ServerApp.getCoordinator("s0").getServerContext().getWorldState();
         Address receiver = Address.fromHexString(RECEIVER_HEX);
-        assertEquals(BigInteger.valueOf(totalValue), ws.getBalance(receiver),
-                "Receiver should have total transferred value");
+        assertEquals(BigInteger.valueOf(30_000), ws.getBalance(receiver),
+                "Receiver should have received only the first transfer");
 
-        System.out.println("[TEST] All " + numTransfers + " transfers committed. Receiver balance: "
-                + ws.getBalance(receiver));
+        Address clientAddress = clientContext.getSelfAddress();
+        System.out.println("[TEST] Receiver balance: " + ws.getBalance(receiver)
+                + ", client balance: " + ws.getBalance(clientAddress));
     }
 
     // ========== Helpers ==========

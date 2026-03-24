@@ -3,11 +3,11 @@ package ist.depchain.core.hotstuff;
 import ist.depchain.common.ClientRequest;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
-import java.util.LinkedList;
 import java.util.Set;
-import java.util.HashSet;
 
 public class CommandMempool {
     // pending commands waiting to be proposed

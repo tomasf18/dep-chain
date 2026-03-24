@@ -59,6 +59,7 @@ public class BasicHotStuffCoordinator {
     private boolean quorumReady = false;
     private List<ClientRequest> lastProposedBatch = null; // track in-flight proposal so we can re-enqueue on timeout
     private static final int MAX_BATCH_SIZE = 10;
+    private Thread proposalLoopThread;
 
     public BasicHotStuffCoordinator(ServerContext serverContext, boolean isByzantine) {
         this.serverContext = serverContext;
@@ -70,8 +71,17 @@ public class BasicHotStuffCoordinator {
         this.lockedQC = this.utils.getGenesisQC();
     }
 
+    public void stop() {
+        timerExecutor.shutdownNow();
+        if (proposalLoopThread != null) {
+            proposalLoopThread.interrupt();
+        }
+    }
+
     public void start() {
-        new Thread(this::proposalLoop, "hotstuff-proposer").start(); // async proposal 
+        proposalLoopThread = new Thread(this::proposalLoop, "hotstuff-proposer");
+        proposalLoopThread.setDaemon(true);
+        proposalLoopThread.start(); // async proposal
 
         HotStuffMessage newViewMsg = utils.msg(HotStuffMessage.Type.NEW_VIEW, null, prepareQC, 0);
         ApplicationMessage wrapper = ApplicationMessage.newBuilder()

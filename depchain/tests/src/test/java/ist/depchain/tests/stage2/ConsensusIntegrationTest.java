@@ -376,6 +376,44 @@ class ConsensusIntegrationTest {
         assertEquals(BigInteger.valueOf(84_000), ws.getBalance(PROPOSER));
     }
 
+    @Test
+    void transactionsFailWhenBalanceExhaustedMidBlock() {
+        // Alice has enough for the first two txs but not the third.
+        // Fee ordering guarantees: tx0 (fee=63_000) → tx1 (fee=42_000) → tx2 (fee=21_000)
+        ws.createEOA(ALICE, 0, BigInteger.valueOf(150_000));
+
+        Transaction tx0 = tx(ALICE, BOB, 10_000, 3, 21_000, 0); // upfront = 10_000 + 63_000 = 73_000
+        Transaction tx1 = tx(ALICE, BOB, 10_000, 2, 21_000, 1); // upfront = 10_000 + 42_000 = 52_000
+        Transaction tx2 = tx(ALICE, BOB, 10_000, 1, 21_000, 2); // upfront = 10_000 + 21_000 = 31_000
+
+        Block genesis = new Block("genesis", null, List.of(), 0);
+        Block block = BlockBuilder.build(List.of(tx0, tx1, tx2), genesis, PROPOSER);
+
+        // Verify fee ordering
+        List<Transaction> ordered = block.getTransactions();
+        assertEquals(BigInteger.valueOf(63_000), ordered.get(0).getMaxFee());
+        assertEquals(BigInteger.valueOf(42_000), ordered.get(1).getMaxFee());
+        assertEquals(BigInteger.valueOf(21_000), ordered.get(2).getMaxFee());
+
+        List<TransactionReceipt> receipts = new ArrayList<>();
+        for (Transaction t : ordered) {
+            receipts.add(executor.execute(t, PROPOSER));
+        }
+
+        // After tx0: 150_000 - 73_000 = 77_000 remaining
+        // After tx1: 77_000  - 52_000 = 25_000 remaining
+        // tx2 needs 31_000 > 25_000 → fails
+        assertTrue(receipts.get(0).isSuccess());
+        assertTrue(receipts.get(1).isSuccess());
+        assertFalse(receipts.get(2).isSuccess());
+        assertEquals("insufficient balance for upfront cost", receipts.get(2).getError());
+
+        // BOB received only the first two transfers
+        assertEquals(BigInteger.valueOf(20_000), ws.getBalance(BOB));
+        // Alice's balance unchanged by the failed tx
+        assertEquals(BigInteger.valueOf(25_000), ws.getBalance(ALICE));
+    }
+
     // ========== Helpers ==========
 
     private static Transaction tx(Address from, Address to, long value,
