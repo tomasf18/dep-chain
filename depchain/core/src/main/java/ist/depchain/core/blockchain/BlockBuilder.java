@@ -25,15 +25,7 @@ public class BlockBuilder {
             Comparator.comparing(Transaction::getMaxFee).reversed()
                     .thenComparing(tx -> Numeric.toHexStringNoPrefix(tx.txHash()));
 
-    /**
-     * Build a block from pending transactions.
-     *
-     * @param transactions  unordered list of validated transactions
-     * @param previousBlock the parent block (for hash and height)
-     * @param proposer      the leader building this block
-     * @return a new block with deterministically ordered transactions and computed hash
-     */
-    public static Block build(List<Transaction> transactions, Block previousBlock, Address proposer) {
+    public static BlockChainBlock build(List<Transaction> transactions, BlockChainBlock previousBlock, Address proposer) {
         // 1. Sort by fee descending, then tx hash ascending for tie-breaking
         List<Transaction> ordered = new ArrayList<>(transactions);
         ordered.sort(TX_ORDER);
@@ -43,18 +35,18 @@ public class BlockBuilder {
         int blockNumber = previousBlock != null ? previousBlock.getBlockNumber() + 1 : 0;
 
         // 3. Compute deterministic block hash
-        String blockHash = Block.computeBlockHash(previousHash, blockNumber, proposer, ordered);
+        String blockHash = BlockChainBlock.computeBlockHash(previousHash, blockNumber, proposer, ordered);
 
         // 4. Build block (receipts are empty - filled after execution)
-        return new Block(blockHash, previousHash, ordered, null, blockNumber, proposer);
+        return new BlockChainBlock(blockHash, previousHash, ordered, null, blockNumber, proposer);
     }
 
     /**
      * Create a finalized block with execution receipts.
      * Called after TransactionExecutor has processed all transactions.
      */
-    public static Block finalize(Block executedBlock, List<TransactionReceipt> receipts) {
-        return new Block(
+    public static BlockChainBlock finalize(BlockChainBlock executedBlock, List<TransactionReceipt> receipts) {
+        return new BlockChainBlock(
                 executedBlock.getBlockHash(),
                 executedBlock.getPreviousBlockHash(),
                 executedBlock.getTransactions(),

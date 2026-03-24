@@ -13,6 +13,7 @@ import ist.depchain.common.Transaction;
 import ist.depchain.common.TransactionPayload;
 import ist.depchain.core.ServerContext;
 import ist.depchain.core.blockchain.BlockBuilder;
+import ist.depchain.core.blockchain.BlockChainBlock;
 import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.byzantine.MaliciousUtils;
 import org.hyperledger.besu.datatypes.Address;
@@ -24,6 +25,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.web3j.utils.Numeric;
 
 public class BasicHotStuffCoordinator {
     public interface RequestCommitListener {
@@ -436,8 +439,8 @@ public class BasicHotStuffCoordinator {
         Address proposerAddress = serverContext.deriveAddressForProcess(leaderId);
 
         // 3. Build deterministic application-level block (sorts by fee, computes hash)
-        ist.depchain.core.blockchain.Block previousAppBlock = serverContext.getBlockChain().getLatestBlock();
-        ist.depchain.core.blockchain.Block appBlock = BlockBuilder.build(txList, previousAppBlock, proposerAddress);
+        BlockChainBlock previousAppBlock = serverContext.getBlockChain().getLatestBlock();
+        BlockChainBlock appBlock = BlockBuilder.build(txList, previousAppBlock, proposerAddress);
 
         // 4. Execute each transaction in the deterministic order
         List<TransactionReceipt> receipts = new ArrayList<>();
@@ -447,11 +450,10 @@ public class BasicHotStuffCoordinator {
         }
 
         // 5. Finalize block with receipts and persist
-        ist.depchain.core.blockchain.Block finalBlock = BlockBuilder.finalize(appBlock, receipts);
+        BlockChainBlock finalBlock = BlockBuilder.finalize(appBlock, receipts);
         serverContext.getBlockChain().addBlock(finalBlock);
 
-        System.out.println("[COORDINATOR] Committed block #" + finalBlock.getBlockNumber()
-                + " with " + txList.size() + " txs, hash=" + finalBlock.getBlockHash());
+        System.out.println("[COORDINATOR] Committed block #" + finalBlock.getBlockNumber() + " with " + txList.size() + " txs, hash=" + finalBlock.getBlockHash());
 
         // 6. Discard committed requests from mempool and notify MessageHandler
         List<ClientRequestMeta> metaList = protoBlock.getRequestMetaList();
@@ -468,14 +470,14 @@ public class BasicHotStuffCoordinator {
         Map<String, TransactionReceipt> receiptByTxHash = new HashMap<>();
         List<Transaction> orderedTxs = appBlock.getTransactions();
         for (int i = 0; i < orderedTxs.size(); i++) {
-            String txHashHex = org.web3j.utils.Numeric.toHexStringNoPrefix(orderedTxs.get(i).txHash());
+            String txHashHex = Numeric.toHexStringNoPrefix(orderedTxs.get(i).txHash());
             receiptByTxHash.put(txHashHex, receipts.get(i));
         }
 
         for (int i = 0; i < metaList.size(); i++) {
             ClientRequestMeta meta = metaList.get(i);
             Transaction originalTx = txList.get(i); // original order matches meta order
-            String txHashHex = org.web3j.utils.Numeric.toHexStringNoPrefix(originalTx.txHash());
+            String txHashHex = Numeric.toHexStringNoPrefix(originalTx.txHash());
             TransactionReceipt receipt = receiptByTxHash.get(txHashHex);
 
             notifyRequestCommitted(meta.getClientId(), meta.getRequestId());

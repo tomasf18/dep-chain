@@ -80,7 +80,7 @@ public class MessageHandler {
 
     private void handleTransactionRequest(ClientRequest clientRequest, RequestKey requestKey) {
         String clientId = clientRequest.getClientId();
-        var tx = Transaction.fromProto(clientRequest.getTransaction());
+        Transaction tx = Transaction.fromProto(clientRequest.getTransaction());
 
         String keyPath = serverContext.getConfig().getTrustedProcessKeyPathString(clientId);
         PublicKey clientPublicKey = KeyLoader.loadPublicKey(keyPath);
@@ -90,21 +90,16 @@ public class MessageHandler {
             return;
         }
 
-        var result = TransactionValidator.validate(
-                tx,
-                clientPublicKey,
-                serverContext.getConfig().getSignatureAlgorithm(),
-                serverContext.getWorldState());
+        TransactionValidator.ValidationResult result = TransactionValidator.validate(tx, clientPublicKey, serverContext.getConfig().getSignatureAlgorithm(), serverContext.getWorldState());
 
-        if (!result.valid()) {
+        if (!result.isValid()) {
             pendingRequests.remove(requestKey);
-            System.err.println("[MESSAGE_HANDLER | ERROR] Rejected tx from " + clientId + ": " + result.error());
+            System.err.println("[MESSAGE_HANDLER | ERROR] Rejected tx from " + clientId + ": " + result.getErrorMessage());
             sendRejectionResponse(clientId, clientRequest.getRequestId());
             return;
         }
 
-        System.out.println("[MESSAGE_HANDLER | INFO] Accepted tx request " + requestKey
-                + " from=" + tx.getFrom() + " nonce=" + tx.getNonce());
+        System.out.println("[MESSAGE_HANDLER | INFO] Accepted tx request " + requestKey + " from=" + tx.getFrom() + " nonce=" + tx.getNonce());
 
         coordinator.enqueueClientRequest(clientRequest);
     }

@@ -20,7 +20,7 @@ import ist.depchain.common.ClientRequestMeta;
 import ist.depchain.common.Transaction;
 import ist.depchain.common.TransactionPayload;
 import ist.depchain.core.BlockChain;
-import ist.depchain.core.blockchain.Block;
+import ist.depchain.core.blockchain.BlockChainBlock;
 import ist.depchain.core.blockchain.BlockBuilder;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionExecutor;
@@ -149,10 +149,10 @@ class ConsensusIntegrationTest {
         ws.createEOA(ALICE, 0, BigInteger.valueOf(1_000_000));
 
         Transaction tx = tx(ALICE, BOB, 500, 1, 21_000, 0);
-        Block genesis = new Block("genesis", null, List.of(), 0);
+        BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
 
         // Build block
-        Block block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
         assertEquals(1, block.getTransactions().size());
         assertEquals(1, block.getBlockNumber());
 
@@ -179,8 +179,8 @@ class ConsensusIntegrationTest {
         Transaction txLow = tx(ALICE, CAROL, 100, 1, 21_000, 0);   // fee = 21_000
         Transaction txHigh = tx(BOB, CAROL, 200, 10, 21_000, 0);    // fee = 210_000
 
-        Block genesis = new Block("genesis", null, List.of(), 0);
-        Block block = BlockBuilder.build(List.of(txLow, txHigh), genesis, PROPOSER);
+        BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
+        BlockChainBlock block = BlockBuilder.build(List.of(txLow, txHigh), genesis, PROPOSER);
 
         // High fee should be first
         assertEquals(BigInteger.valueOf(210_000), block.getTransactions().get(0).getMaxFee());
@@ -204,15 +204,15 @@ class ConsensusIntegrationTest {
         ws.createEOA(ALICE, 0, BigInteger.valueOf(1_000_000));
 
         Transaction tx = tx(ALICE, BOB, 100, 1, 21_000, 0);
-        Block genesis = new Block("genesis", null, List.of(), 0);
-        Block block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
+        BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
 
         List<TransactionReceipt> receipts = new ArrayList<>();
         for (Transaction t : block.getTransactions()) {
             receipts.add(executor.execute(t, PROPOSER));
         }
 
-        Block finalized = BlockBuilder.finalize(block, receipts);
+        BlockChainBlock finalized = BlockBuilder.finalize(block, receipts);
         assertEquals(1, finalized.getReceipts().size());
         assertTrue(finalized.getReceipts().get(0).isSuccess());
         assertEquals(block.getBlockHash(), finalized.getBlockHash());
@@ -223,13 +223,13 @@ class ConsensusIntegrationTest {
         ws.createEOA(ALICE, 0, BigInteger.valueOf(1_000_000));
 
         Transaction tx = tx(ALICE, BOB, 100, 1, 21_000, 0);
-        Block genesis = new Block("genesis", null, List.of(), 0);
+        BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
         BlockChain chain = new BlockChain(); // no persistence dir
         chain.addBlock(genesis);
 
-        Block block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
         List<TransactionReceipt> receipts = List.of(executor.execute(tx, PROPOSER));
-        Block finalized = BlockBuilder.finalize(block, receipts);
+        BlockChainBlock finalized = BlockBuilder.finalize(block, receipts);
         chain.addBlock(finalized);
 
         assertEquals(2, chain.getHeight());
@@ -254,8 +254,8 @@ class ConsensusIntegrationTest {
                 ClientRequestMeta.newBuilder().setClientId("clientB").setRequestId(2).build()
         );
 
-        Block genesis = new Block("genesis", null, List.of(), 0);
-        Block block = BlockBuilder.build(originalOrder, genesis, PROPOSER);
+        BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
+        BlockChainBlock block = BlockBuilder.build(originalOrder, genesis, PROPOSER);
 
         // Execute in BlockBuilder's deterministic order
         List<TransactionReceipt> receipts = new ArrayList<>();
@@ -286,8 +286,8 @@ class ConsensusIntegrationTest {
 
     @Test
     void emptyBlockBuildsSuccessfully() {
-        Block genesis = new Block("genesis", null, List.of(), 0);
-        Block block = BlockBuilder.build(List.of(), genesis, PROPOSER);
+        BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
+        BlockChainBlock block = BlockBuilder.build(List.of(), genesis, PROPOSER);
 
         assertEquals(0, block.getTransactions().size());
         assertEquals(1, block.getBlockNumber());
@@ -300,14 +300,14 @@ class ConsensusIntegrationTest {
         ws.createEOA(ALICE, 0, BigInteger.valueOf(100)); // only 100, tx needs 21_100
 
         Transaction tx = tx(ALICE, BOB, 100, 1, 21_000, 0); // upfront = 100 + 21_000 = 21_100
-        Block genesis = new Block("genesis", null, List.of(), 0);
-        Block block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
+        BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
 
         TransactionReceipt receipt = executor.execute(block.getTransactions().get(0), PROPOSER);
         assertFalse(receipt.isSuccess());
 
         // Block still has the tx
-        Block finalized = BlockBuilder.finalize(block, List.of(receipt));
+        BlockChainBlock finalized = BlockBuilder.finalize(block, List.of(receipt));
         assertEquals(1, finalized.getTransactions().size());
         assertEquals(1, finalized.getReceipts().size());
         assertFalse(finalized.getReceipts().get(0).isSuccess());
@@ -318,8 +318,8 @@ class ConsensusIntegrationTest {
         ws.createEOA(ALICE, 0, BigInteger.valueOf(1_000_000));
 
         Transaction tx = tx(ALICE, BOB, 100, 2, 21_000, 0); // fee = min(2*21000, 2*21000) = 42000
-        Block genesis = new Block("genesis", null, List.of(), 0);
-        Block block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
+        BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
 
         TransactionReceipt receipt = executor.execute(block.getTransactions().get(0), PROPOSER);
         assertTrue(receipt.isSuccess());
@@ -333,22 +333,22 @@ class ConsensusIntegrationTest {
     void consecutiveBlocksBuildCorrectChain() {
         ws.createEOA(ALICE, 0, BigInteger.valueOf(10_000_000));
 
-        Block genesis = new Block("genesis", null, List.of(), 0);
+        BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
         BlockChain chain = new BlockChain();
         chain.addBlock(genesis);
 
         // Block 1
         Transaction tx1 = tx(ALICE, BOB, 100, 1, 21_000, 0);
-        Block block1 = BlockBuilder.build(List.of(tx1), genesis, PROPOSER);
+        BlockChainBlock block1 = BlockBuilder.build(List.of(tx1), genesis, PROPOSER);
         TransactionReceipt r1 = executor.execute(block1.getTransactions().get(0), PROPOSER);
-        Block finalized1 = BlockBuilder.finalize(block1, List.of(r1));
+        BlockChainBlock finalized1 = BlockBuilder.finalize(block1, List.of(r1));
         chain.addBlock(finalized1);
 
         // Block 2
         Transaction tx2 = tx(ALICE, CAROL, 200, 1, 21_000, 1);
-        Block block2 = BlockBuilder.build(List.of(tx2), finalized1, PROPOSER);
+        BlockChainBlock block2 = BlockBuilder.build(List.of(tx2), finalized1, PROPOSER);
         TransactionReceipt r2 = executor.execute(block2.getTransactions().get(0), PROPOSER);
-        Block finalized2 = BlockBuilder.finalize(block2, List.of(r2));
+        BlockChainBlock finalized2 = BlockBuilder.finalize(block2, List.of(r2));
         chain.addBlock(finalized2);
 
         assertEquals(3, chain.getHeight()); // genesis + 2 blocks
@@ -364,8 +364,8 @@ class ConsensusIntegrationTest {
         Transaction tx1 = tx(ALICE, CAROL, 100, 1, 21_000, 0); // fee = 21_000
         Transaction tx2 = tx(BOB, CAROL, 200, 3, 21_000, 0);   // fee = 63_000
 
-        Block genesis = new Block("genesis", null, List.of(), 0);
-        Block block = BlockBuilder.build(List.of(tx1, tx2), genesis, PROPOSER);
+        BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
+        BlockChainBlock block = BlockBuilder.build(List.of(tx1, tx2), genesis, PROPOSER);
 
         for (Transaction t : block.getTransactions()) {
             TransactionReceipt r = executor.execute(t, PROPOSER);
@@ -386,8 +386,8 @@ class ConsensusIntegrationTest {
         Transaction tx1 = tx(ALICE, BOB, 10_000, 2, 21_000, 1); // upfront = 10_000 + 42_000 = 52_000
         Transaction tx2 = tx(ALICE, BOB, 10_000, 1, 21_000, 2); // upfront = 10_000 + 21_000 = 31_000
 
-        Block genesis = new Block("genesis", null, List.of(), 0);
-        Block block = BlockBuilder.build(List.of(tx0, tx1, tx2), genesis, PROPOSER);
+        BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
+        BlockChainBlock block = BlockBuilder.build(List.of(tx0, tx1, tx2), genesis, PROPOSER);
 
         // Verify fee ordering
         List<Transaction> ordered = block.getTransactions();

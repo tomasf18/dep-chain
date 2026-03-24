@@ -16,18 +16,18 @@ import org.web3j.utils.Numeric;
 import ist.depchain.common.Transaction;
 
 /**
- * JSON serialization and deserialization for Block objects.
+ * JSON serialization and deserialization for BlockChainBlock objects.
  * Format matches the genesis block format from the spec.
  */
 public class BlockSerializer {
 
     // --- Serialize ---
 
-    public static String toJson(Block block) {
+    public static String toJson(BlockChainBlock block) {
         return toJsonObject(block).toString();
     }
 
-    public static JsonObject toJsonObject(Block block) {
+    public static JsonObject toJsonObject(BlockChainBlock block) {
         JsonObject root = new JsonObject();
         root.addProperty("block_hash", block.getBlockHash());
 
@@ -109,12 +109,12 @@ public class BlockSerializer {
 
     // --- Deserialize ---
 
-    public static Block fromJson(String json) {
+    public static BlockChainBlock fromJson(String json) {
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         return fromJsonObject(root);
     }
 
-    public static Block fromJsonObject(JsonObject root) {
+    public static BlockChainBlock fromJsonObject(JsonObject root) {
         String blockHash = root.get("block_hash").getAsString();
 
         String previousBlockHash = null;
@@ -145,7 +145,7 @@ public class BlockSerializer {
             }
         }
 
-        return new Block(blockHash, previousBlockHash, transactions, receipts, blockNumber, proposer);
+        return new BlockChainBlock(blockHash, previousBlockHash, transactions, receipts, blockNumber, proposer);
     }
 
     private static Transaction deserializeTransaction(JsonObject obj) {

@@ -37,7 +37,7 @@ class TransactionValidationTest {
         Transaction signed = unsignedTx.withSignature(sig);
 
         var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws);
-        assertTrue(result.valid(), result.error());
+        assertTrue(result.isValid(), result.getErrorMessage());
     }
 
     @Test
@@ -59,8 +59,8 @@ class TransactionValidationTest {
         Transaction signed = unsignedTx.withSignature(sig);
 
         var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws);
-        assertFalse(result.valid());
-        assertTrue(result.error().contains("nonce"));
+        assertFalse(result.isValid());
+        assertTrue(result.getErrorMessage().contains("nonce"));
     }
 
     @Test
@@ -82,8 +82,8 @@ class TransactionValidationTest {
         Transaction signed = unsignedTx.withSignature(sig);
 
         var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws);
-        assertFalse(result.valid());
-        assertTrue(result.error().contains("balance"));
+        assertFalse(result.isValid());
+        assertTrue(result.getErrorMessage().contains("balance"));
     }
 
     @Test
@@ -107,7 +107,7 @@ class TransactionValidationTest {
         Transaction signed = unsignedTx.withSignature(wrongSig);
 
         var result = TransactionValidator.validate(signed, pub1, "SHA256withECDSA", ws);
-        assertFalse(result.valid());
+        assertFalse(result.isValid());
     }
 
     private static KeyPair genKeyPair() throws Exception {

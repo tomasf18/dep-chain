@@ -2,7 +2,7 @@ package ist.depchain.core;
 
 import ist.depchain.common.utils.Config;
 import ist.depchain.common.utils.AddressUtils;
-import ist.depchain.core.blockchain.Block;
+import ist.depchain.core.blockchain.BlockChainBlock;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.GenesisLoader;
 import ist.depchain.core.blockchain.TransactionExecutor;
@@ -19,6 +19,7 @@ import org.hyperledger.besu.datatypes.Address;
 
 public class ServerContext {
     private static final String DEFAULT_GENESIS_PATH = "core/src/main/resources/genesis.json";
+    private final Address selfAddress;
 
     private final Config config;
 
@@ -31,32 +32,33 @@ public class ServerContext {
     private TransactionExecutor transactionExecutor;
 
     private final BLSThresholdSig blsThresholdSig;
-    private final Address selfAddress;
 
     public ServerContext(Config config) {
         this.config = config;
+        
+        PublicKey pubKey = KeyLoader.loadPublicKey(config.getSelfPublicKeyPathString());
+        this.selfAddress = (pubKey != null) ? AddressUtils.deriveAddress(pubKey) : null;
+
         fairLossLink = new UdpFairLossLink(config);
         stubbornLink = new StubbornLink(config, fairLossLink);
         authenticatedPerfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config));
-        blockChain = new BlockChain("data/blocks/" + config.getSelfId());
+
+        blockChain = new BlockChain(config.getSelfId());
         worldState = new DepChainWorldState();
         transactionExecutor = new TransactionExecutor(worldState);
         loadGenesis();
+
         BLSManager.init();
         this.blsThresholdSig = new BLSThresholdSig(config);
-        PublicKey pubKey = KeyLoader.loadPublicKey(config.getSelfPublicKeyPathString());
-        this.selfAddress = (pubKey != null) ? AddressUtils.deriveAddress(pubKey) : null;
     }
 
     private void loadGenesis() {
         try {
-            Block genesis = GenesisLoader.loadGenesis(DEFAULT_GENESIS_PATH, worldState);
+            BlockChainBlock genesis = GenesisLoader.loadGenesis(DEFAULT_GENESIS_PATH, worldState);
             blockChain.addBlock(genesis);
-            System.out.println("[SERVER_CONTEXT] Genesis block loaded with "
-                    + genesis.getTransactions().size() + " transactions");
+            System.out.println("[SERVER_CONTEXT] Genesis block loaded with " + genesis.getTransactions().size() + " transactions");
         } catch (Exception e) {
-            System.err.println("[SERVER_CONTEXT | WARN] Could not load genesis: " + e.getMessage()
-                    + " - starting with empty state");
+            System.err.println("[SERVER_CONTEXT | WARN] Could not load genesis: " + e.getMessage()  + " - starting with empty state");
         }
     }
 

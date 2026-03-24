@@ -6,18 +6,17 @@ import java.io.File;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 
 import org.hyperledger.besu.datatypes.Address;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.web3j.utils.Numeric;
 
 import ist.depchain.common.Transaction;
 import ist.depchain.core.BlockChain;
-import ist.depchain.core.blockchain.Block;
+import ist.depchain.core.blockchain.BlockChainBlock;
 import ist.depchain.core.blockchain.BlockBuilder;
 import ist.depchain.core.blockchain.BlockSerializer;
 import ist.depchain.core.blockchain.TransactionReceipt;
@@ -32,11 +31,11 @@ class BlockBuildingAndPersistenceTest {
     private static final Address CAROL = Address.fromHexString("0xcccccccccccccccccccccccccccccccccccccccc");
     private static final Address PROPOSER = Address.fromHexString("0xdddddddddddddddddddddddddddddddddddddddd");
 
-    private Block genesis;
+    private BlockChainBlock genesis;
 
     @BeforeEach
     void setup() {
-        genesis = new Block("0x0000", null, List.of(), 0);
+        genesis = new BlockChainBlock("0x0000", null, List.of(), 0);
     }
 
     // --- Deterministic ordering ---
@@ -47,7 +46,7 @@ class BlockBuildingAndPersistenceTest {
         Transaction highFee = tx(ALICE, BOB, 100, 10, 21_000, 1);  // fee = 210000
         Transaction midFee = tx(ALICE, BOB, 100, 5, 21_000, 2);    // fee = 105000
 
-        Block block = BlockBuilder.build(List.of(lowFee, highFee, midFee), genesis, PROPOSER);
+        BlockChainBlock block = BlockBuilder.build(List.of(lowFee, highFee, midFee), genesis, PROPOSER);
 
         List<Transaction> ordered = block.getTransactions();
         assertEquals(3, ordered.size());
@@ -65,15 +64,15 @@ class BlockBuildingAndPersistenceTest {
 
         assertEquals(tx1.getMaxFee(), tx2.getMaxFee(), "fees must be equal for this test");
 
-        Block block = BlockBuilder.build(List.of(tx1, tx2), genesis, PROPOSER);
+        BlockChainBlock block = BlockBuilder.build(List.of(tx1, tx2), genesis, PROPOSER);
         List<Transaction> ordered = block.getTransactions();
 
         // Both should be present, in a deterministic order based on tx hash
         assertEquals(2, ordered.size());
 
         // Verify the order is by tx hash ascending
-        String hash0 = org.web3j.utils.Numeric.toHexStringNoPrefix(ordered.get(0).txHash());
-        String hash1 = org.web3j.utils.Numeric.toHexStringNoPrefix(ordered.get(1).txHash());
+        String hash0 = Numeric.toHexStringNoPrefix(ordered.get(0).txHash());
+        String hash1 = Numeric.toHexStringNoPrefix(ordered.get(1).txHash());
         assertTrue(hash0.compareTo(hash1) <= 0, "tie-breaker should sort by tx hash ascending");
     }
 
@@ -83,9 +82,9 @@ class BlockBuildingAndPersistenceTest {
         Transaction tx2 = tx(BOB, CAROL, 50, 3, 21_000, 0);
         Transaction tx3 = tx(CAROL, ALICE, 50, 1, 21_000, 0);
 
-        Block blockA = BlockBuilder.build(List.of(tx1, tx2, tx3), genesis, PROPOSER);
-        Block blockB = BlockBuilder.build(List.of(tx3, tx1, tx2), genesis, PROPOSER);
-        Block blockC = BlockBuilder.build(List.of(tx2, tx3, tx1), genesis, PROPOSER);
+        BlockChainBlock blockA = BlockBuilder.build(List.of(tx1, tx2, tx3), genesis, PROPOSER);
+        BlockChainBlock blockB = BlockBuilder.build(List.of(tx3, tx1, tx2), genesis, PROPOSER);
+        BlockChainBlock blockC = BlockBuilder.build(List.of(tx2, tx3, tx1), genesis, PROPOSER);
 
         // All three should produce the same transaction order
         assertTransactionOrderEquals(blockA.getTransactions(), blockB.getTransactions());
@@ -97,8 +96,8 @@ class BlockBuildingAndPersistenceTest {
     @Test
     void blockHashIsDeterministic() {
         Transaction tx = tx(ALICE, BOB, 100, 1, 21_000, 0);
-        Block block1 = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
-        Block block2 = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock block1 = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock block2 = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
 
         assertEquals(block1.getBlockHash(), block2.getBlockHash());
     }
@@ -108,8 +107,8 @@ class BlockBuildingAndPersistenceTest {
         Transaction tx1 = tx(ALICE, BOB, 100, 1, 21_000, 0);
         Transaction tx2 = tx(ALICE, BOB, 200, 1, 21_000, 0);
 
-        Block block1 = BlockBuilder.build(List.of(tx1), genesis, PROPOSER);
-        Block block2 = BlockBuilder.build(List.of(tx2), genesis, PROPOSER);
+        BlockChainBlock block1 = BlockBuilder.build(List.of(tx1), genesis, PROPOSER);
+        BlockChainBlock block2 = BlockBuilder.build(List.of(tx2), genesis, PROPOSER);
 
         assertNotEquals(block1.getBlockHash(), block2.getBlockHash());
     }
@@ -119,8 +118,8 @@ class BlockBuildingAndPersistenceTest {
         Transaction tx = tx(ALICE, BOB, 100, 1, 21_000, 0);
         Address otherProposer = Address.fromHexString("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
 
-        Block block1 = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
-        Block block2 = BlockBuilder.build(List.of(tx), genesis, otherProposer);
+        BlockChainBlock block1 = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock block2 = BlockBuilder.build(List.of(tx), genesis, otherProposer);
 
         assertNotEquals(block1.getBlockHash(), block2.getBlockHash());
     }
@@ -130,24 +129,24 @@ class BlockBuildingAndPersistenceTest {
     @Test
     void blockNumberIncrementsFromParent() {
         Transaction tx = tx(ALICE, BOB, 100, 1, 21_000, 0);
-        Block block1 = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock block1 = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
         assertEquals(1, block1.getBlockNumber());
 
-        Block block2 = BlockBuilder.build(List.of(tx), block1, PROPOSER);
+        BlockChainBlock block2 = BlockBuilder.build(List.of(tx), block1, PROPOSER);
         assertEquals(2, block2.getBlockNumber());
     }
 
     @Test
     void blockPointsToParentHash() {
         Transaction tx = tx(ALICE, BOB, 100, 1, 21_000, 0);
-        Block block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
         assertEquals(genesis.getBlockHash(), block.getPreviousBlockHash());
     }
 
     @Test
     void proposerIsStoredInBlock() {
         Transaction tx = tx(ALICE, BOB, 100, 1, 21_000, 0);
-        Block block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
         assertEquals(PROPOSER, block.getProposer());
     }
 
@@ -156,14 +155,14 @@ class BlockBuildingAndPersistenceTest {
     @Test
     void finalizeAttachesReceipts() {
         Transaction tx = tx(ALICE, BOB, 100, 1, 21_000, 0);
-        Block block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
 
         assertTrue(block.getReceipts().isEmpty());
 
         TransactionReceipt receipt = TransactionReceipt.success(
                 tx.txHash(), BigInteger.valueOf(21_000), BigInteger.valueOf(21_000));
 
-        Block finalized = BlockBuilder.finalize(block, List.of(receipt));
+        BlockChainBlock finalized = BlockBuilder.finalize(block, List.of(receipt));
         assertEquals(1, finalized.getReceipts().size());
         assertTrue(finalized.getReceipts().get(0).isSuccess());
         assertEquals(block.getBlockHash(), finalized.getBlockHash());
@@ -175,16 +174,16 @@ class BlockBuildingAndPersistenceTest {
     void serializeAndDeserializeBlock() {
         Transaction tx1 = tx(ALICE, BOB, 500, 2, 50_000, 0);
         Transaction tx2 = tx(BOB, CAROL, 300, 1, 21_000, 0);
-        Block block = BlockBuilder.build(List.of(tx1, tx2), genesis, PROPOSER);
+        BlockChainBlock block = BlockBuilder.build(List.of(tx1, tx2), genesis, PROPOSER);
 
         TransactionReceipt r1 = TransactionReceipt.success(
                 tx1.txHash(), BigInteger.valueOf(21_000), BigInteger.valueOf(42_000));
         TransactionReceipt r2 = TransactionReceipt.failure(
                 tx2.txHash(), BigInteger.valueOf(21_000), BigInteger.valueOf(21_000), "some error");
-        Block finalized = BlockBuilder.finalize(block, List.of(r1, r2));
+        BlockChainBlock finalized = BlockBuilder.finalize(block, List.of(r1, r2));
 
         String json = BlockSerializer.toJson(finalized);
-        Block restored = BlockSerializer.fromJson(json);
+        BlockChainBlock restored = BlockSerializer.fromJson(json);
 
         assertEquals(finalized.getBlockHash(), restored.getBlockHash());
         assertEquals(finalized.getPreviousBlockHash(), restored.getPreviousBlockHash());
@@ -211,10 +210,10 @@ class BlockBuildingAndPersistenceTest {
 
     @Test
     void serializeGenesisBlockWithNulls() {
-        Block genesisBlock = new Block("0x0000", null, List.of(), 0);
+        BlockChainBlock genesisBlock = new BlockChainBlock("0x0000", null, List.of(), 0);
 
         String json = BlockSerializer.toJson(genesisBlock);
-        Block restored = BlockSerializer.fromJson(json);
+        BlockChainBlock restored = BlockSerializer.fromJson(json);
 
         assertEquals("0x0000", restored.getBlockHash());
         assertNull(restored.getPreviousBlockHash());
@@ -231,7 +230,7 @@ class BlockBuildingAndPersistenceTest {
         chain.addBlock(genesis);
 
         Transaction tx = tx(ALICE, BOB, 100, 1, 21_000, 0);
-        Block block1 = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
+        BlockChainBlock block1 = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
         chain.addBlock(block1);
 
         // Verify files were created
@@ -243,7 +242,7 @@ class BlockBuildingAndPersistenceTest {
         // Verify persisted block can be deserialized
         try {
             String json = Files.readString(block1File.toPath());
-            Block restored = BlockSerializer.fromJson(json);
+            BlockChainBlock restored = BlockSerializer.fromJson(json);
             assertEquals(block1.getBlockHash(), restored.getBlockHash());
             assertEquals(1, restored.getBlockNumber());
             assertEquals(1, restored.getTransactions().size());

@@ -14,7 +14,7 @@ import ist.depchain.common.Transaction;
  *
  * Gas rules (from spec):
  *   fee = min(gasPrice * gasLimit, gasPrice * gasUsed)
- *   If gasUsed > gasLimit → tx aborted, gas NOT refunded.
+ *   If gasUsed > gasLimit -> tx aborted, gas NOT refunded.
  *   Fees are deducted from sender's native DepCoin balance.
  *   Fees are credited to the block proposer (leader).
  */
@@ -42,7 +42,6 @@ public class TransactionExecutor {
 
         // 1. Reserve max upfront cost (value + gasLimit * gasPrice)
         //    Validation already checked this, but guard against edge cases.
-        BigInteger maxFee = tx.getMaxFee();
         BigInteger upfrontCost = tx.getMaxUpfrontCost();
 
         if (worldState.getBalance(sender).compareTo(upfrontCost) < 0) {

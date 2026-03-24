@@ -36,7 +36,7 @@ import org.hyperledger.besu.datatypes.Address;
  */
 public class GenesisLoader {
 
-    public static Block loadGenesis(String genesisFilePath, DepChainWorldState worldState) throws IOException {
+    public static BlockChainBlock loadGenesis(String genesisFilePath, DepChainWorldState worldState) throws IOException {
         Gson gson = new Gson();
         JsonObject root;
 
@@ -115,7 +115,7 @@ public class GenesisLoader {
             throw new IllegalArgumentException("Genesis block must have previous_block_hash = null");
         }
 
-        return new Block(blockHash, null, transactions, 0);
+        return new BlockChainBlock(blockHash, null, transactions, 0);
     }
 
     private static void validateRoot(JsonObject root) {

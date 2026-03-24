@@ -11,7 +11,7 @@ import org.web3j.utils.Numeric;
 
 import ist.depchain.common.Transaction;
 
-public class Block {
+public class BlockChainBlock {
     private final String blockHash;
     private final String previousBlockHash; // null for genesis
     private final List<Transaction> transactions;
@@ -19,7 +19,7 @@ public class Block {
     private final int blockNumber;
     private final Address proposer; // leader who built this block (null for genesis)
 
-    public Block(String blockHash, String previousBlockHash, List<Transaction> transactions,
+    public BlockChainBlock(String blockHash, String previousBlockHash, List<Transaction> transactions,
                  List<TransactionReceipt> receipts, int blockNumber, Address proposer) {
         this.blockHash = blockHash;
         this.previousBlockHash = previousBlockHash;
@@ -34,7 +34,7 @@ public class Block {
     }
 
     /** Convenience constructor without receipts (for genesis or pre-execution). */
-    public Block(String blockHash, String previousBlockHash, List<Transaction> transactions, int blockNumber) {
+    public BlockChainBlock(String blockHash, String previousBlockHash, List<Transaction> transactions, int blockNumber) {
         this(blockHash, previousBlockHash, transactions, null, blockNumber, null);
     }
 
