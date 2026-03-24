@@ -21,32 +21,6 @@ import ist.depchain.common.Transaction;
  */
 public class TransactionValidator {
 
-    public static class ValidationResult {
-        private final boolean valid;
-        private final String errorMessage;
-
-        private ValidationResult(boolean valid, String errorMessage) {
-            this.valid = valid;
-            this.errorMessage = errorMessage;
-        }
-
-        public static ValidationResult ok() {
-            return new ValidationResult(true, null);
-        }
-
-        public static ValidationResult fail(String errorMessage) {
-            return new ValidationResult(false, errorMessage);
-        }
-
-        public boolean isValid() {
-            return valid;
-        }
-
-        public String getErrorMessage() {
-            return errorMessage;
-        }
-    }
-
     public static ValidationResult validate(Transaction tx, PublicKey clientPublicKey, String signatureAlgorithm, DepChainWorldState worldState) {
 
         if (tx == null) {

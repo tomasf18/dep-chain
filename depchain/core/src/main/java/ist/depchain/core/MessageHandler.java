@@ -9,6 +9,7 @@ import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 import ist.depchain.common.ApplicationMessage;
 import ist.depchain.network.crypto.KeyLoader;
 import ist.depchain.core.blockchain.TransactionValidator;
+import ist.depchain.core.blockchain.ValidationResult;
 
 import java.security.PublicKey;
 import java.util.Set;
@@ -90,7 +91,7 @@ public class MessageHandler {
             return;
         }
 
-        TransactionValidator.ValidationResult result = TransactionValidator.validate(tx, clientPublicKey, serverContext.getConfig().getSignatureAlgorithm(), serverContext.getWorldState());
+        ValidationResult result = TransactionValidator.validate(tx, clientPublicKey, serverContext.getConfig().getSignatureAlgorithm(), serverContext.getWorldState());
 
         if (!result.isValid()) {
             pendingRequests.remove(requestKey);
@@ -107,8 +108,11 @@ public class MessageHandler {
     private void sendRejectionResponse(String clientId, int reqId) {
         try {
             ClientResponse rejection = ClientResponse.newBuilder()
+                    .setClientId(clientId)
                     .setRequestId(reqId)
                     .setCommitted(false)
+                    .setStatus("REJECTED")
+                    .setError("validation failed")
                     .build();
             serverContext.getPerfectLink().send(clientId, rejection.toByteArray());
         } catch (Exception e) {
@@ -174,6 +178,14 @@ public class MessageHandler {
             int result = clientId.hashCode();
             result = 31 * result + requestId;
             return result;
+        }
+
+        @Override
+        public String toString() {
+            return "RequestKey{" +
+                    "clientId='" + clientId + '\'' +
+                    ", requestId=" + requestId +
+                    '}';
         }
     }
 }

@@ -36,7 +36,32 @@ public class BlockChain {
         }
     }
 
-    public void addBlock(BlockChainBlock block) {
+    public synchronized void addBlock(BlockChainBlock block) {
+        if (block == null) {
+            throw new IllegalArgumentException("block cannot be null");
+        }
+
+        if (blocks.isEmpty()) {
+            if (block.getBlockNumber() != 0) {
+                throw new IllegalStateException("Genesis block must have number 0");
+            }
+            if (block.getPreviousBlockHash() != null) {
+                throw new IllegalStateException("Genesis block must have previousBlockHash = null");
+            }
+        } else {
+            BlockChainBlock latest = getLatestBlock();
+
+            if (!latest.getBlockHash().equals(block.getPreviousBlockHash())) {
+                throw new IllegalStateException("Invalid block linkage: expected previous hash "
+                        + latest.getBlockHash() + " but got " + block.getPreviousBlockHash());
+            }
+
+            if (block.getBlockNumber() != latest.getBlockNumber() + 1) {
+                throw new IllegalStateException("Invalid block number: expected "
+                        + (latest.getBlockNumber() + 1) + " but got " + block.getBlockNumber());
+            }
+        }
+
         blocks.add(block);
         persistBlock(block);
     }

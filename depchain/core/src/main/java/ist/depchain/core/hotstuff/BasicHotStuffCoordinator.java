@@ -26,6 +26,11 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import ist.depchain.core.blockchain.BlockValidator;
+import ist.depchain.core.blockchain.DepChainWorldState;
+import ist.depchain.core.blockchain.TransactionValidator;
+import ist.depchain.core.blockchain.ValidationResult;
+
 import org.web3j.utils.Numeric;
 
 public class BasicHotStuffCoordinator {
@@ -311,7 +316,7 @@ public class BasicHotStuffCoordinator {
             return;
 
         voteCollector.putIfAbsent(HotStuffMessage.Type.COMMIT, new HashMap<>());
-        ByteString blockId = vote.getBlock().getId();
+        ByteString blockId = vote.getBlock().getId(); 
         Map<String, HotStuffMessage> votes = voteCollector.get(HotStuffMessage.Type.COMMIT).computeIfAbsent(blockId, k -> new HashMap<>());
         votes.put(sourceId, vote);
 
@@ -343,16 +348,31 @@ public class BasicHotStuffCoordinator {
         boolean extendsJustify = utils.extendsFrom(node, justify.getBlockId());
         boolean safeNode = utils.safeNode(node, justify, lockedQC);
 
-        if (extendsJustify && safeNode) {
-            tree.putBlock(node);
-
-            sendVote(HotStuffMessage.Type.PREPARE, node, null);
-
-            // System.out.println("[COORDINATOR | REPLICA] - Voted PREPARE for Block: " + node.getId().toStringUtf8());
+        if (!extendsJustify || !safeNode) {
+            return;
         }
-        // else {
-        //     System.out.println("[COORDINATOR | REPLICA] - Received PREPARE that does not extend justify or is not safe, ignoring. extendsJustify: " + extendsJustify + ", safeNode: " + safeNode);
-        // }
+
+        // Re-validate the entire proposed block before voting.
+        // This defends against a Byzantine leader injecting invalid or forged txs.
+        // Replicas must not vote for a block just because it has a valid QC chain. They must also verify the payload
+        Address proposerAddress = serverContext.deriveAddressForProcess(sourceId);
+
+        ValidationResult validation =
+                BlockValidator.validateProposedBlock(
+                        node,
+                        serverContext.getWorldState(),
+                        serverContext.getTransactionExecutor(),
+                        serverContext.getConfig(),
+                        proposerAddress);
+
+        if (!validation.isValid()) {
+            System.err.println("[COORDINATOR | REPLICA] Rejecting proposed block " + node.getId().toStringUtf8()
+                    + ": " + validation.getErrorMessage());
+            return;
+        }
+
+        tree.putBlock(node);
+        sendVote(HotStuffMessage.Type.PREPARE, node, null);
     }
 
     /** PRE-COMMIT phase as Replica **/
@@ -427,35 +447,45 @@ public class BasicHotStuffCoordinator {
     /**
      * Stage 2: execute all transactions in the decided block, build an application Block,
      * persist it, and send per-transaction ClientResponses.
+     * 
+     * Makes block commit atomic at block level:
+     * - simulate all txs on a copy,
+     * - compute the resulting deterministic state hash,
+     * - then publish the snapshot into the committed world state.
      */
     private void executeStage2Block(Block protoBlock, ByteString blockId, String leaderId) {
-        // 1. Convert protobuf transactions to application Transaction objects
-        List<Transaction> txList = new ArrayList<>();
-        for (TransactionPayload payload : protoBlock.getTransactionsList()) {
-            txList.add(Transaction.fromProto(payload));
-        }
+        // 1. Decode txs
+        List<Transaction> txList = BlockValidator.decodeTransactions(protoBlock);
 
-        // 2. Determine the leader/proposer address for gas fee crediting
+        // 2. Determine proposer address
         Address proposerAddress = serverContext.deriveAddressForProcess(leaderId);
 
-        // 3. Build deterministic application-level block (sorts by fee, computes hash)
+        // 3. Build deterministic app-level block
         BlockChainBlock previousAppBlock = serverContext.getBlockChain().getLatestBlock();
         BlockChainBlock appBlock = BlockBuilder.build(txList, previousAppBlock, proposerAddress);
 
-        // 4. Execute each transaction in the deterministic order
+        // 4. Execute on an isolated snapshot, not on the committed world state directly
+        DepChainWorldState workingState = serverContext.getWorldState().copy();
         List<TransactionReceipt> receipts = new ArrayList<>();
+
         for (Transaction tx : appBlock.getTransactions()) {
-            TransactionReceipt receipt = serverContext.getTransactionExecutor().execute(tx, proposerAddress);
+            TransactionReceipt receipt = serverContext.getTransactionExecutor().execute(workingState, tx, proposerAddress);
             receipts.add(receipt);
         }
 
-        // 5. Finalize block with receipts and persist
-        BlockChainBlock finalBlock = BlockBuilder.finalize(appBlock, receipts);
+        // 5. Compute resulting state hash and finalize block
+        String stateHash = workingState.computeStateHash();
+        BlockChainBlock finalBlock = BlockBuilder.finalize(appBlock, receipts, stateHash);
+
+        // 6. Atomically publish the new committed state + persist block
+        serverContext.getWorldState().replaceWith(workingState);
         serverContext.getBlockChain().addBlock(finalBlock);
 
-        System.out.println("[COORDINATOR] Committed block #" + finalBlock.getBlockNumber() + " with " + txList.size() + " txs, hash=" + finalBlock.getBlockHash());
+        System.out.println("[COORDINATOR] Committed block #" + finalBlock.getBlockNumber()
+                + " with " + txList.size() + " txs, hash=" + finalBlock.getBlockHash()
+                + ", stateHash=" + stateHash);
 
-        // 6. Discard committed requests from mempool and notify MessageHandler
+        // 7. Discard committed requests from mempool and notify MessageHandler
         List<ClientRequestMeta> metaList = protoBlock.getRequestMetaList();
         synchronized (this) {
             lastProposedBatch = null;
@@ -464,38 +494,33 @@ public class BasicHotStuffCoordinator {
             }
         }
 
-        // 7. Send per-transaction ClientResponses
-        //    Match each receipt to its request metadata by index
-        //    (BlockBuilder reorders transactions, so we map by tx hash)
-        Map<String, TransactionReceipt> receiptByTxHash = new HashMap<>();
-        List<Transaction> orderedTxs = appBlock.getTransactions();
-        for (int i = 0; i < orderedTxs.size(); i++) {
-            String txHashHex = Numeric.toHexStringNoPrefix(orderedTxs.get(i).txHash());
-            receiptByTxHash.put(txHashHex, receipts.get(i));
+        if (requestCommitListener != null) {
+            for (ClientRequestMeta meta : metaList) {
+                requestCommitListener.onRequestCommitted(meta.getClientId(), meta.getRequestId());
+            }
         }
 
+        // 8. Send per-request client responses
         for (int i = 0; i < metaList.size(); i++) {
             ClientRequestMeta meta = metaList.get(i);
-            Transaction originalTx = txList.get(i); // original order matches meta order
-            String txHashHex = Numeric.toHexStringNoPrefix(originalTx.txHash());
-            TransactionReceipt receipt = receiptByTxHash.get(txHashHex);
-
-            notifyRequestCommitted(meta.getClientId(), meta.getRequestId());
-
-            String status = (receipt != null && receipt.isSuccess()) ? "COMMITTED" : "REJECTED";
-            String error = (receipt != null && receipt.getError() != null) ? receipt.getError() : "";
+            TransactionReceipt receipt = receipts.get(i);
 
             ClientResponse response = ClientResponse.newBuilder()
                     .setClientId(meta.getClientId())
                     .setRequestId(meta.getRequestId())
                     .setCommitted(true)
-                    .setBlockId(blockId)
-                    .setTxHash(ByteString.copyFrom(originalTx.txHash()))
-                    .setStatus(status)
-                    .setError(error)
+                    .setBlockId(ByteString.copyFromUtf8(finalBlock.getBlockHash()))
+                    .setTxHash(ByteString.copyFrom(receipt.getTxHash()))
+                    .setStatus(receipt.isSuccess() ? "COMMITTED_SUCCESS" : "COMMITTED_FAILURE")
+                    .setError(receipt.getError() == null ? "" : receipt.getError())
                     .build();
 
-            serverContext.getPerfectLink().send(meta.getClientId(), response.toByteArray());
+            try {
+                serverContext.getPerfectLink().send(meta.getClientId(), response.toByteArray());
+            } catch (Exception e) {
+                System.err.println("[COORDINATOR | ERROR] Failed to send response to " + meta.getClientId()
+                        + ": " + e.getMessage());
+            }
         }
     }
 

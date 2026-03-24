@@ -7,137 +7,124 @@ import org.hyperledger.besu.datatypes.Address;
 import ist.depchain.common.Transaction;
 
 /**
- * Executes transactions against the world state.
+ * Executes transactions against a provided world state.
  *
  * Currently supports native DepCoin transfers with gas accounting.
  * EVM contract deployment/calls will be added in Step 6.
  *
- * Gas rules (from spec):
- *   fee = min(gasPrice * gasLimit, gasPrice * gasUsed)
- *   If gasUsed > gasLimit -> tx aborted, gas NOT refunded.
- *   Fees are deducted from sender's native DepCoin balance.
- *   Fees are credited to the block proposer (leader).
+ * Gas rules:
+ * fee = min(gasPrice * gasLimit, gasPrice * gasUsed)
+ * If gasUsed > gasLimit -> tx aborted, gas NOT refunded.
+ * Fees are deducted from sender's native DepCoin balance.
+ * Fees are credited to the block proposer (leader).
  */
 public class TransactionExecutor {
 
     /** Fixed gas cost for a native DepCoin transfer (no EVM involved). */
     private static final BigInteger NATIVE_TRANSFER_GAS = BigInteger.valueOf(21_000);
 
-    private final DepChainWorldState worldState;
-
-    public TransactionExecutor(DepChainWorldState worldState) {
-        this.worldState = worldState;
-    }
-
-    /**
-     * Execute a single transaction, mutating world state.
-     *
-     * @param tx        the transaction to execute
-     * @param proposer  the block proposer who receives gas fees (null = burn fees)
-     * @return receipt describing outcome
-     */
-    public TransactionReceipt execute(Transaction tx, Address proposer) {
+    public TransactionReceipt execute(DepChainWorldState state, Transaction tx, Address proposer) {
         byte[] txHash = tx.txHash();
         Address sender = tx.getFrom();
 
-        // 1. Reserve max upfront cost (value + gasLimit * gasPrice)
-        //    Validation already checked this, but guard against edge cases.
         BigInteger upfrontCost = tx.getMaxUpfrontCost();
+        if (upfrontCost.signum() < 0) {
+            return TransactionReceipt.failure(txHash, BigInteger.ZERO, BigInteger.ZERO, "negative upfront cost");
+        }
 
-        if (worldState.getBalance(sender).compareTo(upfrontCost) < 0) {
+        if (state.getBalance(sender).compareTo(upfrontCost) < 0) {
             return TransactionReceipt.failure(txHash, BigInteger.ZERO, BigInteger.ZERO,
                     "insufficient balance for upfront cost");
         }
 
-        // Deduct upfront cost (will refund unused gas later)
-        worldState.subtractBalance(sender, upfrontCost);
+        // Reserve max upfront cost immediately.
+        state.subtractBalance(sender, upfrontCost);
 
-        // 2. Increment sender nonce
-        worldState.incrementNonce(sender);
+        // Nonce always advances for an accepted-on-chain transaction, even if execution
+        // fails deterministically.
+        state.incrementNonce(sender);
 
-        // 3. Execute based on transaction type
-        TransactionReceipt receipt;
         if (tx.isContractDeployment()) {
-            receipt = executeContractDeployment(tx, txHash, sender, proposer);
+            return executeContractDeployment(state, tx, txHash, proposer);
         } else if (tx.isContractCall()) {
-            receipt = executeContractCall(tx, txHash, sender, proposer);
+            return executeContractCall(state, tx, txHash, proposer);
         } else {
-            receipt = executeNativeTransfer(tx, txHash, sender, proposer);
+            return executeNativeTransfer(state, tx, txHash, proposer);
         }
-
-        return receipt;
     }
 
-    private TransactionReceipt executeNativeTransfer(Transaction tx, byte[] txHash,
-                                                     Address sender, Address proposer) {
+    private TransactionReceipt executeNativeTransfer(DepChainWorldState state, Transaction tx, byte[] txHash, Address proposer) {
         BigInteger gasUsed = NATIVE_TRANSFER_GAS;
         BigInteger gasLimit = tx.getGasLimit();
         BigInteger gasPrice = tx.getGasPrice();
 
-        // Check if gas limit is sufficient for a native transfer
-        if (gasLimit.compareTo(gasUsed) < 0) {
-            // Out of gas: tx aborted, fee = gasLimit * gasPrice (not refunded)
-            BigInteger fee = gasPrice.multiply(gasLimit);
-            creditFee(proposer, fee);
-            // Refund only value (gas is NOT refunded when out of gas)
-            worldState.addBalance(sender, tx.getValue());
-            return TransactionReceipt.failure(txHash, gasUsed, fee,
-                    "out of gas: native transfer requires " + NATIVE_TRANSFER_GAS + " gas");
-        }
-
-        // Credit receiver
-        Address receiver = tx.getTo();
-        if (!worldState.accountExists(receiver)) {
-            // Create the receiver account if it doesn't exist (like Ethereum)
-            worldState.createEOA(receiver, 0, BigInteger.ZERO);
-        }
-        worldState.addBalance(receiver, tx.getValue());
-
-        // Calculate actual fee: min(gasPrice*gasLimit, gasPrice*gasUsed)
         BigInteger feeByLimit = gasPrice.multiply(gasLimit);
         BigInteger feeByUsed = gasPrice.multiply(gasUsed);
-        BigInteger fee = feeByLimit.compareTo(feeByUsed) < 0 ? feeByLimit : feeByUsed;
 
-        // Credit fee to proposer
-        creditFee(proposer, fee);
+        if (gasLimit.compareTo(gasUsed) < 0) {
+            // Out of gas: value transfer does not happen, gas is not refunded.
+            // We already deducted (value + maxFee) upfront.
+            BigInteger fee = feeByLimit;
+            creditFee(state, proposer, fee);
 
-        // Refund unused gas: upfront was (value + gasLimit*gasPrice), we used (value + fee)
+            // Refund the value part only.
+            if (tx.getValue().signum() > 0) {
+                state.addBalance(tx.getFrom(), tx.getValue());
+            }
+
+            return TransactionReceipt.failure(txHash, gasUsed, fee, "out of gas: native transfer requires " + NATIVE_TRANSFER_GAS + " gas");
+        }
+
+        Address receiver = tx.getTo();
+        if (!state.accountExists(receiver)) {
+            state.createEOA(receiver, 0, BigInteger.ZERO);
+        }
+        state.addBalance(receiver, tx.getValue());
+
+        BigInteger fee = feeByLimit.min(feeByUsed);
+        creditFee(state, proposer, fee);
+
         BigInteger refund = feeByLimit.subtract(fee);
         if (refund.signum() > 0) {
-            worldState.addBalance(sender, refund);
+            state.addBalance(tx.getFrom(), refund);
         }
 
         return TransactionReceipt.success(txHash, gasUsed, fee);
     }
 
-    private TransactionReceipt executeContractDeployment(Transaction tx, byte[] txHash,
-                                                         Address sender, Address proposer) {
-        // Placeholder for Step 6 (Besu EVM integration)
+    private TransactionReceipt executeContractDeployment(DepChainWorldState state, Transaction tx, byte[] txHash, Address proposer) {
         BigInteger fee = tx.getMaxFee();
-        creditFee(proposer, fee);
-        // Refund value since we can't deploy yet
-        worldState.addBalance(sender, tx.getValue());
-        return TransactionReceipt.failure(txHash, tx.getGasLimit(), fee,
-                "contract deployment not yet implemented");
-    }
+        creditFee(state, proposer, fee);
 
-    private TransactionReceipt executeContractCall(Transaction tx, byte[] txHash,
-                                                   Address sender, Address proposer) {
-        // Placeholder for Step 6 (Besu EVM integration)
-        BigInteger fee = tx.getMaxFee();
-        creditFee(proposer, fee);
-        // Refund value since we can't call yet
-        worldState.addBalance(sender, tx.getValue());
-        return TransactionReceipt.failure(txHash, tx.getGasLimit(), fee,
-                "contract calls not yet implemented");
-    }
-
-    private void creditFee(Address proposer, BigInteger fee) {
-        if (proposer == null || fee.signum() <= 0) return;
-
-        if (!worldState.accountExists(proposer)) {
-            worldState.createEOA(proposer, 0, BigInteger.ZERO);
+        // Value is not transferred anywhere yet; refund it fully until Step 6.
+        if (tx.getValue().signum() > 0) {
+            state.addBalance(tx.getFrom(), tx.getValue());
         }
-        worldState.addBalance(proposer, fee);
+
+        return TransactionReceipt.failure(txHash, BigInteger.ZERO, fee,
+                "contract deployment not implemented yet");
+    }
+
+    private TransactionReceipt executeContractCall(DepChainWorldState state, Transaction tx, byte[] txHash, Address proposer) {
+
+        BigInteger fee = tx.getMaxFee();
+        creditFee(state, proposer, fee);
+
+        // For now, refund value because call execution is not implemented.
+        if (tx.getValue().signum() > 0) {
+            state.addBalance(tx.getFrom(), tx.getValue());
+        }
+
+        return TransactionReceipt.failure(txHash, BigInteger.ZERO, fee, "contract call not implemented yet");
+    }
+
+    private void creditFee(DepChainWorldState state, Address proposer, BigInteger fee) {
+        if (proposer == null || fee == null || fee.signum() <= 0) {
+            return;
+        }
+        if (!state.accountExists(proposer)) {
+            state.createEOA(proposer, 0, BigInteger.ZERO);
+        }
+        state.addBalance(proposer, fee);
     }
 }

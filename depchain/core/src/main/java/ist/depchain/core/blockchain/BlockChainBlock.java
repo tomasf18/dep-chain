@@ -18,9 +18,11 @@ public class BlockChainBlock {
     private final List<TransactionReceipt> receipts; // one per transaction, same order
     private final int blockNumber;
     private final Address proposer; // leader who built this block (null for genesis)
+    private final String stateHash; // deterministic hash of world state after this block
 
-    public BlockChainBlock(String blockHash, String previousBlockHash, List<Transaction> transactions,
-                 List<TransactionReceipt> receipts, int blockNumber, Address proposer) {
+    public BlockChainBlock(String blockHash, String previousBlockHash, List<Transaction> transactions, 
+        List<TransactionReceipt> receipts, int blockNumber, Address proposer, String stateHash) {
+            
         this.blockHash = blockHash;
         this.previousBlockHash = previousBlockHash;
         this.transactions = transactions == null
@@ -31,17 +33,14 @@ public class BlockChainBlock {
                 : Collections.unmodifiableList(new ArrayList<>(receipts));
         this.blockNumber = blockNumber;
         this.proposer = proposer;
+        this.stateHash = stateHash;
     }
 
     /** Convenience constructor without receipts (for genesis or pre-execution). */
     public BlockChainBlock(String blockHash, String previousBlockHash, List<Transaction> transactions, int blockNumber) {
-        this(blockHash, previousBlockHash, transactions, null, blockNumber, null);
+        this(blockHash, previousBlockHash, transactions, null, blockNumber, null, null);
     }
 
-    /**
-     * Compute a deterministic block hash from the block's contents.
-     * Hash = Keccak256(previousBlockHash || blockNumber || proposer || tx1Hash || tx2Hash || ...)
-     */
     public static String computeBlockHash(String previousBlockHash, int blockNumber,
                                           Address proposer, List<Transaction> transactions) {
         byte[] prevBytes = previousBlockHash != null ? previousBlockHash.getBytes() : new byte[0];
@@ -50,7 +49,7 @@ public class BlockChainBlock {
 
         int totalSize = 4 + prevBytes.length + 4 + blockNumBytes.length + 4 + proposerBytes.length;
         for (Transaction tx : transactions) {
-            totalSize += 4 + 32; // length prefix + 32-byte tx hash
+            totalSize += 4 + 32;
         }
 
         ByteBuffer buf = ByteBuffer.allocate(totalSize);
@@ -70,11 +69,11 @@ public class BlockChainBlock {
         buf.put(data);
     }
 
-    // Getters
     public String getBlockHash() { return blockHash; }
     public String getPreviousBlockHash() { return previousBlockHash; }
     public List<Transaction> getTransactions() { return transactions; }
     public List<TransactionReceipt> getReceipts() { return receipts; }
     public int getBlockNumber() { return blockNumber; }
     public Address getProposer() { return proposer; }
+    public String getStateHash() { return stateHash; }
 }

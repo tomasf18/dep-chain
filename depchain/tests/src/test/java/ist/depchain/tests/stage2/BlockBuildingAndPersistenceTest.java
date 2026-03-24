@@ -162,7 +162,7 @@ class BlockBuildingAndPersistenceTest {
         TransactionReceipt receipt = TransactionReceipt.success(
                 tx.txHash(), BigInteger.valueOf(21_000), BigInteger.valueOf(21_000));
 
-        BlockChainBlock finalized = BlockBuilder.finalize(block, List.of(receipt));
+        BlockChainBlock finalized = BlockBuilder.finalize(block, List.of(receipt), "");
         assertEquals(1, finalized.getReceipts().size());
         assertTrue(finalized.getReceipts().get(0).isSuccess());
         assertEquals(block.getBlockHash(), finalized.getBlockHash());
@@ -180,7 +180,7 @@ class BlockBuildingAndPersistenceTest {
                 tx1.txHash(), BigInteger.valueOf(21_000), BigInteger.valueOf(42_000));
         TransactionReceipt r2 = TransactionReceipt.failure(
                 tx2.txHash(), BigInteger.valueOf(21_000), BigInteger.valueOf(21_000), "some error");
-        BlockChainBlock finalized = BlockBuilder.finalize(block, List.of(r1, r2));
+        BlockChainBlock finalized = BlockBuilder.finalize(block, List.of(r1, r2), "");
 
         String json = BlockSerializer.toJson(finalized);
         BlockChainBlock restored = BlockSerializer.fromJson(json);

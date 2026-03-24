@@ -44,14 +44,14 @@ public class BlockSerializer {
         } else {
             root.add("proposer", JsonNull.INSTANCE);
         }
-
+        
         // Transactions
         JsonArray txArray = new JsonArray();
         for (Transaction tx : block.getTransactions()) {
             txArray.add(serializeTransaction(tx));
         }
         root.add("transactions", txArray);
-
+        
         // Receipts
         if (!block.getReceipts().isEmpty()) {
             JsonArray receiptArray = new JsonArray();
@@ -60,7 +60,13 @@ public class BlockSerializer {
             }
             root.add("receipts", receiptArray);
         }
-
+        
+        if (block.getStateHash() != null) {
+            root.addProperty("state_hash", block.getStateHash());
+        } else {
+            root.add("state_hash", JsonNull.INSTANCE);
+        }
+        
         return root;
     }
 
@@ -145,7 +151,12 @@ public class BlockSerializer {
             }
         }
 
-        return new BlockChainBlock(blockHash, previousBlockHash, transactions, receipts, blockNumber, proposer);
+        String stateHash = null;
+        if (root.has("state_hash") && !root.get("state_hash").isJsonNull()) {
+            stateHash = root.get("state_hash").getAsString();
+        }
+
+        return new BlockChainBlock(blockHash, previousBlockHash, transactions, receipts, blockNumber, proposer, stateHash);
     }
 
     private static Transaction deserializeTransaction(JsonObject obj) {

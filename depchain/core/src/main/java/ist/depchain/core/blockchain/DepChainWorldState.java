@@ -1,6 +1,13 @@
 package ist.depchain.core.blockchain;
 
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.units.bigints.UInt256;
@@ -9,6 +16,9 @@ import org.hyperledger.besu.datatypes.Wei;
 import org.hyperledger.besu.evm.account.AccountState;
 import org.hyperledger.besu.evm.account.MutableAccount;
 import org.hyperledger.besu.evm.fluent.SimpleWorld;
+import org.web3j.crypto.Hash;
+import org.web3j.utils.Numeric;
+import java.nio.ByteBuffer;
 
 /**
  * Wraps Besu's SimpleWorld to manage blockchain account state.
@@ -20,7 +30,13 @@ import org.hyperledger.besu.evm.fluent.SimpleWorld;
  * Semantically, these values represent the smallest unit of DepCoin.
  */
 public class DepChainWorldState {
-    private final SimpleWorld world;
+    private SimpleWorld world;
+
+    /** Track all created accounts so we can copy/hash deterministically. */
+    private final Set<Address> trackedAccounts = ConcurrentHashMap.newKeySet();
+
+    /** Track storage slots touched for each contract account. */
+    private final Map<Address, Set<UInt256>> trackedStorageSlots = new ConcurrentHashMap<>();
 
     public DepChainWorldState() {
         this.world = new SimpleWorld();
@@ -30,18 +46,26 @@ public class DepChainWorldState {
         return world;
     }
 
-    // --- Account creation ---
-
-    public void createEOA(Address address, long nonce, BigInteger balanceWei) {
-        world.createAccount(address, nonce, Wei.of(balanceWei));
+    public boolean accountExists(Address address) {
+        return world.get(address) != null;
     }
 
-    public void createContractAccount(Address address, long nonce, BigInteger balanceWei, Bytes code) {
-        world.createAccount(address, nonce, Wei.of(balanceWei));
+    // --- Account creation ---
+
+    public void createEOA(Address address, long nonce, BigInteger balanceUnits) {
+        world.createAccount(address, nonce, Wei.of(balanceUnits));
+        trackedAccounts.add(address);
+        trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet());
+    }
+
+    public void createContractAccount(Address address, long nonce, BigInteger balanceUnits, Bytes code) {
+        world.createAccount(address, nonce, Wei.of(balanceUnits));
         MutableAccount account = (MutableAccount) world.get(address);
         if (account != null && code != null) {
             account.setCode(code);
         }
+        trackedAccounts.add(address);
+        trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet());
     }
 
     // --- Balance operations ---
@@ -52,12 +76,12 @@ public class DepChainWorldState {
         return account.getBalance().toBigInteger();
     }
 
-    public void setBalance(Address address, BigInteger balanceWei) {
+    public void setBalance(Address address, BigInteger balanceUnits) {
         MutableAccount account = (MutableAccount) world.get(address);
         if (account == null) {
             throw new IllegalStateException("Account does not exist: " + address);
         }
-        account.setBalance(Wei.of(balanceWei));
+        account.setBalance(Wei.of(balanceUnits));
     }
 
     public void addBalance(Address address, BigInteger amount) {
@@ -117,11 +141,104 @@ public class DepChainWorldState {
             throw new IllegalStateException("Account does not exist: " + address);
         }
         account.setStorageValue(slot, value);
+        trackedAccounts.add(address);
+        trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet()).add(slot);
     }
 
-    // --- Query ---
+    // --- Snapshot / replace ---
 
-    public boolean accountExists(Address address) {
-        return world.get(address) != null;
+    public DepChainWorldState copy() {
+        DepChainWorldState cloned = new DepChainWorldState();
+
+        List<Address> orderedAccounts = new ArrayList<>(trackedAccounts);
+        orderedAccounts.sort(Comparator.comparing(Address::toHexString));
+
+        for (Address address : orderedAccounts) {
+            long nonce = getNonce(address);
+            BigInteger balance = getBalance(address);
+            Bytes code = getCode(address);
+
+            if (code == null || code.isEmpty()) {
+                cloned.createEOA(address, nonce, balance);
+            } else {
+                cloned.createContractAccount(address, nonce, balance, code);
+            }
+
+            Set<UInt256> slots = trackedStorageSlots.getOrDefault(address, Set.of());
+            List<UInt256> orderedSlots = new ArrayList<>(slots);
+            orderedSlots.sort(Comparator.comparing(UInt256::toHexString));
+            for (UInt256 slot : orderedSlots) {
+                cloned.setStorageValue(address, slot, getStorageValue(address, slot));
+            }
+        }
+
+        return cloned;
+    }
+
+    public void replaceWith(DepChainWorldState other) {
+        this.world = new SimpleWorld();
+        this.trackedAccounts.clear();
+        this.trackedStorageSlots.clear();
+
+        List<Address> orderedAccounts = new ArrayList<>(other.trackedAccounts);
+        orderedAccounts.sort(Comparator.comparing(Address::toHexString));
+
+        for (Address address : orderedAccounts) {
+            long nonce = other.getNonce(address);
+            BigInteger balance = other.getBalance(address);
+            Bytes code = other.getCode(address);
+
+            if (code == null || code.isEmpty()) {
+                createEOA(address, nonce, balance);
+            } else {
+                createContractAccount(address, nonce, balance, code);
+            }
+
+            Set<UInt256> slots = other.trackedStorageSlots.getOrDefault(address, Set.of());
+            List<UInt256> orderedSlots = new ArrayList<>(slots);
+            orderedSlots.sort(Comparator.comparing(UInt256::toHexString));
+            for (UInt256 slot : orderedSlots) {
+                setStorageValue(address, slot, other.getStorageValue(address, slot));
+            }
+        }
+    }
+
+    /**
+     * Deterministic digest of the current world state.
+     * Useful to detect accidental divergence across replicas.
+     */
+    public String computeStateHash() {
+        List<byte[]> parts = new ArrayList<>();
+
+        List<Address> orderedAccounts = new ArrayList<>(trackedAccounts);
+        orderedAccounts.sort(Comparator.comparing(Address::toHexString));
+
+        for (Address address : orderedAccounts) {
+            parts.add(address.toHexString().getBytes(StandardCharsets.UTF_8));
+            parts.add(getBalance(address).toString().getBytes(StandardCharsets.UTF_8));
+            parts.add(Long.toString(getNonce(address)).getBytes(StandardCharsets.UTF_8));
+            parts.add(getCode(address).toHexString().getBytes(StandardCharsets.UTF_8));
+
+            Set<UInt256> slots = trackedStorageSlots.getOrDefault(address, Set.of());
+            List<UInt256> orderedSlots = new ArrayList<>(slots);
+            orderedSlots.sort(Comparator.comparing(UInt256::toHexString));
+            for (UInt256 slot : orderedSlots) {
+                parts.add(slot.toHexString().getBytes(StandardCharsets.UTF_8));
+                parts.add(getStorageValue(address, slot).toHexString().getBytes(StandardCharsets.UTF_8));
+            }
+        }
+
+        int total = 0;
+        for (byte[] p : parts) {
+            total += 4 + p.length;
+        }
+
+        ByteBuffer buf = ByteBuffer.allocate(total);
+        for (byte[] p : parts) {
+            buf.putInt(p.length);
+            buf.put(p);
+        }
+
+        return Numeric.toHexStringNoPrefix(Hash.sha3(buf.array()));
     }
 }

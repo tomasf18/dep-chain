@@ -45,7 +45,7 @@ public class ServerContext {
 
         blockChain = new BlockChain(config.getSelfId());
         worldState = new DepChainWorldState();
-        transactionExecutor = new TransactionExecutor(worldState);
+        transactionExecutor = new TransactionExecutor();
         loadGenesis();
 
         BLSManager.init();
@@ -105,8 +105,10 @@ public class ServerContext {
      */
     public Address deriveAddressForProcess(String processId) {
         String keyPath = config.getTrustedProcessKeyPathString(processId);
-        PublicKey pk = KeyLoader.loadPublicKey(keyPath);
-        if (pk == null) return null;
-        return AddressUtils.deriveAddress(pk);
+        PublicKey pubKey = KeyLoader.loadPublicKey(keyPath);
+        if (pubKey == null) {
+            return null;
+        }
+        return AddressUtils.deriveAddress(pubKey);
     }
 }
