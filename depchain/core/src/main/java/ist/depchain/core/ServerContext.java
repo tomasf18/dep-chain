@@ -56,7 +56,7 @@ public class ServerContext {
                     + genesis.getTransactions().size() + " transactions");
         } catch (Exception e) {
             System.err.println("[SERVER_CONTEXT | WARN] Could not load genesis: " + e.getMessage()
-                    + " — starting with empty state");
+                    + " - starting with empty state");
         }
     }
 

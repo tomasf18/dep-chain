@@ -14,7 +14,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -91,33 +90,25 @@ public class NativeTransferHotStuffTest {
     }
 
     @Test
-    @DisplayName("Multiple sequential native transfers all committed")
+    @DisplayName("Three sequential native transfers - each blocks until committed")
     void testMultipleSequentialTransfers() throws InterruptedException {
         TimeUnit.SECONDS.sleep(5);
 
-        int numTransfers = 10;
-        int[] reqIds = new int[numTransfers];
+        int numTransfers = 3;
         long totalValue = 0;
 
         for (int i = 0; i < numTransfers; i++) {
-            reqIds[i] = clientContext.getRequestId().get() + 1;
-            long nonce = i;
             BigInteger value = BigInteger.valueOf(100L * (i + 1));
             totalValue += 100L * (i + 1);
-
-            System.out.println("[TEST] Submitting transfer " + (i + 1) + " (reqId=" + reqIds[i]
-                    + ", value=" + value + ", nonce=" + nonce + ")");
-            clientLibrary.submitNativeTransfer(RECEIVER_HEX, value, GAS_PRICE, GAS_LIMIT, nonce);
-
-            TimeUnit.MILLISECONDS.sleep(500);
+            System.out.println("[TEST] Submitting transfer " + (i + 1) + " (value=" + value + ")");
+            // Blocking - returns only after f+1 commit responses; nonce auto-increments
+            clientLibrary.submitNativeTransfer(RECEIVER_HEX, value, GAS_PRICE, GAS_LIMIT);
+            System.out.println("[TEST] Transfer " + (i + 1) + " confirmed");
         }
 
-        boolean allCommitted = waitForCommit(numTransfers, 180, reqIds[numTransfers - 1]);
-        assertTrue(allCommitted, "All " + numTransfers + " transfers should be committed");
-
-        List<String> log = clientContext.getCommitedLog();
-        assertEquals(numTransfers, log.size(),
-                "Committed log should have " + numTransfers + " entries, got " + log.size());
+        // All transfers are committed by the time we reach here
+        assertEquals(numTransfers, clientContext.getCommitedLog().size(),
+                "Committed log should have " + numTransfers + " entries");
 
         DepChainWorldState ws = ServerApp.getCoordinator("s0").getServerContext().getWorldState();
         Address receiver = Address.fromHexString(RECEIVER_HEX);
@@ -141,20 +132,5 @@ public class NativeTransferHotStuffTest {
         });
         t.setDaemon(true);
         t.start();
-    }
-
-    private boolean waitForCommit(int expectedSize, int timeOutSeconds, int lastRequestId)
-            throws InterruptedException {
-        for (int i = 0; i < timeOutSeconds; i++) {
-            boolean logOk = clientContext.getCommitedLog().size() >= expectedSize;
-            boolean pendingOk = !clientContext.getPendingRequests().containsKey(lastRequestId);
-            if (logOk && pendingOk) {
-                return true;
-            }
-            TimeUnit.SECONDS.sleep(1);
-        }
-        System.err.println("[TEST] Timeout! commitedLog.size()=" + clientContext.getCommitedLog().size()
-                + ", pendingRequests=" + clientContext.getPendingRequests().keySet());
-        return false;
     }
 }

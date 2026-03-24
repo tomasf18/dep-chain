@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * Attack vector: After a client request is legitimately committed (requestId = N),
  * the test re-crafts a ClientRequest protobuf with the same requestId N, signs it
- * with the real client key, and broadcasts it directly to all replicas — bypassing
+ * with the real client key, and broadcasts it directly to all replicas - bypassing
  * the ClientLibrary's auto-increment.
  *
  * What is tested:

@@ -60,7 +60,7 @@ public class InvalidClientSignatureTest {
         // Build a ClientRequest signed with random bytes instead of the real key.
         Command command = Command.newBuilder()
                 .setType("append")
-                .setData("Forged request — should never be committed")
+                .setData("Forged request - should never be committed")
                 .build();
 
         byte[] forgedSig = new byte[64];

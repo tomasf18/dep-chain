@@ -44,10 +44,7 @@ public class ClientApp {
                         System.out.print("Gas limit: ");
                         java.math.BigInteger gasLimit = new java.math.BigInteger(in.nextLine());
 
-                        System.out.print("Nonce: ");
-                        long nonce = Long.parseLong(in.nextLine());
-
-                        clientLib.submitNativeTransfer(to, value, gasPrice, gasLimit, nonce);
+                        clientLib.submitNativeTransfer(to, value, gasPrice, gasLimit);
                         break;
 
                     case "exit":

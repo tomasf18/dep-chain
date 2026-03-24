@@ -65,7 +65,7 @@ public class AuthenticatedPerfectLink implements Link {
         int skipped = 0;
         for (String dest : destinationIds) {
             if (authenticator.shouldAuthenticate(dest) && !authenticator.hasSession(dest)) {
-                System.out.println("[APL][BROADCAST] Skipping " + dest + " — no authenticated session yet");
+                System.out.println("[APL][BROADCAST] Skipping " + dest + " - no authenticated session yet");
                 skipped++;
                 continue;
             }
@@ -79,7 +79,7 @@ public class AuthenticatedPerfectLink implements Link {
     }
 
     // ============================================================
-    // RECEIVE — intercepts before PerfectLink
+    // RECEIVE - intercepts before PerfectLink
     // ============================================================
 
     private void handleIncomingMessage(String senderId, byte[] data) {

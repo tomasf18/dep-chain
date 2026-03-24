@@ -43,7 +43,7 @@ public class PruningStressTest {
     public void setup() throws InterruptedException {
         System.out.println("[TEST] - Starting PruningStressTest");
 
-        // s1 is the leader of view 1 — make it equivocate (propose diverging commands)
+        // s1 is the leader of view 1 - make it equivocate (propose diverging commands)
         // to force view changes and create competing branches that must be pruned
         startReplica("s0", false, AttackType.SILENT);
         startReplica("s1", true,  AttackType.EQUIVOCATE);
@@ -166,10 +166,10 @@ public class PruningStressTest {
         for (Map.Entry<ByteString, List<Block>> entry : childrenOf.entrySet()) {
             assertTrue(entry.getValue().size() <= 1,
                     serverId + ": block " + shortId(entry.getKey())
-                            + " has " + entry.getValue().size() + " children — tree is not a chain");
+                            + " has " + entry.getValue().size() + " children - tree is not a chain");
         }
 
-        // Walk from genesis to tip — every block must be reachable
+        // Walk from genesis to tip - every block must be reachable
         Block current = tree.getGenesisBlock();
         assertNotNull(current, serverId + ": genesis block missing");
 
@@ -183,7 +183,7 @@ public class PruningStressTest {
 
         assertEquals(allBlocks.size(), walked,
                 serverId + ": walked " + walked + " blocks but tree has " + allBlocks.size()
-                        + " — orphan blocks exist");
+                        + " - orphan blocks exist");
     }
 
     private static void startReplica(String serverId, boolean isByzantine, AttackType attack) {

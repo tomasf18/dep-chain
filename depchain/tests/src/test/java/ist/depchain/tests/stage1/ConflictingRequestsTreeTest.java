@@ -195,7 +195,7 @@ public class ConflictingRequestsTreeTest {
                     visited.add(current.getId());
                     Block parent = allBlocks.get(current.getParentId());
                     assertNotNull(parent,
-                            replicaId + ": broken chain — parent not found for block "
+                            replicaId + ": broken chain - parent not found for block "
                                     + idLabel(current.getId(), allBlocks));
                     current = parent;
                 }

@@ -105,7 +105,7 @@ class ConsensusIntegrationTest {
         mempool.enqueue(makeClientRequest("c1", 1));
         mempool.drainBatch(1);
 
-        // Re-enqueue the same key — should succeed since drainBatch removed the dedup key
+        // Re-enqueue the same key - should succeed since drainBatch removed the dedup key
         mempool.enqueue(makeClientRequest("c1", 1));
         assertFalse(mempool.isEmpty());
     }
@@ -243,7 +243,7 @@ class ConsensusIntegrationTest {
         ws.createEOA(ALICE, 0, BigInteger.valueOf(10_000_000));
         ws.createEOA(BOB, 0, BigInteger.valueOf(10_000_000));
 
-        // Create txs in "wrong" order (low fee first) — BlockBuilder will reorder
+        // Create txs in "wrong" order (low fee first) - BlockBuilder will reorder
         Transaction txFromAlice = tx(ALICE, CAROL, 100, 1, 21_000, 0);  // fee = 21_000
         Transaction txFromBob = tx(BOB, CAROL, 200, 5, 21_000, 0);      // fee = 105_000
 

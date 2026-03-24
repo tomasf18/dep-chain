@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *   - Liveness across multiple rounds: all three client requests are eventually
  *     committed with the correct content.
  *   - The system does not re-elect or stall on the Byzantine leader after the
- *     first view change — honest leaders continue to drive progress.
+ *     first view change - honest leaders continue to drive progress.
  */
 public class MultipleRequestsByzantineLeaderTest {
     private static final String CONFIG_FILE = "../config-test.json";

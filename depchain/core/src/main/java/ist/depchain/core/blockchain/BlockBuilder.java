@@ -45,7 +45,7 @@ public class BlockBuilder {
         // 3. Compute deterministic block hash
         String blockHash = Block.computeBlockHash(previousHash, blockNumber, proposer, ordered);
 
-        // 4. Build block (receipts are empty — filled after execution)
+        // 4. Build block (receipts are empty - filled after execution)
         return new Block(blockHash, previousHash, ordered, null, blockNumber, proposer);
     }
 

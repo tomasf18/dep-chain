@@ -18,7 +18,7 @@ Por isso alterei modo como client requests sao tracked no server -> no message h
 
 Plan:
 
-Great — this is the **most important moment in your project**, and you’re doing the right thing by asking for a structured plan before coding.
+Great - this is the **most important moment in your project**, and you’re doing the right thing by asking for a structured plan before coding.
 
 I’m going to give you a **full roadmap from zero → working Stage 2**, specifically tailored to your current codebase (HotStuff + mempool + request tracking).
 
@@ -40,7 +40,7 @@ You are basically turning your system into a **mini Ethereum-like blockchain**.
 
 # 🧱 1. Concepts You MUST Understand First
 
-Don’t skip this — but also don’t overstudy.
+Don’t skip this - but also don’t overstudy.
 
 ## 1.1 Accounts & State
 
@@ -149,7 +149,7 @@ Client → Transaction → Mempool → HotStuff → Block → Execute → State
 
 # 🔁 3. Migration Plan (Step-by-Step)
 
-## ✅ STEP 1 — Replace Command with Transaction
+## ✅ STEP 1 - Replace Command with Transaction
 
 ### Goal
 
@@ -179,7 +179,7 @@ class Transaction {
 
 ---
 
-## ✅ STEP 2 — Replace Blockchain (String list → State)
+## ✅ STEP 2 - Replace Blockchain (String list → State)
 
 ### Current:
 
@@ -202,7 +202,7 @@ Add:
 
 ---
 
-## ✅ STEP 3 — Implement Transaction Validation
+## ✅ STEP 3 - Implement Transaction Validation
 
 Before adding to mempool:
 
@@ -219,7 +219,7 @@ If not → reject
 
 ---
 
-## ✅ STEP 4 — Upgrade Mempool
+## ✅ STEP 4 - Upgrade Mempool
 
 Current mempool = FIFO queue
 
@@ -234,7 +234,7 @@ Optional (later):
 
 ---
 
-## ✅ STEP 5 — Propose BLOCKS (not single tx)
+## ✅ STEP 5 - Propose BLOCKS (not single tx)
 
 ### Change HotStuff proposal
 
@@ -253,7 +253,7 @@ Block block = new Block(txs, parent);
 
 ---
 
-## ✅ STEP 6 — Execution Engine
+## ✅ STEP 6 - Execution Engine
 
 Replace `CommandExecutor` with:
 
@@ -269,7 +269,7 @@ class ExecutionEngine {
 
 ---
 
-## ✅ STEP 7 — Transaction Application Logic
+## ✅ STEP 7 - Transaction Application Logic
 
 Core logic:
 
@@ -286,7 +286,7 @@ void applyTransaction(tx):
 
 ---
 
-## ✅ STEP 8 — Deterministic Failure Handling
+## ✅ STEP 8 - Deterministic Failure Handling
 
 Important:
 
@@ -304,7 +304,7 @@ only include VALID txs in proposal
 
 ---
 
-## ✅ STEP 9 — Client Response Redesign
+## ✅ STEP 9 - Client Response Redesign
 
 Instead of:
 
@@ -321,7 +321,7 @@ status (SUCCESS / FAIL)
 
 ---
 
-## ✅ STEP 10 — Genesis Block
+## ✅ STEP 10 - Genesis Block
 
 Initialize:
 

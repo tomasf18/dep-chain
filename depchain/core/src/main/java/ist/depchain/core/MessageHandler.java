@@ -2,6 +2,7 @@ package ist.depchain.core;
 
 import ist.depchain.common.Transaction;
 import ist.depchain.common.ClientRequest;
+import ist.depchain.common.ClientResponse;
 import ist.depchain.common.HotStuffMessage;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 import ist.depchain.common.ApplicationMessage;
@@ -9,10 +10,7 @@ import ist.depchain.network.crypto.Crypto;
 import ist.depchain.network.crypto.KeyLoader;
 import ist.depchain.core.blockchain.TransactionValidator;
 
-import org.hyperledger.besu.datatypes.Address;
-
 import java.security.PublicKey;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -21,9 +19,6 @@ public class MessageHandler {
     private final BasicHotStuffCoordinator coordinator;
     private final Set<RequestKey> pendingRequests = ConcurrentHashMap.newKeySet();
     private final Set<RequestKey> executedRequests = ConcurrentHashMap.newKeySet();
-    // Tracks the next expected nonce per sender address to allow sequential multi-tx
-    // submission before prior transactions are committed and world state is updated.
-    private final Map<Address, Long> pendingNonces = new ConcurrentHashMap<>();
 
     public MessageHandler(ServerContext serverContext, BasicHotStuffCoordinator coordinator) {
         this.serverContext = serverContext;
@@ -95,31 +90,35 @@ public class MessageHandler {
             return;
         }
 
-        Address sender = tx.getFrom();
-        long wsNonce = serverContext.getWorldState().accountExists(sender)
-                ? serverContext.getWorldState().getNonce(sender)
-                : 0;
-        long expectedNonce = pendingNonces.getOrDefault(sender, wsNonce);
-
         var result = TransactionValidator.validate(
                 tx,
                 clientPublicKey,
                 serverContext.getConfig().getSignatureAlgorithm(),
-                serverContext.getWorldState(),
-                expectedNonce);
+                serverContext.getWorldState());
 
         if (!result.valid()) {
             pendingRequests.remove(requestKey);
             System.err.println("[MESSAGE_HANDLER | ERROR] Rejected tx from " + clientId + ": " + result.error());
+            sendRejectionResponse(clientId, clientRequest.getRequestId());
             return;
         }
 
-        // Advance the pending nonce for this sender.
-        pendingNonces.put(sender, expectedNonce + 1);
-
-        System.out.println("[MESSAGE_HANDLER | INFO] Accepted tx request " + requestKey + " from=" + sender + " nonce=" + tx.getNonce());
+        System.out.println("[MESSAGE_HANDLER | INFO] Accepted tx request " + requestKey
+                + " from=" + tx.getFrom() + " nonce=" + tx.getNonce());
 
         coordinator.enqueueClientRequest(clientRequest);
+    }
+
+    private void sendRejectionResponse(String clientId, int reqId) {
+        try {
+            ClientResponse rejection = ClientResponse.newBuilder()
+                    .setRequestId(reqId)
+                    .setCommitted(false)
+                    .build();
+            serverContext.getPerfectLink().send(clientId, rejection.toByteArray());
+        } catch (Exception e) {
+            System.err.println("[MESSAGE_HANDLER | ERROR] Failed to send rejection to " + clientId + ": " + e.getMessage());
+        }
     }
 
     private void markRequestExecuted(String clientId, int requestId) {

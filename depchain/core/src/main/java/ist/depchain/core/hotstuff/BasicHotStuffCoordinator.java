@@ -105,14 +105,12 @@ public class BasicHotStuffCoordinator {
             synchronized (this) {
                 try {
                     while (!quorumReady || mempool.isEmpty()) {
-                        // if (quorumReady) {
-                        //     System.out.println("[COORDINATOR | LEADER] - Quorum ready but waiting for client request to propose for view " + currentView.get());
-                        // } else if (!mempool.isEmpty()) {
-                        //     System.out.println("[COORDINATOR | LEADER] - Client request available but waiting for quorum to be ready for view " + currentView.get());
-                        // }
-                        wait(); 
+                        wait();
                     }
-                    // System.out.println("[COORDINATOR | LEADER] - Quorum ready and client request available, proposing new block for view " + currentView.get());
+                    // Brief accumulation window: allow concurrent transactions from
+                    // multiple clients to pile up before draining the mempool, so
+                    // they are batched into the same block rather than one per block.
+                    wait(50);
                     doPropose();
                     quorumReady = false;
                 } catch (InterruptedException e) {

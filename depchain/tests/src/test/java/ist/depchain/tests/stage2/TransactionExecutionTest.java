@@ -16,7 +16,7 @@ import ist.depchain.core.blockchain.TransactionReceipt;
 /**
  * Unit tests for TransactionExecutor (Step 3).
  * Covers native DepCoin transfers, gas accounting, edge cases, and failure modes.
- * No network, keys, or consensus required — tests run against an in-memory world state.
+ * No network, keys, or consensus required - tests run against an in-memory world state.
  */
 class TransactionExecutionTest {
 

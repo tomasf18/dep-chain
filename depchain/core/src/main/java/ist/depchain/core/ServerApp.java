@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ServerApp {
-    // Registry for test inspection — maps serverId to its coordinator
+    // Registry for test inspection - maps serverId to its coordinator
     private static final Map<String, BasicHotStuffCoordinator> coordinators = new ConcurrentHashMap<>();
 
     public static BasicHotStuffCoordinator getCoordinator(String serverId) {

@@ -1,0 +1,174 @@
+package ist.depchain.tests.stage2;
+
+import ist.depchain.client.ClientContext;
+import ist.depchain.client.ClientLibrary;
+import ist.depchain.common.utils.Config;
+import ist.depchain.core.ServerApp;
+import ist.depchain.core.blockchain.DepChainWorldState;
+import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
+
+import org.hyperledger.besu.datatypes.Address;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigInteger;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Stress test: two clients fire dozens of native transfers at each other
+ * concurrently through full HotStuff consensus.
+ *
+ * Uses config-dev.json (no fault injection, no delays) for maximum throughput.
+ * Each client runs on its own thread since submitNativeTransfer is blocking.
+ *
+ * Invariant checked at the end:
+ *   total balance of (client1 + client2) = 2 * INITIAL_BALANCE
+ *                                          - total gas fees paid
+ *   i.e. no coins are created or destroyed.
+ */
+public class StressTest {
+
+    private static final String CONFIG_FILE   = "../config-dev.json";
+    private static final String[] REPLICAS    = {"s0", "s1", "s2", "s3"};
+
+    private static final String CLIENT1_ADDR = "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9";
+    private static final String CLIENT2_ADDR = "0x172bf398d2a931323199521625f471fb1c28879a";
+
+    private static final BigInteger INITIAL_BALANCE = BigInteger.valueOf(10_000_000);
+    private static final BigInteger TX_VALUE        = BigInteger.valueOf(100);
+    private static final BigInteger GAS_PRICE       = BigInteger.ONE;
+    private static final BigInteger GAS_LIMIT       = BigInteger.valueOf(21_000);
+    private static final int       NUM_TXS_EACH     = 20; // 40 txs total
+
+    private ClientContext  ctx1, ctx2;
+    private ClientLibrary  lib1, lib2;
+
+    @BeforeEach
+    void setup() throws Exception {
+        for (String id : REPLICAS) startReplica(id);
+
+        System.out.println("[STRESS] Waiting for replica handshake...");
+        TimeUnit.SECONDS.sleep(15);
+
+        ctx1 = new ClientContext(Config.loadConfiguration(CONFIG_FILE, "client1"));
+        ctx2 = new ClientContext(Config.loadConfiguration(CONFIG_FILE, "client2"));
+        lib1 = new ClientLibrary(ctx1);
+        lib2 = new ClientLibrary(ctx2);
+
+        Address addr1 = Address.fromHexString(CLIENT1_ADDR);
+        Address addr2 = Address.fromHexString(CLIENT2_ADDR);
+
+        for (String id : REPLICAS) {
+            BasicHotStuffCoordinator coord = ServerApp.getCoordinator(id);
+            assertNotNull(coord, "Coordinator missing for " + id);
+            DepChainWorldState ws = coord.getServerContext().getWorldState();
+
+            for (Address addr : new Address[]{addr1, addr2}) {
+                if (!ws.accountExists(addr)) ws.createEOA(addr, 0, INITIAL_BALANCE);
+                else ws.addBalance(addr, INITIAL_BALANCE);
+            }
+        }
+
+        ctx1.start();
+        ctx2.start();
+    }
+
+    @AfterEach
+    void teardown() {
+        if (ctx1 != null) ctx1.stop();
+        if (ctx2 != null) ctx2.stop();
+        ServerApp.stopAll();
+    }
+
+    @Test
+    @DisplayName("Two clients exchange " + NUM_TXS_EACH + " txs each concurrently")
+    void testConcurrentTransfers() throws InterruptedException {
+        TimeUnit.SECONDS.sleep(5);
+
+        // Snapshot actual balances now — world state may include genesis funds
+        DepChainWorldState wsSnap = ServerApp.getCoordinator("s0").getServerContext().getWorldState();
+        Address addr1 = Address.fromHexString(CLIENT1_ADDR);
+        Address addr2 = Address.fromHexString(CLIENT2_ADDR);
+        BigInteger initialBal1 = wsSnap.getBalance(addr1);
+        BigInteger initialBal2 = wsSnap.getBalance(addr2);
+        BigInteger initialTotal = initialBal1.add(initialBal2);
+        System.out.printf("[STRESS] initial balance: client1=%s  client2=%s  total=%s%n",
+                initialBal1, initialBal2, initialTotal);
+
+        AtomicReference<Throwable> err1 = new AtomicReference<>();
+        AtomicReference<Throwable> err2 = new AtomicReference<>();
+
+        Thread t1 = new Thread(() -> {
+            try {
+                for (int i = 0; i < NUM_TXS_EACH; i++) {
+                    lib1.submitNativeTransfer(CLIENT2_ADDR, TX_VALUE, GAS_PRICE, GAS_LIMIT);
+                    System.out.printf("[STRESS] client1 tx %d/%d committed%n", i + 1, NUM_TXS_EACH);
+                }
+            } catch (Throwable e) {
+                err1.set(e);
+            }
+        }, "client1-thread");
+
+        Thread t2 = new Thread(() -> {
+            try {
+                for (int i = 0; i < NUM_TXS_EACH; i++) {
+                    lib2.submitNativeTransfer(CLIENT1_ADDR, TX_VALUE, GAS_PRICE, GAS_LIMIT);
+                    System.out.printf("[STRESS] client2 tx %d/%d committed%n", i + 1, NUM_TXS_EACH);
+                }
+            } catch (Throwable e) {
+                err2.set(e);
+            }
+        }, "client2-thread");
+
+        long timeoutMs = NUM_TXS_EACH * 70_000L; // 70s per tx worst case
+        t1.start();
+        t2.start();
+        t1.join(timeoutMs);
+        t2.join(timeoutMs);
+
+        assertFalse(t1.isAlive(), "client1 thread did not finish in time");
+        assertFalse(t2.isAlive(), "client2 thread did not finish in time");
+        assertNull(err1.get(), "client1 error: " + err1.get());
+        assertNull(err2.get(), "client2 error: " + err2.get());
+
+        assertEquals(NUM_TXS_EACH, ctx1.getCommitedLog().size(),
+                "client1 committed log size mismatch");
+        assertEquals(NUM_TXS_EACH, ctx2.getCommitedLog().size(),
+                "client2 committed log size mismatch");
+
+        // Conservation: total balance = initialTotal - all gas fees paid
+        DepChainWorldState ws = ServerApp.getCoordinator("s0").getServerContext().getWorldState();
+        BigInteger bal1 = ws.getBalance(addr1);
+        BigInteger bal2 = ws.getBalance(addr2);
+        BigInteger totalBalance = bal1.add(bal2);
+        BigInteger maxGasPerTx = GAS_PRICE.multiply(GAS_LIMIT);
+        BigInteger totalGasPaid = maxGasPerTx.multiply(BigInteger.valueOf(NUM_TXS_EACH * 2L));
+        BigInteger minExpectedTotal = initialTotal.subtract(totalGasPaid);
+
+        System.out.printf("[STRESS] client1 balance: %s%n", bal1);
+        System.out.printf("[STRESS] client2 balance: %s%n", bal2);
+        System.out.printf("[STRESS] total balance:   %s (min expected: %s)%n", totalBalance, minExpectedTotal);
+
+        assertTrue(totalBalance.compareTo(minExpectedTotal) >= 0,
+                "Total balance fell below minimum expected (coins were lost)");
+        assertTrue(totalBalance.compareTo(initialTotal) <= 0,
+                "Total balance exceeds initial total (coins were created)");
+    }
+
+    private static void startReplica(String id) {
+        Thread t = new Thread(() -> {
+            try {
+                ServerApp.main(new String[]{CONFIG_FILE, id, "false"});
+            } catch (Exception e) {
+                System.err.println("[STRESS] Error starting replica " + id);
+            }
+        });
+        t.setDaemon(true);
+        t.start();
+    }
+}

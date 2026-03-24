@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * ExceedFaultThresholdTest  —  boundary / negative test
+ * ExceedFaultThresholdTest  -  boundary / negative test
  *
  * Setup: only 2 of the 4 replicas are started (s0 and s3).
  * With n=4 and f=1 the quorum threshold is n-f = 3.  Because only 2 processes
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  *   - No safety violation occurs either: nothing is committed under these
  *     conditions, which is the correct behaviour.
  *
- * This is a negative test — the assertion is that the commit log remains empty.
+ * This is a negative test - the assertion is that the commit log remains empty.
  */
 public class ExceedFaultThresholdTest {
     private static final String CONFIG_FILE = "../config-test.json";
@@ -43,7 +43,7 @@ public class ExceedFaultThresholdTest {
     public void setup() throws InterruptedException {
         System.out.println("[TEST] - Starting ExceedFaultThresholdTest (only 2 of 4 replicas online)");
 
-        // Only start s0 and s3 — s1 and s2 are treated as crashed.
+        // Only start s0 and s3 - s1 and s2 are treated as crashed.
         startReplica("s0");
         startReplica("s3");
 
