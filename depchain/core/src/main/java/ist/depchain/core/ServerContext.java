@@ -75,13 +75,13 @@ public class ServerContext {
 
             MutableAccount contractAccount = (MutableAccount) worldState.getSimpleWorld().get(config.getIstContractAddress());
             // 5. Read-only calls
-            String name = EvmService.callString(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("name()"));
-            String symbol = EvmService.callString(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("symbol()"));
-            BigInteger decimals = EvmService.callUint(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("decimals()"));
-            BigInteger totalSupply = EvmService.callUint(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("totalSupply()"));
+            String name = EvmService.callString(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("name()"));
+            String symbol = EvmService.callString(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("symbol()"));
+            BigInteger decimals = EvmService.callUint(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("decimals()"));
+            BigInteger totalSupply = EvmService.callUint(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("totalSupply()"));
 
             String balanceOfInitialTokenHolderCalldata = EvmService.selector("balanceOf(address)") + EvmService.encodeAddressArgument(config.getInitialTokenHolderAddress());
-            BigInteger initialTokenHolderBalance = EvmService.callUint(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), balanceOfInitialTokenHolderCalldata);
+            BigInteger initialTokenHolderBalance = EvmService.callUint(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), balanceOfInitialTokenHolderCalldata);
 
             // 6. Print results
             System.out.println("=== ERC-20 Read Calls ===");

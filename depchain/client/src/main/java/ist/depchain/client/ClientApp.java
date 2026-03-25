@@ -14,7 +14,7 @@ public class ClientApp {
 
         String configFile = args[0];
         String clientId = args[1];
-        
+
         try {
             Config config = Config.loadConfiguration(configFile, clientId);
             ClientContext client = new ClientContext(config);
@@ -25,17 +25,22 @@ public class ClientApp {
             System.out.println("[INFO] Successfully started:");
             System.out.println("    - Client ID: " + clientId);
             System.out.println("    - Blockchain address: " + config.getProcessInfo(clientId).getAddress());
+            System.out.println("    - IST contract address: " + config.getIstContractAddress().toHexString());
 
             Scanner in = new Scanner(System.in);
             while (true) {
                 System.out.println("\n=== DepChain Client ===");
-                System.out.println("1 - Submit transfer");
+                System.out.println("1 - Submit native transfer");
+                System.out.println("2 - ERC20 transfer");
+                System.out.println("3 - ERC20 increaseAllowance");
+                System.out.println("4 - ERC20 decreaseAllowance");
+                System.out.println("5 - ERC20 transferFrom");
                 System.out.println("exit - Quit");
                 System.out.print("> ");
                 String line = in.nextLine();
 
                 switch (line) {
-                    case "1":
+                    case "1": {
                         System.out.print("Destination address (0x...): ");
                         String to = in.nextLine();
 
@@ -50,6 +55,86 @@ public class ClientApp {
 
                         clientLib.submitNativeTransfer(to, value, gasPrice, gasLimit);
                         break;
+                    }
+
+                    case "2": {
+                        String contract = config.getIstContractAddress().toHexString();
+
+                        System.out.print("Token recipient address (0x...): ");
+                        String to = in.nextLine();
+
+                        System.out.print("Token amount (base units): ");
+                        BigInteger amount = new BigInteger(in.nextLine());
+
+                        System.out.print("Gas price: ");
+                        BigInteger gasPrice = new BigInteger(in.nextLine());
+
+                        System.out.print("Gas limit: ");
+                        BigInteger gasLimit = new BigInteger(in.nextLine());
+
+                        clientLib.submitTokenTransfer(contract, to, amount, gasPrice, gasLimit);
+                        break;
+                    }
+
+                    case "3": {
+                        String contract = config.getIstContractAddress().toHexString();
+
+                        System.out.print("Spender address (0x...): ");
+                        String spender = in.nextLine();
+
+                        System.out.print("Increase amount (base units): ");
+                        BigInteger amount = new BigInteger(in.nextLine());
+
+                        System.out.print("Gas price: ");
+                        BigInteger gasPrice = new BigInteger(in.nextLine());
+
+                        System.out.print("Gas limit: ");
+                        BigInteger gasLimit = new BigInteger(in.nextLine());
+
+                        clientLib.submitIncreaseAllowance(contract, spender, amount, gasPrice, gasLimit);
+                        break;
+                    }
+
+                    case "4": {
+                        String contract = config.getIstContractAddress().toHexString();
+
+                        System.out.print("Spender address (0x...): ");
+                        String spender = in.nextLine();
+
+                        System.out.print("Decrease amount (base units): ");
+                        BigInteger amount = new BigInteger(in.nextLine());
+
+                        System.out.print("Gas price: ");
+                        BigInteger gasPrice = new BigInteger(in.nextLine());
+
+                        System.out.print("Gas limit: ");
+                        BigInteger gasLimit = new BigInteger(in.nextLine());
+
+                        clientLib.submitDecreaseAllowance(contract, spender, amount, gasPrice, gasLimit);
+                        break;
+                    }
+
+                    case "5": {
+                        String contract = config.getIstContractAddress().toHexString();
+
+                        System.out.print("From address (token owner): ");
+                        String from = in.nextLine();
+
+                        System.out.print("To address (recipient): ");
+                        String to = in.nextLine();
+
+                        System.out.print("Amount (base units): ");
+                        BigInteger amount = new BigInteger(in.nextLine());
+
+                        System.out.print("Gas price: ");
+                        BigInteger gasPrice = new BigInteger(in.nextLine());
+
+                        System.out.print("Gas limit: ");
+                        BigInteger gasLimit = new BigInteger(in.nextLine());
+
+                        clientLib.submitTransferFrom(contract, from, to, amount, gasPrice, gasLimit);
+                        break;
+                    }
 
                     case "exit":
                         System.out.println("[INFO] Exiting...");
@@ -61,8 +146,7 @@ public class ClientApp {
                         System.out.println("Unknown option");
                 }
             }
-        }
-        catch(Exception e){
+        } catch (Exception e) {
             System.out.println("[ERROR] Failed to load config file: " + e.getMessage());
         }
     }

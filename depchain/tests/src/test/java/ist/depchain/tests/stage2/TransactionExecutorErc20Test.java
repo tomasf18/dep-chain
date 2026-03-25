@@ -235,7 +235,7 @@ class TransactionExecutorErc20Test {
         String deploymentHex = creationBin + EvmService.encodeAddressArgument(treasury);
 
         EvmService.EvmResult deployment = EvmService.deployContract(
-                worldState.getSimpleWorld(),
+                worldState,
                 treasury,
                 CONTRACT_ADDRESS,
                 Bytes.fromHexString("0x" + deploymentHex).toArrayUnsafe()
@@ -261,20 +261,20 @@ class TransactionExecutorErc20Test {
     private BigInteger tokenBalanceOf(Address owner) {
         Bytes runtimeCode = worldState.getCode(CONTRACT_ADDRESS);
         String calldata = "0x" + EvmService.selector("balanceOf(address)") + EvmService.encodeAddressArgument(owner);
-        return EvmService.callUint(worldState.getSimpleWorld(), owner, CONTRACT_ADDRESS, runtimeCode, calldata);
+        return EvmService.callUint(worldState, owner, CONTRACT_ADDRESS, runtimeCode, calldata);
     }
 
     private BigInteger tokenAllowanceOf(Address owner, Address spender) {
         Bytes runtimeCode = worldState.getCode(CONTRACT_ADDRESS);
         String calldata = "0x" + EvmService.selector("allowance(address,address)")
                 + EvmService.encodeTwoAddresses(owner, spender);
-        return EvmService.callUint(worldState.getSimpleWorld(), owner, CONTRACT_ADDRESS, runtimeCode, calldata);
+        return EvmService.callUint(worldState, owner, CONTRACT_ADDRESS, runtimeCode, calldata);
     }
 
     private String tokenName() {
         Bytes runtimeCode = worldState.getCode(CONTRACT_ADDRESS);
         return EvmService.callString(
-                worldState.getSimpleWorld(),
+                worldState,
                 treasury,
                 CONTRACT_ADDRESS,
                 runtimeCode,
@@ -285,7 +285,7 @@ class TransactionExecutorErc20Test {
     private String tokenSymbol() {
         Bytes runtimeCode = worldState.getCode(CONTRACT_ADDRESS);
         return EvmService.callString(
-                worldState.getSimpleWorld(),
+                worldState,
                 treasury,
                 CONTRACT_ADDRESS,
                 runtimeCode,
@@ -296,7 +296,7 @@ class TransactionExecutorErc20Test {
     private BigInteger tokenDecimals() {
         Bytes runtimeCode = worldState.getCode(CONTRACT_ADDRESS);
         return EvmService.callUint(
-                worldState.getSimpleWorld(),
+                worldState,
                 treasury,
                 CONTRACT_ADDRESS,
                 runtimeCode,
@@ -307,7 +307,7 @@ class TransactionExecutorErc20Test {
     private BigInteger tokenTotalSupply() {
         Bytes runtimeCode = worldState.getCode(CONTRACT_ADDRESS);
         return EvmService.callUint(
-                worldState.getSimpleWorld(),
+                worldState,
                 treasury,
                 CONTRACT_ADDRESS,
                 runtimeCode,

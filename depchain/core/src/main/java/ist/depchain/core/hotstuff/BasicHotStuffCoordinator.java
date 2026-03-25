@@ -505,15 +505,28 @@ public class BasicHotStuffCoordinator {
             ClientRequestMeta meta = metaList.get(i);
             TransactionReceipt receipt = receipts.get(i);
 
-            ClientResponse response = ClientResponse.newBuilder()
+            ClientResponse.Builder responseBuilder = ClientResponse.newBuilder()
                     .setClientId(meta.getClientId())
                     .setRequestId(meta.getRequestId())
                     .setCommitted(true)
                     .setBlockId(ByteString.copyFromUtf8(finalBlock.getBlockHash()))
                     .setTxHash(ByteString.copyFrom(receipt.getTxHash()))
                     .setStatus(receipt.isSuccess() ? "COMMITTED_SUCCESS" : "COMMITTED_FAILURE")
-                    .setError(receipt.getError() == null ? "" : receipt.getError())
-                    .build();
+                    .setError(receipt.getError() == null ? "" : receipt.getError());
+
+            if (receipt != null) {
+                responseBuilder
+                        .setReturnData(ByteString.copyFrom(receipt.getReturnData()))
+                        .setGasUsed(ByteString.copyFrom(receipt.getGasUsed().toByteArray()))
+                        .setFee(ByteString.copyFrom(receipt.getFee().toByteArray()));
+
+                if (receipt.getContractAddress() != null) {
+                    responseBuilder.setContractAddress(
+                            ByteString.copyFrom(receipt.getContractAddress().toArrayUnsafe()));
+                }
+            }
+
+            ClientResponse response = responseBuilder.build();
 
             try {
                 serverContext.getPerfectLink().send(meta.getClientId(), response.toByteArray());

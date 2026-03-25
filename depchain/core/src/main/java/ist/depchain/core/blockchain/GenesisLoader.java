@@ -102,7 +102,7 @@ public class GenesisLoader {
 
                 // Execute deployment into the fixed, known IST contract address
                 EvmService.deployContract(
-                        worldState.getSimpleWorld(),
+                        worldState,
                         tx.getFrom(),
                         expectedContractAddress,
                         tx.getData()
@@ -117,6 +117,13 @@ public class GenesisLoader {
         if (worldState.getCode(expectedContractAddress) == null || worldState.getCode(expectedContractAddress).isEmpty()) {
             throw new IllegalStateException("IST contract runtime code is empty after genesis deployment");
         }
+
+        worldState.registerExistingContractAccount(expectedContractAddress);
+        worldState.registerStorageSlot(expectedContractAddress, EvmService.erc20TotalSupplySlot());
+        worldState.refreshTrackedStorageValue(expectedContractAddress, EvmService.erc20TotalSupplySlot());
+
+        worldState.registerStorageSlot(expectedContractAddress, EvmService.erc20BalanceSlot(expectedInitialTokenHolderAddress));
+        worldState.refreshTrackedStorageValue(expectedContractAddress, EvmService.erc20BalanceSlot(expectedInitialTokenHolderAddress));
 
         // 5. Build genesis block
         String blockHash = root.has("block_hash") && !root.get("block_hash").isJsonNull()

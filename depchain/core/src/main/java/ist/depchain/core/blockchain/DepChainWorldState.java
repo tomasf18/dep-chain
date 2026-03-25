@@ -34,6 +34,7 @@ public class DepChainWorldState {
 
     /** Track all created accounts so we can copy/hash deterministically. */
     private final Set<Address> trackedAccounts = ConcurrentHashMap.newKeySet();
+    private final Map<Address, Map<UInt256, UInt256>> trackedStorageValues = new ConcurrentHashMap<>();
 
     /** Track storage slots touched for each contract account. */
     private final Map<Address, Set<UInt256>> trackedStorageSlots = new ConcurrentHashMap<>();
@@ -56,6 +57,7 @@ public class DepChainWorldState {
         world.createAccount(address, nonce, Wei.of(balanceUnits));
         trackedAccounts.add(address);
         trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet());
+        trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>());
     }
 
     public void createContractAccount(Address address, long nonce, BigInteger balanceUnits, Bytes code) {
@@ -66,6 +68,7 @@ public class DepChainWorldState {
         }
         trackedAccounts.add(address);
         trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet());
+        trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>());
     }
 
     // --- Balance operations ---
@@ -143,6 +146,7 @@ public class DepChainWorldState {
         account.setStorageValue(slot, value);
         trackedAccounts.add(address);
         trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet()).add(slot);
+        trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>()).put(slot, value);
     }
 
     // --- Snapshot / replace ---
@@ -164,11 +168,11 @@ public class DepChainWorldState {
                 cloned.createContractAccount(address, nonce, balance, code);
             }
 
-            Set<UInt256> slots = trackedStorageSlots.getOrDefault(address, Set.of());
-            List<UInt256> orderedSlots = new ArrayList<>(slots);
+            Map<UInt256, UInt256> values = trackedStorageValues.getOrDefault(address, Map.of());
+            List<UInt256> orderedSlots = new ArrayList<>(values.keySet());
             orderedSlots.sort(Comparator.comparing(UInt256::toHexString));
             for (UInt256 slot : orderedSlots) {
-                cloned.setStorageValue(address, slot, getStorageValue(address, slot));
+                cloned.setStorageValue(address, slot, values.get(slot));
             }
         }
 
@@ -194,11 +198,11 @@ public class DepChainWorldState {
                 createContractAccount(address, nonce, balance, code);
             }
 
-            Set<UInt256> slots = other.trackedStorageSlots.getOrDefault(address, Set.of());
-            List<UInt256> orderedSlots = new ArrayList<>(slots);
+            Map<UInt256, UInt256> values = other.trackedStorageValues.getOrDefault(address, Map.of());
+            List<UInt256> orderedSlots = new ArrayList<>(values.keySet());
             orderedSlots.sort(Comparator.comparing(UInt256::toHexString));
             for (UInt256 slot : orderedSlots) {
-                setStorageValue(address, slot, other.getStorageValue(address, slot));
+                setStorageValue(address, slot, values.get(slot));
             }
         }
     }
@@ -219,12 +223,12 @@ public class DepChainWorldState {
             parts.add(Long.toString(getNonce(address)).getBytes(StandardCharsets.UTF_8));
             parts.add(getCode(address).toHexString().getBytes(StandardCharsets.UTF_8));
 
-            Set<UInt256> slots = trackedStorageSlots.getOrDefault(address, Set.of());
-            List<UInt256> orderedSlots = new ArrayList<>(slots);
+            Map<UInt256, UInt256> values = trackedStorageValues.getOrDefault(address, Map.of());
+            List<UInt256> orderedSlots = new ArrayList<>(values.keySet());
             orderedSlots.sort(Comparator.comparing(UInt256::toHexString));
             for (UInt256 slot : orderedSlots) {
                 parts.add(slot.toHexString().getBytes(StandardCharsets.UTF_8));
-                parts.add(getStorageValue(address, slot).toHexString().getBytes(StandardCharsets.UTF_8));
+                parts.add(values.get(slot).toHexString().getBytes(StandardCharsets.UTF_8));
             }
         }
 
@@ -240,5 +244,31 @@ public class DepChainWorldState {
         }
 
         return Numeric.toHexStringNoPrefix(Hash.sha3(buf.array()));
+    }
+
+    public void registerExistingContractAccount(Address address) {
+        if (world.get(address) == null) {
+            throw new IllegalStateException("Cannot register missing contract account: " + address);
+        }
+        trackedAccounts.add(address);
+        trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet());
+        trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>());
+    }
+
+    public void registerStorageSlot(Address address, UInt256 slot) {
+        trackedAccounts.add(address);
+        trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet()).add(slot);
+        trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>())
+                .put(slot, getStorageValue(address, slot));
+    }
+
+    public void registerStorageValue(Address address, UInt256 slot, UInt256 value) {
+        trackedAccounts.add(address);
+        trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet()).add(slot);
+        trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>()).put(slot, value);
+    }
+
+    public void refreshTrackedStorageValue(Address address, UInt256 slot) {
+        registerStorageValue(address, slot, getStorageValue(address, slot));
     }
 }

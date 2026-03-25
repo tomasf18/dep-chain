@@ -110,6 +110,10 @@ public class BlockSerializer {
             obj.addProperty("contract_address", receipt.getContractAddress().toHexString());
         }
 
+        if (receipt.getReturnData() != null && receipt.getReturnData().length > 0) {
+            obj.addProperty("return_data", "0x" + Numeric.toHexStringNoPrefix(receipt.getReturnData()));
+        }
+
         return obj;
     }
 
@@ -216,6 +220,11 @@ public class BlockSerializer {
             contractAddress = Address.fromHexString(obj.get("contract_address").getAsString());
         }
 
-        return new TransactionReceipt(txHash, success, gasUsed, fee, error, null, contractAddress);
+        byte[] returnData = new byte[0];
+        if (obj.has("return_data") && !obj.get("return_data").isJsonNull()) {
+            returnData = Numeric.hexStringToByteArray(obj.get("return_data").getAsString());
+        }
+
+        return new TransactionReceipt(txHash, success, gasUsed, fee, error, returnData, contractAddress);
     }
 }

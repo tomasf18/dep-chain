@@ -24,6 +24,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import org.apache.tuweni.units.bigints.UInt256;
+import org.web3j.utils.Numeric;
+
 public final class EvmService {
 
     private EvmService() {}
@@ -81,7 +84,7 @@ public final class EvmService {
      * Deploys a contract by executing creation bytecode (+ constructor args) into a given address.
      * Used for bootstrap/genesis or any deterministic project-specific deployment flow.
      */
-    public static EvmResult deployContract(SimpleWorld world, Address sender, Address contractAddress, byte[] deploymentData) {
+    public static EvmResult deployContract(DepChainWorldState worldState, Address sender, Address contractAddress, byte[] deploymentData) {
 
         ByteArrayOutputStream traceOutput = new ByteArrayOutputStream();
         PrintStream tracePrint = new PrintStream(traceOutput);
@@ -90,13 +93,13 @@ public final class EvmService {
         var executor = EVMExecutor.evm(EvmSpecVersion.CANCUN);
         executor.tracer(tracer);
 
-        if (world.get(contractAddress) == null) {
-            world.createAccount(contractAddress, 0, Wei.ZERO);
+        if (worldState.getSimpleWorld().get(contractAddress) == null) {
+            worldState.getSimpleWorld().createAccount(contractAddress, 0, Wei.ZERO);
         }
 
         executor.sender(sender);
         executor.receiver(contractAddress);
-        executor.worldUpdater(world.updater());
+        executor.worldUpdater(worldState.getSimpleWorld().updater());
         executor.commitWorldState();
 
         executor.code(Bytes.wrap(deploymentData));
@@ -125,7 +128,7 @@ public final class EvmService {
             );
         }
 
-        MutableAccount contractAccount = (MutableAccount) world.get(contractAddress);
+        MutableAccount contractAccount = (MutableAccount) worldState.getSimpleWorld().get(contractAddress);
         if (contractAccount == null) {
             return new EvmResult(false, Bytes.EMPTY, Bytes.EMPTY, "contract account was not created");
         }
@@ -138,7 +141,7 @@ public final class EvmService {
     /**
      * Executes a contract call (may mutate storage if calldata targets a state-changing function).
      */
-    public static EvmResult callContract(SimpleWorld world, Address sender, Address contractAddress, Bytes runtimeCode, byte[] calldata) {
+    public static EvmResult callContract(DepChainWorldState worldState, Address sender, Address contractAddress, Bytes runtimeCode, byte[] calldata) {
 
         ByteArrayOutputStream traceOutput = new ByteArrayOutputStream();
         PrintStream tracePrint = new PrintStream(traceOutput);
@@ -148,7 +151,7 @@ public final class EvmService {
         executor.tracer(tracer);
         executor.sender(sender);
         executor.receiver(contractAddress);
-        executor.worldUpdater(world.updater());
+        executor.worldUpdater(worldState.getSimpleWorld().updater());
         executor.commitWorldState();
         executor.code(runtimeCode);
         executor.callData(Bytes.wrap(calldata));
@@ -182,18 +185,18 @@ public final class EvmService {
 
     // ---------- Convenience read helpers ----------
 
-    public static String callString(SimpleWorld world, Address sender, Address contractAddress, Bytes runtimeCode, String calldataHex) {
+    public static String callString(DepChainWorldState worldState, Address sender, Address contractAddress, Bytes runtimeCode, String calldataHex) {
 
-        EvmResult result = callContract(world, sender, contractAddress, runtimeCode, Bytes.fromHexString(calldataHex).toArrayUnsafe());
+        EvmResult result = callContract(worldState, sender, contractAddress, runtimeCode, Bytes.fromHexString(calldataHex).toArrayUnsafe());
         if (!result.isSuccess()) {
             throw new IllegalStateException("EVM string call failed: " + result.getErrorMessage());
         }
         return decodeAbiString(result.getReturnData());
     }
 
-    public static BigInteger callUint(SimpleWorld world, Address sender, Address contractAddress, Bytes runtimeCode, String calldataHex) {
+    public static BigInteger callUint(DepChainWorldState worldState, Address sender, Address contractAddress, Bytes runtimeCode, String calldataHex) {
 
-        EvmResult result = callContract(world, sender, contractAddress, runtimeCode, Bytes.fromHexString(calldataHex).toArrayUnsafe());
+        EvmResult result = callContract(worldState, sender, contractAddress, runtimeCode, Bytes.fromHexString(calldataHex).toArrayUnsafe());
         if (!result.isSuccess()) {
             throw new IllegalStateException("EVM uint call failed: " + result.getErrorMessage());
         }
@@ -372,5 +375,41 @@ public final class EvmService {
             throw new IllegalStateException(
                     "Assertion failed for " + label + ": expected=" + expected + ", actual=" + actual);
         }
+    }
+
+    public static UInt256 erc20BalanceSlot(Address owner) {
+        String paddedAddress = padTo32(owner.toHexString().substring(2));
+        String slotIndex = padTo32("0");
+        String hash = Numeric.toHexStringNoPrefix(
+                Hash.sha3(Numeric.hexStringToByteArray(paddedAddress + slotIndex))
+        );
+        return UInt256.fromHexString("0x" + hash);
+    }
+
+    public static UInt256 erc20AllowanceSlot(Address owner, Address spender) {
+        String paddedOwner = padTo32(owner.toHexString().substring(2));
+        String allowancesSlot = padTo32("1");
+
+        String inner = Numeric.toHexStringNoPrefix(
+                Hash.sha3(Numeric.hexStringToByteArray(paddedOwner + allowancesSlot))
+        );
+
+        String paddedSpender = padTo32(spender.toHexString().substring(2));
+        String outer = Numeric.toHexStringNoPrefix(
+                Hash.sha3(Numeric.hexStringToByteArray(paddedSpender + inner))
+        );
+
+        return UInt256.fromHexString("0x" + outer);
+    }
+
+    public static UInt256 erc20TotalSupplySlot() {
+        return UInt256.valueOf(2);
+    }
+
+    private static String padTo32(String hex) {
+        if (hex.startsWith("0x") || hex.startsWith("0X")) {
+            hex = hex.substring(2);
+        }
+        return "0".repeat(64 - hex.length()) + hex;
     }
 }

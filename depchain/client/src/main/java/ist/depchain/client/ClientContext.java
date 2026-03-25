@@ -104,4 +104,12 @@ public class ClientContext {
     public List<String> getCommitedLog() {
         return commitedLog;
     }
+
+    public void setNonce(long nonce) {
+        this.nonce.set(nonce);
+    }
+
+    public void setRequestId(int requestId) {
+        this.requestId.set(requestId);
+    }
 }
