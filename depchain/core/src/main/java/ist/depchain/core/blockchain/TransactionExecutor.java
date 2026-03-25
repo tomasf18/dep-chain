@@ -3,6 +3,7 @@ package ist.depchain.core.blockchain;
 import java.math.BigInteger;
 
 import org.hyperledger.besu.datatypes.Address;
+import org.apache.tuweni.bytes.Bytes;
 
 import ist.depchain.common.Transaction;
 
@@ -67,7 +68,7 @@ public class TransactionExecutor {
             BigInteger fee = feeByLimit;
             creditFee(state, proposer, fee);
 
-            // Refund the value part only.
+            // Refund the transferred value, but not gas
             if (tx.getValue().signum() > 0) {
                 state.addBalance(tx.getFrom(), tx.getValue());
             }
@@ -85,7 +86,7 @@ public class TransactionExecutor {
         creditFee(state, proposer, fee);
 
         BigInteger refund = feeByLimit.subtract(fee);
-        if (refund.signum() > 0) {
+        if (refund.signum() > 0) { // refund unused gas
             state.addBalance(tx.getFrom(), refund);
         }
 
@@ -93,29 +94,63 @@ public class TransactionExecutor {
     }
 
     private TransactionReceipt executeContractDeployment(DepChainWorldState state, Transaction tx, byte[] txHash, Address proposer) {
+        BigInteger gasUsed = tx.getGasLimit();
         BigInteger fee = tx.getMaxFee();
-        creditFee(state, proposer, fee);
 
-        // Value is not transferred anywhere yet; refund it fully until Step 6.
-        if (tx.getValue().signum() > 0) {
-            state.addBalance(tx.getFrom(), tx.getValue());
+        if (tx.getValue().signum() > 0) { // if the transaction tries to transfer native value while deploying a contract, we simply refund the value and charge the fee
+            creditFee(state, proposer, fee);
+            state.addBalance(tx.getFrom(), tx.getValue()); // refund value part
+            return TransactionReceipt.failure(txHash, gasUsed, fee, "contract deployment with non-zero native value not supported");
         }
 
-        return TransactionReceipt.failure(txHash, BigInteger.ZERO, fee,
-                "contract deployment not implemented yet");
+        Address contractAddress = EvmService.deriveContractAddress(tx.getFrom(), tx.getNonce());
+        EvmService.EvmResult result = EvmService.deployContract(state.getSimpleWorld(), tx.getFrom(), contractAddress, tx.getData());
+
+        creditFee(state, proposer, fee);
+
+        if (!result.isSuccess()) {
+            return TransactionReceipt.failure(txHash, gasUsed, fee, result.getErrorMessage() == null ? "contract deployment failed" : result.getErrorMessage());
+        }
+
+        return TransactionReceipt.success(txHash, gasUsed, fee, result.getReturnData().toArrayUnsafe(), contractAddress);
     }
 
     private TransactionReceipt executeContractCall(DepChainWorldState state, Transaction tx, byte[] txHash, Address proposer) {
-
+        BigInteger gasUsed = tx.getGasLimit();
         BigInteger fee = tx.getMaxFee();
-        creditFee(state, proposer, fee);
 
-        // For now, refund value because call execution is not implemented.
         if (tx.getValue().signum() > 0) {
-            state.addBalance(tx.getFrom(), tx.getValue());
+            creditFee(state, proposer, fee);
+            state.addBalance(tx.getFrom(), tx.getValue()); // refund value part
+            return TransactionReceipt.failure(txHash, gasUsed, fee, "contract call with non-zero native value not supported");
         }
 
-        return TransactionReceipt.failure(txHash, BigInteger.ZERO, fee, "contract call not implemented yet");
+        Address contractAddress = tx.getTo();
+        if (contractAddress == null) {
+            creditFee(state, proposer, fee);
+            return TransactionReceipt.failure(txHash, gasUsed, fee, "missing contract address");
+        }
+
+        if (!state.accountExists(contractAddress)) {
+            creditFee(state, proposer, fee);
+            return TransactionReceipt.failure(txHash, gasUsed, fee, "target contract account does not exist");
+        }
+
+        Bytes runtimeCode = state.getCode(contractAddress);
+        if (runtimeCode == null || runtimeCode.isEmpty()) {
+            creditFee(state, proposer, fee);
+            return TransactionReceipt.failure(txHash, gasUsed, fee, "target contract has no runtime code");
+        }
+
+        EvmService.EvmResult result = EvmService.callContract(state.getSimpleWorld(), tx.getFrom(), contractAddress, runtimeCode, tx.getData());
+
+        creditFee(state, proposer, fee);
+
+        if (!result.isSuccess()) {
+            return TransactionReceipt.failure(txHash, gasUsed, fee, result.getErrorMessage() == null ? "contract call failed" : result.getErrorMessage());
+        }
+
+        return TransactionReceipt.success(txHash, gasUsed, fee, result.getReturnData().toArrayUnsafe(), null);
     }
 
     private void creditFee(DepChainWorldState state, Address proposer, BigInteger fee) {

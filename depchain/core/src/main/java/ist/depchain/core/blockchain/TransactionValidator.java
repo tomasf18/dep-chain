@@ -79,6 +79,10 @@ public class TransactionValidator {
             return ValidationResult.fail("contract deployment requires non-empty bytecode");
         }
 
+        if ((tx.isContractCall() || tx.isContractDeployment()) && tx.getValue().signum() != 0) {
+            return ValidationResult.fail("contract transactions with non-zero native value are not supported");
+        }
+
         return ValidationResult.ok();
     }
 }
