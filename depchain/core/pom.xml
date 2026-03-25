@@ -125,7 +125,7 @@
         <configuration>
           <archive>
             <manifest>
-              <mainClass>ist.depchain.core.ServerApp</mainClass>
+              <mainClass>ist.depchain.core.blockchain.MainIST</mainClass>
             </manifest>
           </archive>
         </configuration>
@@ -135,7 +135,7 @@
           <artifactId>exec-maven-plugin</artifactId>
           <version>3.6.3</version> 
           <configuration>
-              <mainClass>ist.depchain.core.ServerApp</mainClass>
+              <mainClass>ist.depchain.core.blockchain.MainIST</mainClass>
               <environmentVariables>
                   <LD_LIBRARY_PATH>${project.basedir}/../native/linux-x86_64</LD_LIBRARY_PATH>
               </environmentVariables>
