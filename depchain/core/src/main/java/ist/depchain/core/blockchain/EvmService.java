@@ -23,7 +23,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 public class EvmService {
-    private static void deployContract(SimpleWorld world, Address sender, Address contractAddress, String deploymentDataHex) {
+    
+    public static void deployContract(SimpleWorld world, Address sender, Address contractAddress, byte[] deploymentData) {
 
         ByteArrayOutputStream traceOutput = new ByteArrayOutputStream();
         PrintStream tracePrint = new PrintStream(traceOutput);
@@ -41,7 +42,7 @@ public class EvmService {
         executor.commitWorldState();
 
         // Run creation bytecode + encoded constructor args
-        executor.code(Bytes.fromHexString(deploymentDataHex));
+        executor.code(Bytes.wrap(deploymentData));
         executor.callData(Bytes.EMPTY);
 
         executor.execute();
@@ -61,7 +62,7 @@ public class EvmService {
         contractAccount.setCode(runtimeCode);
     }
 
-    private static Bytes extractReturnBytes(ByteArrayOutputStream output) {
+    public static Bytes extractReturnBytes(ByteArrayOutputStream output) {
         JsonObject json = getLastTraceObject(output);
 
         String memory = json.get("memory").getAsString();
@@ -78,7 +79,7 @@ public class EvmService {
         return Bytes.fromHexString("0x" + returnData);
     }
 
-    private static String callString(SimpleWorld world, Address sender, Address contractAddress, Bytes runtimeCode, String calldataHex) {
+    public static String callString(SimpleWorld world, Address sender, Address contractAddress, Bytes runtimeCode, String calldataHex) {
         ByteArrayOutputStream traceOutput = new ByteArrayOutputStream();
         PrintStream tracePrint = new PrintStream(traceOutput);
         StandardJsonTracer tracer = new StandardJsonTracer(tracePrint, true, true, true, true);
@@ -97,7 +98,7 @@ public class EvmService {
         return extractStringFromReturnData(traceOutput);
     }
 
-    private static BigInteger callUint(SimpleWorld world, Address sender, Address contractAddress, Bytes runtimeCode, String calldataHex) {
+    public static BigInteger callUint(SimpleWorld world, Address sender, Address contractAddress, Bytes runtimeCode, String calldataHex) {
 
         ByteArrayOutputStream traceOutput = new ByteArrayOutputStream();
         PrintStream tracePrint = new PrintStream(traceOutput);
@@ -117,7 +118,7 @@ public class EvmService {
         return extractUintFromReturnData(traceOutput);
     }
 
-    private static String readHexFile(String path) throws IOException {
+    public static String readHexFile(String path) throws IOException {
         String raw = Files.readString(Path.of(path), StandardCharsets.UTF_8).trim();
         if (raw.startsWith("0x") || raw.startsWith("0X")) {
             raw = raw.substring(2);
@@ -129,7 +130,7 @@ public class EvmService {
      * Computes the 4-byte function selector from a Solidity function signature.
      * Example: selector("balanceOf(address)")
      */
-    private static String selector(String signature) {
+    public static String selector(String signature) {
         String hashHex = Hash.sha3String(signature);
         return hashHex.substring(2, 10);
     }
@@ -137,7 +138,7 @@ public class EvmService {
     /**
      * ABI-encode a Solidity address argument as one 32-byte word.
      */
-    private static String encodeAddressArgument(Address address) {
+    public static String encodeAddressArgument(Address address) {
         String hex = address.toHexString().substring(2); // strip 0x
         return "000000000000000000000000" + hex;
     }
@@ -180,7 +181,7 @@ public class EvmService {
         );
     }
 
-    private static BigInteger extractUintFromReturnData(ByteArrayOutputStream output) {
+    public static BigInteger extractUintFromReturnData(ByteArrayOutputStream output) {
         JsonObject json = getLastTraceObject(output);
 
         String memory = json.get("memory").getAsString();
@@ -201,7 +202,7 @@ public class EvmService {
         return new BigInteger(returnData, 16);
     }
 
-    private static JsonObject getLastTraceObject(ByteArrayOutputStream output) {
+    public static JsonObject getLastTraceObject(ByteArrayOutputStream output) {
         String[] lines = output.toString(StandardCharsets.UTF_8).split("\\r?\\n");
         for (int i = lines.length - 1; i >= 0; i--) {
             String line = lines[i].trim();
@@ -212,11 +213,11 @@ public class EvmService {
         throw new IllegalStateException("No JSON trace line found in Besu tracer output");
     }
 
-    private static int decodeHexInt(String value) {
+    public static int decodeHexInt(String value) {
         return Integer.decode(value);
     }
 
-    private static byte[] hexStringToByteArray(String hexString) {
+    public static byte[] hexStringToByteArray(String hexString) {
         int length = hexString.length();
         byte[] byteArray = new byte[length / 2];
 
@@ -228,7 +229,7 @@ public class EvmService {
         return byteArray;
     }
 
-    private static void printAccount(SimpleWorld world, Address address, String label) {
+    public static void printAccount(SimpleWorld world, Address address, String label) {
         MutableAccount account = (MutableAccount) world.get(address);
         System.out.println(label + " Account");
         System.out.println("  Address: " + address);
@@ -243,7 +244,7 @@ public class EvmService {
         System.out.println("  Code size: " + (account.getCode() == null ? 0 : account.getCode().size()));
     }
 
-    private static void printLastTraceLine(ByteArrayOutputStream output, String label) {
+    public static void printLastTraceLine(ByteArrayOutputStream output, String label) {
         String[] lines = output.toString(StandardCharsets.UTF_8).split("\\r?\\n");
         for (int i = lines.length - 1; i >= 0; i--) {
             String line = lines[i].trim();
@@ -254,7 +255,7 @@ public class EvmService {
             }
         }
     }
-    private static void assertEquals(Object expected, Object actual, String label) {
+    public static void assertEquals(Object expected, Object actual, String label) {
         if (!expected.equals(actual)) {
             throw new IllegalStateException("Assertion failed for " + label + ": expected=" + expected + ", actual=" + actual);
         }

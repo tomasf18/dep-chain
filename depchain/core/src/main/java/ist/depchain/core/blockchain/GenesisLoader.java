@@ -14,42 +14,31 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-
+import java.io.File;
 import ist.depchain.common.Transaction;
+import ist.depchain.common.utils.Config;
 
 import org.hyperledger.besu.datatypes.Address;
 
 /**
- * Loads the genesis block (block 0) from a JSON file and initializes the world state.
- *
- *  - The "state" section is authoritative and is applied directly to the world state.
- *
- * Expected format:
- * {
- *   "block_hash": "0x...",
- *   "previous_block_hash": null,
- *   "transactions": [ ... ],
- *   "state": {
- *     "0xAddress": { "balance": "100000", "nonce": 0 }
- *   }
- * }
+ * Loads the genesis block (block 0), initializes world state,
+ * and executes the genesis deployment transaction(s).
  */
 public class GenesisLoader {
 
-    public static BlockChainBlock loadGenesis(String genesisFilePath, DepChainWorldState worldState) throws IOException {
+    public static BlockChainBlock loadGenesis(DepChainWorldState worldState, Config config) throws IOException {
         Gson gson = new Gson();
         JsonObject root;
 
-        // Try filesystem first, then classpath
-        java.io.File file = new java.io.File(genesisFilePath);
+        String genesisFilePath = config.getGenesisPath();
+
+        File file = new File(genesisFilePath);
         if (file.exists()) {
             try (Reader reader = new FileReader(file)) {
                 root = gson.fromJson(reader, JsonObject.class);
             }
         } else {
-            // Try classpath (works from any working directory)
             String resourceName = genesisFilePath;
-            // Strip leading path components to get just the filename for classpath lookup
             int lastSlash = resourceName.lastIndexOf('/');
             if (lastSlash >= 0) resourceName = resourceName.substring(lastSlash + 1);
             int lastBackslash = resourceName.lastIndexOf('\\');
@@ -67,7 +56,7 @@ public class GenesisLoader {
 
         validateRoot(root);
 
-        // 1. Load authoritative initial account state
+        // 1. Load initial account state
         JsonObject state = root.getAsJsonObject("state");
         for (Map.Entry<String, JsonElement> accountEntry : state.entrySet()) {
             String addressString = accountEntry.getKey();
@@ -91,7 +80,7 @@ public class GenesisLoader {
             worldState.createEOA(address, nonce, balance);
         }
 
-        // 2. Parse genesis transactions for metadata only
+        // 2. Parse genesis transactions
         List<Transaction> transactions = new ArrayList<>();
         if (root.has("transactions") && !root.get("transactions").isJsonNull()) {
             JsonArray txArray = root.getAsJsonArray("transactions");
@@ -101,7 +90,35 @@ public class GenesisLoader {
             }
         }
 
-        // 3. Build the genesis block
+        // 3. Execute genesis deployment transactions
+        Address expectedContractAddress = config.getIstContractAddress();
+        Address expectedInitialTokenHolderAddress = config.getInitialTokenHolderAddress();
+
+        for (Transaction tx : transactions) {
+            if (tx.isContractDeployment()) {
+                if (!tx.getFrom().equals(expectedInitialTokenHolderAddress)) {
+                    throw new IllegalArgumentException("Genesis deployment tx sender must equal treasuryAddress");
+                }
+
+                // Execute deployment into the fixed, known IST contract address
+                EvmService.deployContract(
+                        worldState.getSimpleWorld(),
+                        tx.getFrom(),
+                        expectedContractAddress,
+                        tx.getData()
+                );
+            }
+        }
+
+        // 4. Verify that the contract was actually installed
+        if (!worldState.accountExists(expectedContractAddress)) {
+            throw new IllegalStateException("IST contract account does not exist after genesis deployment");
+        }
+        if (worldState.getCode(expectedContractAddress) == null || worldState.getCode(expectedContractAddress).isEmpty()) {
+            throw new IllegalStateException("IST contract runtime code is empty after genesis deployment");
+        }
+
+        // 5. Build genesis block
         String blockHash = root.has("block_hash") && !root.get("block_hash").isJsonNull()
                 ? root.get("block_hash").getAsString()
                 : "0x0";

@@ -26,7 +26,7 @@ public class MainIST {
 
     private static final String CREATION_BIN_PATH = "./src/main/resources/contracts/ist/ISTCoin.creation.bin";
 
-    private static final Address INITIAL_TOKEN_HOLDER = Address.fromHexString("0x1111111111111111111111111111111111111111");
+    private static final Address INITIAL_TOKEN_HOLDER = Address.fromHexString("0x1000000000000000000000000000000000000001");
     private static final Address CONTRACT_ADDRESS = Address.fromHexString("0x9999999999999999999999999999999999999999");
 
     public static void main(String[] args) throws Exception {

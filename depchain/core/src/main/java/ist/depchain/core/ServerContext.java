@@ -4,6 +4,7 @@ import ist.depchain.common.utils.Config;
 import ist.depchain.common.utils.AddressUtils;
 import ist.depchain.core.blockchain.BlockChainBlock;
 import ist.depchain.core.blockchain.DepChainWorldState;
+import ist.depchain.core.blockchain.EvmService;
 import ist.depchain.core.blockchain.GenesisLoader;
 import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.hotstuff.tsignatures.BLSManager;
@@ -16,11 +17,11 @@ import ist.depchain.network.crypto.KeyLoader;
 
 import java.security.PublicKey;
 import org.hyperledger.besu.datatypes.Address;
+import org.hyperledger.besu.evm.account.MutableAccount;
+
+import java.math.BigInteger;
 
 public class ServerContext {
-    private static final String DEFAULT_GENESIS_PATH = "core/src/main/resources/genesis.json";
-    private final Address selfAddress;
-
     private final Config config;
 
     private final UdpFairLossLink fairLossLink;
@@ -35,9 +36,6 @@ public class ServerContext {
 
     public ServerContext(Config config) {
         this.config = config;
-        
-        PublicKey pubKey = KeyLoader.loadPublicKey(config.getSelfPublicKeyPathString());
-        this.selfAddress = (pubKey != null) ? AddressUtils.deriveAddress(pubKey) : null;
 
         fairLossLink = new UdpFairLossLink(config);
         stubbornLink = new StubbornLink(config, fairLossLink);
@@ -54,11 +52,49 @@ public class ServerContext {
 
     private void loadGenesis() {
         try {
-            BlockChainBlock genesis = GenesisLoader.loadGenesis(DEFAULT_GENESIS_PATH, worldState);
+            BlockChainBlock genesis = GenesisLoader.loadGenesis(worldState, config);
             blockChain.addBlock(genesis);
-            System.out.println("[SERVER_CONTEXT] Genesis block loaded with " + genesis.getTransactions().size() + " transactions");
+
+            Address istAddress = config.getIstContractAddress();
+            if (!worldState.accountExists(istAddress)) {
+                throw new IllegalStateException("IST contract account missing after bootstrap");
+            }
+            if (worldState.getCode(istAddress) == null || worldState.getCode(istAddress).isEmpty()) {
+                throw new IllegalStateException("IST contract code missing after bootstrap");
+            }
+
+            System.out.println("[SERVER_CONTEXT] Genesis block loaded with "
+                    + genesis.getTransactions().size()
+                    + " transactions; IST contract bootstrapped at "
+                    + istAddress.toHexString());
+
+            System.out.println("=== After Deployment ===");
+            EvmService.printAccount(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), "InitialTokenHolder");
+            EvmService.printAccount(worldState.getSimpleWorld(), config.getIstContractAddress(), "Contract");
+            System.out.println();
+
+            MutableAccount contractAccount = (MutableAccount) worldState.getSimpleWorld().get(config.getIstContractAddress());
+            // 5. Read-only calls
+            String name = EvmService.callString(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("name()"));
+            String symbol = EvmService.callString(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("symbol()"));
+            BigInteger decimals = EvmService.callUint(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("decimals()"));
+            BigInteger totalSupply = EvmService.callUint(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("totalSupply()"));
+
+            String balanceOfInitialTokenHolderCalldata = EvmService.selector("balanceOf(address)") + EvmService.encodeAddressArgument(config.getInitialTokenHolderAddress());
+            BigInteger initialTokenHolderBalance = EvmService.callUint(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), balanceOfInitialTokenHolderCalldata);
+
+            // 6. Print results
+            System.out.println("=== ERC-20 Read Calls ===");
+            System.out.println("name():        " + name);
+            System.out.println("symbol():      " + symbol);
+            System.out.println("decimals():    " + decimals);
+            System.out.println("totalSupply(): " + totalSupply);
+            System.out.println("balanceOf(initialTokenHolder): " + initialTokenHolderBalance);
+            System.out.println();
+
         } catch (Exception e) {
-            System.err.println("[SERVER_CONTEXT | WARN] Could not load genesis: " + e.getMessage()  + " - starting with empty state");
+            System.err.println("[SERVER_CONTEXT | WARN] Could not load genesis: "
+                    + e.getMessage() + " - starting with empty state");
         }
     }
 
@@ -96,7 +132,7 @@ public class ServerContext {
     }
 
     public Address getSelfAddress() {
-        return selfAddress;
+        return config.getSelfAddress();
     }
 
     /**
