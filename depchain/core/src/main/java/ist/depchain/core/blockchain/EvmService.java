@@ -22,75 +22,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-public class MainIST {
-
-    private static final String CREATION_BIN_PATH = "./src/main/resources/contracts/ist/ISTCoin.creation.bin";
-
-    private static final Address INITIAL_TOKEN_HOLDER = Address.fromHexString("0x1111111111111111111111111111111111111111");
-    private static final Address CONTRACT_ADDRESS = Address.fromHexString("0x9999999999999999999999999999999999999999");
-
-    public static void main(String[] args) throws Exception {
-        // 1. Create a fresh in-memory world
-        SimpleWorld world = new SimpleWorld();
-
-        // 2. Create the deployer/owner account with plenty of native balance
-        world.createAccount(INITIAL_TOKEN_HOLDER, 0, Wei.of(BigInteger.valueOf(1_000_000_000L)));
-
-        System.out.println("=== Initial World State ===");
-        printAccount(world, INITIAL_TOKEN_HOLDER, "InitialTokenHolder");
-        System.out.println();
-
-        // 3. Load creation bytecode and append ABI-encoded constructor arg
-        String creationBytecode = readHexFile(CREATION_BIN_PATH);
-        String constructorArg = encodeAddressArgument(INITIAL_TOKEN_HOLDER);
-        String deploymentDataHex = creationBytecode + constructorArg;
-        System.out.println("Deployment data (creation bytecode + constructor arg): " + deploymentDataHex);
-
-        // 4. Deploy contract
-        deployContract(world, INITIAL_TOKEN_HOLDER, CONTRACT_ADDRESS, deploymentDataHex);
-
-        System.out.println("=== After Deployment ===");
-        printAccount(world, INITIAL_TOKEN_HOLDER, "InitialTokenHolder");
-        printAccount(world, CONTRACT_ADDRESS, "Contract");
-        System.out.println();
-
-        MutableAccount contractAccount = (MutableAccount) world.get(CONTRACT_ADDRESS);
-        if (contractAccount == null) {
-            throw new IllegalStateException("Contract account was not created");
-        }
-        if (contractAccount.getCode() == null || contractAccount.getCode().isEmpty()) {
-            throw new IllegalStateException("Deployment failed: contract runtime code is empty");
-        }
-
-        // 5. Read-only calls
-        String name = callString(world, INITIAL_TOKEN_HOLDER, CONTRACT_ADDRESS, contractAccount.getCode(), selector("name()"));
-        String symbol = callString(world, INITIAL_TOKEN_HOLDER, CONTRACT_ADDRESS, contractAccount.getCode(), selector("symbol()"));
-        BigInteger decimals = callUint(world, INITIAL_TOKEN_HOLDER, CONTRACT_ADDRESS, contractAccount.getCode(), selector("decimals()"));
-        BigInteger totalSupply = callUint(world, INITIAL_TOKEN_HOLDER, CONTRACT_ADDRESS, contractAccount.getCode(), selector("totalSupply()"));
-
-        String balanceOfInitialTokenHolderCalldata = selector("balanceOf(address)") + encodeAddressArgument(INITIAL_TOKEN_HOLDER);
-        BigInteger initialTokenHolderBalance = callUint(world, INITIAL_TOKEN_HOLDER, CONTRACT_ADDRESS, contractAccount.getCode(), balanceOfInitialTokenHolderCalldata);
-
-        // 6. Print results
-        System.out.println("=== ERC-20 Read Calls ===");
-        System.out.println("name():        " + name);
-        System.out.println("symbol():      " + symbol);
-        System.out.println("decimals():    " + decimals);
-        System.out.println("totalSupply(): " + totalSupply);
-        System.out.println("balanceOf(initialTokenHolder): " + initialTokenHolderBalance);
-        System.out.println();
-
-        // 7. Expected values for the contract we designed
-        BigInteger expectedSupply = new BigInteger("10000000000"); // 100,000,000 * 10^2
-        assertEquals("IST Coin", name, "name()");
-        assertEquals("IST", symbol, "symbol()");
-        assertEquals(BigInteger.valueOf(2), decimals, "decimals()");
-        assertEquals(expectedSupply, totalSupply, "totalSupply()");
-        assertEquals(expectedSupply, initialTokenHolderBalance, "balanceOf(initialTokenHolder)");
-
-        System.out.println("All checks passed.");
-    }
-
+public class EvmService {
     private static void deployContract(SimpleWorld world, Address sender, Address contractAddress, String deploymentDataHex) {
 
         ByteArrayOutputStream traceOutput = new ByteArrayOutputStream();
@@ -322,7 +254,6 @@ public class MainIST {
             }
         }
     }
-
     private static void assertEquals(Object expected, Object actual, String label) {
         if (!expected.equals(actual)) {
             throw new IllegalStateException("Assertion failed for " + label + ": expected=" + expected + ", actual=" + actual);

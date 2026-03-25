@@ -8,7 +8,7 @@ public class ClientApp {
     public static void main(String[] args) {
         if (args.length < 2) {
             System.out.println("Usage: mvn exec:java -Dexec.args=\"<configFile> <clientId>\"");
-            System.out.println("Example: mvn exec:java -Dexec.args=\"config-dev.json client1\"");
+            System.out.println("Example: mvn exec:java -Dexec.args=\"../config/config-dev.json client1\"");
             return;
         }
 
@@ -22,7 +22,9 @@ public class ClientApp {
             ClientLibrary clientLib = new ClientLibrary(client, messageHandler);
             client.start();
 
-            System.out.println("[INFO] Successfully started");
+            System.out.println("[INFO] Successfully started:");
+            System.out.println("    - Client ID: " + clientId);
+            System.out.println("    - Blockchain address: " + config.getProcessInfo(clientId).getAddress());
 
             Scanner in = new Scanner(System.in);
             while (true) {

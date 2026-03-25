@@ -82,7 +82,8 @@ public class Config {
                     processId,
                     processJson.get("host").getAsString(),
                     processJson.get("port").getAsInt(),
-                    processJson.get("role").getAsString()
+                    processJson.get("role").getAsString(),
+                    processJson.get("address").getAsString()
             );
             processes.put(processId, info);
         }

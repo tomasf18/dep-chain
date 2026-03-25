@@ -18,7 +18,7 @@ public class ServerApp {
     public static void main(String[] args) {
         if (args.length < 2) {
             System.out.println("Usage: mvn exec:java -Dexec.args='<configFile> <serverId> <byzantine_flag> <attack_type>'");
-            System.out.println("Example: mvn exec:java -Dexec.args='../config-dev.json s1 true EQUIVOCATE'");
+            System.out.println("Example: mvn exec:java -Dexec.args='../config/config-dev.json s1 true EQUIVOCATE'");
             return;
         }
 
@@ -57,6 +57,8 @@ public class ServerApp {
         }
         hotStuffCoordinator.start();
         
-        System.out.println("[SERVER_APP | INFO] Successfully started");
+        System.out.println("[SERVER_APP | INFO] Successfully started:");
+        System.out.println("    - Server ID: " + selfId);
+        System.out.println("    - Blockchain address: " + config.getProcessInfo(selfId).getAddress());
     }
 }

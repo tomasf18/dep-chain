@@ -1,23 +1,31 @@
 {
   "block_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
   "previous_block_hash": null,
+  "block_number": 0,
+  "proposer": null,
   "transactions": [
     {
-      "from": "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+      "from": "0x1000000000000000000000000000000000000001",
       "to": null,
-      "input": "0x",
+      "value": "0",
+      "input": "0x<creation_bytecode_plus_constructor_args>",
       "gas_price": "1",
       "gas_limit": "10000000",
       "nonce": 0
     }
   ],
+  "receipts": [],
   "state": {
-    "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9": {
+    "0x1000000000000000000000000000000000000001": {
       "balance": "1000000000000000000000",
       "nonce": 0
     },
+    "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9": {
+      "balance": "1000000000",
+      "nonce": 0
+    },
     "0x172bf398d2a931323199521625f471fb1c28879a": {
-      "balance": "500000000000000000000",
+      "balance": "500000000",
       "nonce": 0
     }
   }

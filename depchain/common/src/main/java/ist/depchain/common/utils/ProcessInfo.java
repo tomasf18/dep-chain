@@ -5,12 +5,14 @@ public class ProcessInfo {
     private String host;
     private int port;
     private String role; // "client" or "server"
+    private String address; // blockchain address for clients and servers
 
-    public ProcessInfo(String id, String host, int port, String role) {
+    public ProcessInfo(String id, String host, int port, String role, String address) {
         this.id = id;
         this.host = host;
         this.port = port;
         this.role = role;
+        this.address = address;
     }
 
     public String getId() {
@@ -29,6 +31,10 @@ public class ProcessInfo {
         return role;
     }
 
+    public String getAddress() {
+        return address;
+    }
+
     public boolean isClient() {
         return "client".equals(role);
     }
@@ -39,6 +45,6 @@ public class ProcessInfo {
 
     @Override
     public String toString() {
-        return "ProcessInfo{id='" + id + "', host='" + host + "', port=" + port + ", role='" + role + "'}";
+        return "ProcessInfo{id='" + id + "', host='" + host + "', port=" + port + ", role='" + role + "', address='" + address + "'}";
     }
 }

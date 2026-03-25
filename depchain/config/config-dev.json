@@ -7,39 +7,45 @@
       "client1": {
         "host": "localhost",
         "port": 4001,
-        "role": "client"
+        "role": "client",
+        "address": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9"
       },
       "client2": {
         "host": "localhost",
         "port": 4002,
-        "role": "client"
+        "role": "client",
+        "address": "0x172bf398d2a931323199521625f471fb1c28879a"
       },
       "s0": {
         "host": "localhost",
         "port": 5000,
-        "role": "server"
+        "role": "server",
+        "address": "0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd"
       },
       "s1": {
         "host": "localhost",
         "port": 5001,
-        "role": "server"
+        "role": "server",
+        "address": "0x163b745a57f26b27f3876c82b21a6d90bbe54bc9"
       },
       "s2": {
         "host": "localhost",
         "port": 5002,
-        "role": "server"
+        "role": "server",
+        "address": "0xdb710290c98c770c5ee6b312ea42b89cdbd23cc2"
       },
       "s3": {
         "host": "localhost",
         "port": 5003,
-        "role": "server"
+        "role": "server",
+        "address": "0x76c6c1931f73ef9d9e9499c79d6bc34fd201ab15"
       }
     }
   },
   "faultConfig": {
     "dropProbability": 0.0,
     "duplicateProbability": 0.0,
-    "tamperProbability": 0.5,
+    "tamperProbability": 0.0,
     "maxDelayMs": 0
   },
   "cryptoConfig": {
