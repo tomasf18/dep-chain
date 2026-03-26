@@ -37,9 +37,7 @@ public class MessageHandler {
 
                 Set<String> rejectors = rejectionSenders.computeIfAbsent(reqId, k -> ConcurrentHashMap.newKeySet());
                 rejectors.add(sourceId);
-                System.out.println("[-] (" + reqId + ", " + sourceId + "): REJECTED ("
-                        + rejectors.size() + "/" + responsesThreshold + ") error="
-                        + clientResponse.getError());
+                System.out.println("[-] (" + reqId + ", " + sourceId + "): REJECTED (" + rejectors.size() + "/" + responsesThreshold + ") error=" + clientResponse.getError());
 
                 if (rejectors.size() >= responsesThreshold) {
                     rejectionSenders.remove(reqId);
@@ -47,9 +45,7 @@ public class MessageHandler {
                     clientContext.getRequestDataMap().remove(reqId);
                     CompletableFuture<Void> future = pendingFutures.remove(reqId);
                     if (future != null) {
-                        String reason = clientResponse.getError().isBlank()
-                                ? "Transaction rejected by replicas (reqId=" + reqId + ")"
-                                : clientResponse.getError();
+                        String reason = clientResponse.getError().isBlank() ? "Transaction rejected by replicas (reqId=" + reqId + ")" : clientResponse.getError();
                         future.completeExceptionally(new RuntimeException(reason));
                     }
                 }
@@ -68,14 +64,12 @@ public class MessageHandler {
             int count = senders.size();
 
             if (!isNewSender) {
-                System.out.println("[ ] (" + reqId + ", " + sourceId + "): duplicate sender ignored for ["
-                        + responseId + "] (" + count + "/" + responsesThreshold + ")");
+                System.out.println("[ ] (" + reqId + ", " + sourceId + "): duplicate sender ignored for [" + responseId + "] (" + count + "/" + responsesThreshold + ")");
                 return;
             }
 
             if (count >= responsesThreshold) {
-                System.out.println("[*] (" + reqId + ", " + sourceId + "): [" + responseId + "] ("
-                        + count + "/" + responsesThreshold + ") COMMITTED");
+                System.out.println("[*] (" + reqId + ", " + sourceId + "): [" + responseId + "] (" + count + "/" + responsesThreshold + ") COMMITTED");
 
                 printReceiptInfo(clientResponse);
 
@@ -93,8 +87,7 @@ public class MessageHandler {
                     future.complete(null);
                 }
             } else {
-                System.out.println("[+] (" + reqId + ", " + sourceId + "): [" + responseId + "] ("
-                        + count + "/" + responsesThreshold + ")");
+                System.out.println("[+] (" + reqId + ", " + sourceId + "): [" + responseId + "] (" + count + "/" + responsesThreshold + ")");
             }
         } catch (Exception e) {
             System.out.println("[ERROR] Error while processing response: " + e.getMessage());
@@ -108,14 +101,11 @@ public class MessageHandler {
         String txHashStr = Numeric.toHexStringNoPrefix(response.getTxHash().toByteArray());
         String status = response.getStatus();
         String error = response.getError();
-        return response.getRequestId() + ":" + blockIdStr + ":" + response.getCommitted()
-                + ":" + txHashStr + ":" + status + ":" + error;
+        return response.getRequestId() + ":" + blockIdStr + ":" + response.getCommitted() + ":" + txHashStr + ":" + status + ":" + error;
     }
 
     private void printReceiptInfo(ClientResponse response) {
-        String txHash = response.getTxHash().isEmpty()
-                ? "<empty>"
-                : "0x" + Numeric.toHexStringNoPrefix(response.getTxHash().toByteArray());
+        String txHash = response.getTxHash().isEmpty() ? "<empty>" : "0x" + Numeric.toHexStringNoPrefix(response.getTxHash().toByteArray());
 
         System.out.println("    txHash      = " + txHash);
         System.out.println("    status      = " + response.getStatus());
@@ -133,13 +123,11 @@ public class MessageHandler {
         }
 
         if (!response.getContractAddress().isEmpty()) {
-            System.out.println("    contractAdr = 0x"
-                    + Numeric.toHexStringNoPrefix(response.getContractAddress().toByteArray()));
+            System.out.println("    contractAdr = 0x" + Numeric.toHexStringNoPrefix(response.getContractAddress().toByteArray()));
         }
 
         if (!response.getReturnData().isEmpty()) {
-            System.out.println("    returnData  = 0x"
-                    + Numeric.toHexStringNoPrefix(response.getReturnData().toByteArray()));
+            System.out.println("    returnData  = 0x" + Numeric.toHexStringNoPrefix(response.getReturnData().toByteArray()));
         }
     }
 

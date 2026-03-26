@@ -58,5 +58,4 @@
     "istCreationBinPath": "core/src/main/resources/contracts/ist/ISTCoin.creation.bin",
     "istAbiPath": "core/src/main/resources/contracts/ist/ISTCoin.abi"
   }
-      
 }

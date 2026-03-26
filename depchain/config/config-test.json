@@ -50,5 +50,12 @@
   },
   "cryptoConfig": {
     "signatureAlgorithm": "SHA256withECDSA"
+  },
+  "blockchainConfig": {
+    "genesisPath": "core/src/main/resources/genesis.json",
+    "initialTokenHolderAddress": "0x1000000000000000000000000000000000000001",
+    "istContractAddress": "0x9999999999999999999999999999999999999999",
+    "istCreationBinPath": "core/src/main/resources/contracts/ist/ISTCoin.creation.bin",
+    "istAbiPath": "core/src/main/resources/contracts/ist/ISTCoin.abi"
   }
 }

@@ -33,7 +33,7 @@ public class ClientContext {
 
     private final AtomicInteger requestId = new AtomicInteger(0);
 
-    // requestId -> original request data (for logging committed transactions)
+    // requestId -> original request data (for logging committed transactions -> debugging)
     private final Map<Integer, String> requestDataMap = new ConcurrentHashMap<>();
     private final List<String> commitedLog = Collections.synchronizedList(new ArrayList<>());
 

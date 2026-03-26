@@ -39,27 +39,14 @@ public class ClientLibrary {
         Address to = Address.fromHexString(toHex);
         long nonce = clientContext.getNonce();
 
-        Transaction unsignedTx = new Transaction(
-                clientContext.getSelfAddress(),
-                to,
-                value,
-                new byte[0],
-                gasPrice,
-                gasLimit,
-                nonce,
-                null
-        );
+        Transaction unsignedTx = new Transaction(clientContext.getSelfAddress(), to, value, new byte[0], gasPrice, gasLimit, nonce, null);
 
-        Transaction signedTx = TransactionSigner.sign(
-                unsignedTx,
-                clientContext.getPrivateKey(),
-                clientContext.getConfig().getSignatureAlgorithm()
-        );
+        Transaction signedTx = TransactionSigner.sign(unsignedTx, clientContext.getPrivateKey(), clientContext.getConfig().getSignatureAlgorithm());
 
         int reqId = clientContext.getRequestId().incrementAndGet();
-        String desc = "native:" + signedTx.getFrom() + ":" + toHex + ":" + value + ":" + nonce;
+        String requestDescription = "native:" + signedTx.getFrom() + ":" + toHex + ":" + value + ":" + nonce;
 
-        submitSignedTransaction(reqId, signedTx, desc, true);
+        submitSignedTransaction(reqId, signedTx, requestDescription);
 
         System.out.println("[COMMITTED] native tx reqId=" + reqId + " nonce=" + nonce);
     }
@@ -97,9 +84,7 @@ public class ClientLibrary {
                 "erc20.transferFrom(" + fromHex + "," + toHex + "," + amount + ")");
     }
 
-    private void submitContractCall(String contractHex, byte[] calldata,
-                                    BigInteger gasPrice, BigInteger gasLimit,
-                                    String description) {
+    private void submitContractCall(String contractHex, byte[] calldata, BigInteger gasPrice, BigInteger gasLimit, String description) {
         Address contractAddress = Address.fromHexString(contractHex);
         long nonce = clientContext.getNonce();
 
@@ -123,15 +108,14 @@ public class ClientLibrary {
         int reqId = clientContext.getRequestId().incrementAndGet();
         String desc = description + " nonce=" + nonce;
 
-        submitSignedTransaction(reqId, signedTx, desc, true);
+        submitSignedTransaction(reqId, signedTx, desc);
 
         System.out.println("[COMMITTED] contract tx reqId=" + reqId + " nonce=" + nonce
                 + " to=" + contractHex
                 + " data=0x" + Numeric.toHexStringNoPrefix(calldata));
     }
 
-    private void submitSignedTransaction(int reqId, Transaction signedTx, String requestDescription,
-                                         boolean incrementNonceOnCommit) {
+    private void submitSignedTransaction(int reqId, Transaction signedTx, String requestDescription) {
         ClientRequest unsignedReq = ClientRequest.newBuilder()
                 .setClientId(clientContext.getConfig().getSelfId())
                 .setRequestId(reqId)
@@ -160,9 +144,7 @@ public class ClientLibrary {
 
         try {
             committed.get(SUBMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            if (incrementNonceOnCommit) {
-                clientContext.incrementNonce();
-            }
+        clientContext.incrementNonce();
         } catch (TimeoutException e) {
             throw new RuntimeException(
                     "Transaction timed out waiting for commit (reqId=" + reqId + ", nonce=" + signedTx.getNonce() + ")", e);
