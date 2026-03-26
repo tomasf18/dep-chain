@@ -118,8 +118,6 @@ public class GenesisLoader {
             throw new IllegalStateException("IST contract runtime code is empty after genesis deployment");
         }
 
-        worldState.registerExistingContractAccount(expectedContractAddress);
-
         // 5. Build genesis block
         String blockHash = root.has("block_hash") && !root.get("block_hash").isJsonNull()
                 ? root.get("block_hash").getAsString()

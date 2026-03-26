@@ -1,5 +1,6 @@
 - ordem das transacoes por fee, mas para o mesmo client ordenar por nonce 
 - para liveness do sistema basta haverem sempre newViews apos timeout ou é necessario estarem sempre a ser propostos novos blocos mesmo que sem transacoes?
+- nao tem mal se uma replica receber num bloco do lider uma tx que ainda nao tenha recebido do cliente
 
 
 

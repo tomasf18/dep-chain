@@ -38,6 +38,18 @@ message ApplicationMessage { // serves to simplify the message handling logic by
   }
 }
 
+message ClientRequest {
+  string client_id  = 1;
+  uint32 request_id = 2;
+
+  oneof payload {
+    Command            command     = 3;                 // legacy Stage 1
+    TransactionPayload transaction = 4;  // Stage 2
+  }
+
+  bytes signature = 10; // signature over request envelope (without this field)
+}
+
 message Command {
   string type       = 1;
   string data       = 2;
@@ -54,18 +66,6 @@ message TransactionPayload {
   bytes  gas_limit = 6;   // big-endian BigInteger
   uint64 nonce     = 7;
   bytes  signature = 8;   // ECDSA signature over unsigned tx bytes
-}
-
-message ClientRequest {
-  string client_id  = 1;
-  uint32 request_id = 2;
-
-  oneof payload {
-    Command            command     = 3;                 // legacy Stage 1
-    TransactionPayload transaction = 4;  // Stage 2
-  }
-
-  bytes signature = 10; // signature over request envelope (without this field)
 }
 
 message ClientResponse {

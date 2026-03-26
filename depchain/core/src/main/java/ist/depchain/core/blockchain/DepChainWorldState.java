@@ -34,9 +34,11 @@ public class DepChainWorldState {
 
     /** Track all created accounts so we can copy/hash deterministically. */
     private final Set<Address> trackedAccounts = ConcurrentHashMap.newKeySet();
+    // address ->  (slot -> value)
     private final Map<Address, Map<UInt256, UInt256>> trackedStorageValues = new ConcurrentHashMap<>();
 
     /** Track storage slots touched for each contract account. */
+    // address -> set of slots 
     private final Map<Address, Set<UInt256>> trackedStorageSlots = new ConcurrentHashMap<>();
 
     public DepChainWorldState() {
@@ -132,7 +134,10 @@ public class DepChainWorldState {
         account.setCode(code);
     }
 
-    public UInt256 getStorageValue(Address address, UInt256 slot) {
+    public UInt256 getStorageValue(Address address, UInt256 slot) { 
+        // a storage value is a value at a specific slot of a specific contract account and is used to determine the state of a contract account; for example, 
+        // for the IST contract, the balance of an address is stored at a specific slot of that address's contract account, and thus to determine the balance 
+        // of an address we need to get the storage value at that slot of that address's contract account
         AccountState account = world.get(address);
         if (account == null) return UInt256.ZERO;
         return account.getStorageValue(slot);
@@ -244,31 +249,5 @@ public class DepChainWorldState {
         }
 
         return Numeric.toHexStringNoPrefix(Hash.sha3(buf.array()));
-    }
-
-    public void registerExistingContractAccount(Address address) {
-        if (world.get(address) == null) {
-            throw new IllegalStateException("Cannot register missing contract account: " + address);
-        }
-        trackedAccounts.add(address);
-        trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet());
-        trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>());
-    }
-
-    public void registerStorageSlot(Address address, UInt256 slot) {
-        trackedAccounts.add(address);
-        trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet()).add(slot);
-        trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>())
-                .put(slot, getStorageValue(address, slot));
-    }
-
-    public void registerStorageValue(Address address, UInt256 slot, UInt256 value) {
-        trackedAccounts.add(address);
-        trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet()).add(slot);
-        trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>()).put(slot, value);
-    }
-
-    public void refreshTrackedStorageValue(Address address, UInt256 slot) {
-        registerStorageValue(address, slot, getStorageValue(address, slot));
     }
 }

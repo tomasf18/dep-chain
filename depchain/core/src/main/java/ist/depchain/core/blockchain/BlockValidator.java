@@ -27,12 +27,7 @@ public final class BlockValidator {
 
     private BlockValidator() {}
 
-    public static ValidationResult validateProposedBlock(
-            Block protoBlock,
-            DepChainWorldState committedState,
-            TransactionExecutor executor,
-            Config config,
-            Address proposerAddress) {
+    public static ValidationResult validateProposedBlock(Block protoBlock, DepChainWorldState committedState, TransactionExecutor executor, Config config, Address proposerAddress) {
 
         List<TransactionPayload> txPayloads = protoBlock.getTransactionsList();
         List<ClientRequestMeta> metaList = protoBlock.getRequestMetaList();
@@ -72,7 +67,7 @@ public final class BlockValidator {
         return ValidationResult.ok();
     }
 
-    public static List<Transaction> decodeTransactions(Block protoBlock) {
+    public static List<Transaction> decodeTransactionsFromProto(Block protoBlock) {
         List<Transaction> out = new ArrayList<>();
         for (TransactionPayload payload : protoBlock.getTransactionsList()) {
             out.add(Transaction.fromProto(payload));

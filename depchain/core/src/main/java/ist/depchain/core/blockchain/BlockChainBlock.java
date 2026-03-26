@@ -41,8 +41,7 @@ public class BlockChainBlock {
         this(blockHash, previousBlockHash, transactions, null, blockNumber, null, null);
     }
 
-    public static String computeBlockHash(String previousBlockHash, int blockNumber,
-                                          Address proposer, List<Transaction> transactions) {
+    public static String computeBlockHash(String previousBlockHash, int blockNumber, Address proposer, List<Transaction> transactions) {
         byte[] prevBytes = previousBlockHash != null ? previousBlockHash.getBytes() : new byte[0];
         byte[] blockNumBytes = ByteBuffer.allocate(Integer.BYTES).putInt(blockNumber).array();
         byte[] proposerBytes = proposer != null ? proposer.toArrayUnsafe() : new byte[0];

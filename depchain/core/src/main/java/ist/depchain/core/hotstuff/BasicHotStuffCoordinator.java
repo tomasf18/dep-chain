@@ -28,10 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import ist.depchain.core.blockchain.BlockValidator;
 import ist.depchain.core.blockchain.DepChainWorldState;
-import ist.depchain.core.blockchain.TransactionValidator;
 import ist.depchain.core.blockchain.ValidationResult;
-
-import org.web3j.utils.Numeric;
 
 public class BasicHotStuffCoordinator {
     public interface RequestCommitListener {
@@ -455,7 +452,7 @@ public class BasicHotStuffCoordinator {
      */
     private void executeStage2Block(Block protoBlock, ByteString blockId, String leaderId) {
         // 1. Decode txs
-        List<Transaction> txList = BlockValidator.decodeTransactions(protoBlock);
+        List<Transaction> txList = BlockValidator.decodeTransactionsFromProto(protoBlock);
 
         // 2. Determine proposer address
         Address proposerAddress = serverContext.deriveAddressForProcess(leaderId);

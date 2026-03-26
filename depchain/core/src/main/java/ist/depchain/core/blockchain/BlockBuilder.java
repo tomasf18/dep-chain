@@ -34,9 +34,7 @@ public class BlockBuilder {
         return new BlockChainBlock(blockHash, previousHash, ordered, null, blockNumber, proposer, null);
     }
 
-    public static BlockChainBlock finalize(BlockChainBlock executedBlock,
-                                           List<TransactionReceipt> receipts,
-                                           String stateHash) {
+    public static BlockChainBlock finalize(BlockChainBlock executedBlock, List<TransactionReceipt> receipts, String stateHash) {
         return new BlockChainBlock(
                 executedBlock.getBlockHash(),
                 executedBlock.getPreviousBlockHash(),

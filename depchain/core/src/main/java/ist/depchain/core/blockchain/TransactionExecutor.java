@@ -112,7 +112,6 @@ public class TransactionExecutor {
             return TransactionReceipt.failure(txHash, gasUsed, fee, result.getErrorMessage() == null ? "contract deployment failed" : result.getErrorMessage());
         }
 
-        state.registerExistingContractAccount(contractAddress);
         return TransactionReceipt.success(txHash, gasUsed, fee, result.getReturnData().toArrayUnsafe(), contractAddress);
     }
 
