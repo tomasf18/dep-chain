@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import ist.depchain.common.Transaction;
 import ist.depchain.common.utils.AddressUtils;
 import ist.depchain.common.utils.Crypto;
-
+import ist.depchain.common.utils.Erc20Abi;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
@@ -76,8 +76,9 @@ class TransactionExecutorErc20Test {
 
         // transfer(alice, 5000)
         byte[] calldata = Bytes.fromHexString(
-                "0x" + EvmService.selector("transfer(address,uint256)")
-                        + EvmService.encodeAddressAndUint256(alice, BigInteger.valueOf(5000))
+                "0x" + Erc20Abi.smartContractMethodIdentifier("transfer(address,uint256)")
+                        + Erc20Abi.encodeAddress(alice)
+						+ Erc20Abi.encodeUint256(BigInteger.valueOf(5000))
         ).toArrayUnsafe();
 
         Transaction tx = signTx(new Transaction(
@@ -118,8 +119,9 @@ class TransactionExecutorErc20Test {
     void increaseAllowanceThenTransferFromWorks() throws Exception {
         // 1. Treasury transfers some tokens to Alice first
         byte[] transferToAlice = Bytes.fromHexString(
-                "0x" + EvmService.selector("transfer(address,uint256)")
-                        + EvmService.encodeAddressAndUint256(alice, BigInteger.valueOf(1000))
+                "0x" + Erc20Abi.smartContractMethodIdentifier("transfer(address,uint256)")
+                        + Erc20Abi.encodeAddress(alice)
+                        + Erc20Abi.encodeUint256(BigInteger.valueOf(1000))
         ).toArrayUnsafe();
 
         Transaction t1 = signTx(new Transaction(
@@ -140,8 +142,9 @@ class TransactionExecutorErc20Test {
 
         // 2. Alice increaseAllowance(bob, 400)
         byte[] incAllowance = Bytes.fromHexString(
-                "0x" + EvmService.selector("increaseAllowance(address,uint256)")
-                        + EvmService.encodeAddressAndUint256(bob, BigInteger.valueOf(400))
+                "0x" + Erc20Abi.smartContractMethodIdentifier("increaseAllowance(address,uint256)")
+                        + Erc20Abi.encodeAddress(bob)
+                        + Erc20Abi.encodeUint256(BigInteger.valueOf(400))
         ).toArrayUnsafe();
 
         Transaction t2 = signTx(new Transaction(
@@ -162,9 +165,10 @@ class TransactionExecutorErc20Test {
 
         // 3. Bob transferFrom(alice, bob, 250)
         byte[] transferFrom = Bytes.fromHexString(
-                "0x" + EvmService.selector("transferFrom(address,address,uint256)")
-                        + EvmService.encodeTwoAddresses(alice, bob)
-                        + EvmService.encodeUint256Argument(BigInteger.valueOf(250))
+                "0x" + Erc20Abi.smartContractMethodIdentifier("transferFrom(address,address,uint256)")
+                        + Erc20Abi.encodeAddress(alice)
+                        + Erc20Abi.encodeAddress(bob)
+                        + Erc20Abi.encodeUint256(BigInteger.valueOf(250))
         ).toArrayUnsafe();
 
         Transaction t3 = signTx(new Transaction(
@@ -190,8 +194,9 @@ class TransactionExecutorErc20Test {
     void contractCallRevertProducesFailedReceipt() throws Exception {
         // Alice has zero tokens initially, so transfer(bob,1) should revert/fail
         byte[] transfer = Bytes.fromHexString(
-                "0x" + EvmService.selector("transfer(address,uint256)")
-                        + EvmService.encodeAddressAndUint256(bob, BigInteger.ONE)
+                "0x" + Erc20Abi.smartContractMethodIdentifier("transfer(address,uint256)")
+                        + Erc20Abi.encodeAddress(bob)
+                        + Erc20Abi.encodeUint256(BigInteger.ONE)
         ).toArrayUnsafe();
 
         Transaction tx = signTx(new Transaction(
@@ -232,7 +237,7 @@ class TransactionExecutorErc20Test {
             creationBin = creationBin.substring(2);
         }
 
-        String deploymentHex = creationBin + EvmService.encodeAddressArgument(treasury);
+        String deploymentHex = creationBin + Erc20Abi.encodeAddress(treasury);
 
         EvmService.EvmResult deployment = EvmService.deployContract(
                 worldState,
@@ -260,14 +265,15 @@ class TransactionExecutorErc20Test {
 
     private BigInteger tokenBalanceOf(Address owner) {
         Bytes runtimeCode = worldState.getCode(CONTRACT_ADDRESS);
-        String calldata = "0x" + EvmService.selector("balanceOf(address)") + EvmService.encodeAddressArgument(owner);
+        String calldata = "0x" + Erc20Abi.smartContractMethodIdentifier("balanceOf(address)") + Erc20Abi.encodeAddress(owner);
         return EvmService.callUint(worldState, owner, CONTRACT_ADDRESS, runtimeCode, calldata);
     }
 
     private BigInteger tokenAllowanceOf(Address owner, Address spender) {
         Bytes runtimeCode = worldState.getCode(CONTRACT_ADDRESS);
-        String calldata = "0x" + EvmService.selector("allowance(address,address)")
-                + EvmService.encodeTwoAddresses(owner, spender);
+        String calldata = "0x" + Erc20Abi.smartContractMethodIdentifier("allowance(address,address)")
+                + Erc20Abi.encodeAddress(owner) 
+                + Erc20Abi.encodeAddress(spender);
         return EvmService.callUint(worldState, owner, CONTRACT_ADDRESS, runtimeCode, calldata);
     }
 
@@ -278,7 +284,7 @@ class TransactionExecutorErc20Test {
                 treasury,
                 CONTRACT_ADDRESS,
                 runtimeCode,
-                "0x" + EvmService.selector("name()")
+                "0x" + Erc20Abi.smartContractMethodIdentifier("name()")
         );
     }
 
@@ -289,7 +295,7 @@ class TransactionExecutorErc20Test {
                 treasury,
                 CONTRACT_ADDRESS,
                 runtimeCode,
-                "0x" + EvmService.selector("symbol()")
+                "0x" + Erc20Abi.smartContractMethodIdentifier("symbol()")
         );
     }
 
@@ -300,7 +306,7 @@ class TransactionExecutorErc20Test {
                 treasury,
                 CONTRACT_ADDRESS,
                 runtimeCode,
-                "0x" + EvmService.selector("decimals()")
+                "0x" + Erc20Abi.smartContractMethodIdentifier("decimals()")
         );
     }
 
@@ -311,7 +317,7 @@ class TransactionExecutorErc20Test {
                 treasury,
                 CONTRACT_ADDRESS,
                 runtimeCode,
-                "0x" + EvmService.selector("totalSupply()")
+                "0x" + Erc20Abi.smartContractMethodIdentifier("totalSupply()")
         );
     }
 

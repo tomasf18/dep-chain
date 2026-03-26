@@ -17,10 +17,10 @@ public class Erc20AbiTest {
             Address.fromHexString("0x2222222222222222222222222222222222222222");
 
     @Test
-    void selectorProducesExpectedLength() {
-        assertEquals(8, Erc20Abi.selector("transfer(address,uint256)").length());
-        assertEquals(8, Erc20Abi.selector("balanceOf(address)").length());
-        assertEquals(8, Erc20Abi.selector("allowance(address,address)").length());
+    void smartContractMethodIdentifierProducesExpectedLength() {
+        assertEquals(8, Erc20Abi.smartContractMethodIdentifier("transfer(address,uint256)").length());
+        assertEquals(8, Erc20Abi.smartContractMethodIdentifier("balanceOf(address)").length());
+        assertEquals(8, Erc20Abi.smartContractMethodIdentifier("allowance(address,address)").length());
     }
 
     @Test
@@ -51,13 +51,13 @@ public class Erc20AbiTest {
 
         assertEquals(8 + 64 + 64, hex.length());
 
-        String expectedSelector = Erc20Abi.selector("transfer(address,uint256)");
-        assertTrue(hex.startsWith(expectedSelector));
+        String expectedsmartContractMethodIdentifier = Erc20Abi.smartContractMethodIdentifier("transfer(address,uint256)");
+        assertTrue(hex.startsWith(expectedsmartContractMethodIdentifier));
 
         String encodedAddress = Erc20Abi.encodeAddress(B);
         String encodedAmount = Erc20Abi.encodeUint256(BigInteger.valueOf(5000));
 
-        assertEquals(expectedSelector + encodedAddress + encodedAmount, hex);
+        assertEquals(expectedsmartContractMethodIdentifier + encodedAddress + encodedAmount, hex);
     }
 
     @Test
@@ -68,7 +68,7 @@ public class Erc20AbiTest {
         assertEquals(8 + 64 + 64, hex.length());
 
         String expected =
-                Erc20Abi.selector("increaseAllowance(address,uint256)")
+                Erc20Abi.smartContractMethodIdentifier("increaseAllowance(address,uint256)")
                         + Erc20Abi.encodeAddress(B)
                         + Erc20Abi.encodeUint256(BigInteger.valueOf(123));
 
@@ -81,7 +81,7 @@ public class Erc20AbiTest {
         String hex = bytesToHex(calldata);
 
         String expected =
-                Erc20Abi.selector("decreaseAllowance(address,uint256)")
+                Erc20Abi.smartContractMethodIdentifier("decreaseAllowance(address,uint256)")
                         + Erc20Abi.encodeAddress(B)
                         + Erc20Abi.encodeUint256(BigInteger.valueOf(77));
 
@@ -96,7 +96,7 @@ public class Erc20AbiTest {
         assertEquals(8 + 64 + 64, hex.length());
 
         String expected =
-                Erc20Abi.selector("allowance(address,address)")
+                Erc20Abi.smartContractMethodIdentifier("allowance(address,address)")
                         + Erc20Abi.encodeAddress(A)
                         + Erc20Abi.encodeAddress(B);
 
@@ -111,7 +111,7 @@ public class Erc20AbiTest {
         assertEquals(8 + 64 + 64 + 64, hex.length());
 
         String expected =
-                Erc20Abi.selector("transferFrom(address,address,uint256)")
+                Erc20Abi.smartContractMethodIdentifier("transferFrom(address,address,uint256)")
                         + Erc20Abi.encodeAddress(A)
                         + Erc20Abi.encodeAddress(B)
                         + Erc20Abi.encodeUint256(BigInteger.valueOf(250));
@@ -127,7 +127,7 @@ public class Erc20AbiTest {
         assertEquals(8 + 64, hex.length());
 
         String expected =
-                Erc20Abi.selector("balanceOf(address)")
+                Erc20Abi.smartContractMethodIdentifier("balanceOf(address)")
                         + Erc20Abi.encodeAddress(A);
 
         assertEquals(expected, hex);

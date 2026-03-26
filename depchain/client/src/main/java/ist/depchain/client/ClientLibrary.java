@@ -35,6 +35,13 @@ public class ClientLibrary {
     public void append(String data) {}
     public void showLog() {}
 
+    public void submitBalanceCheck() {
+        Address selfAddress = clientContext.getSelfAddress();
+        byte[] calldata = Erc20Abi.balanceOf(selfAddress);
+        submitContractCall(calldata, BigInteger.ZERO, BigInteger.ZERO, "balanceOf(" + selfAddress.toHexString() + ")");
+    }
+        
+
     public void submitNativeTransfer(String toHex, BigInteger value, BigInteger gasPrice, BigInteger gasLimit) {
         Address to = Address.fromHexString(toHex);
         long nonce = clientContext.getNonce();
@@ -51,59 +58,39 @@ public class ClientLibrary {
         System.out.println("[COMMITTED] native tx reqId=" + reqId + " nonce=" + nonce);
     }
 
-    public void submitTokenTransfer(String contractHex, String toHex, BigInteger amount,
-                                    BigInteger gasPrice, BigInteger gasLimit) {
+    public void submitTokenTransfer(String toHex, BigInteger amount, BigInteger gasPrice, BigInteger gasLimit) {
         Address to = Address.fromHexString(toHex);
         byte[] calldata = Erc20Abi.transfer(to, amount);
-        submitContractCall(contractHex, calldata, gasPrice, gasLimit,
+        submitContractCall(calldata, gasPrice, gasLimit,
                 "erc20.transfer(" + toHex + "," + amount + ")");
     }
 
-    public void submitIncreaseAllowance(String contractHex, String spenderHex, BigInteger amount,
-                                        BigInteger gasPrice, BigInteger gasLimit) {
+    public void submitIncreaseAllowance(String spenderHex, BigInteger amount, BigInteger gasPrice, BigInteger gasLimit) {
         Address spender = Address.fromHexString(spenderHex);
         byte[] calldata = Erc20Abi.increaseAllowance(spender, amount);
-        submitContractCall(contractHex, calldata, gasPrice, gasLimit,
-                "erc20.increaseAllowance(" + spenderHex + "," + amount + ")");
+        submitContractCall(calldata, gasPrice, gasLimit, "erc20.increaseAllowance(" + spenderHex + "," + amount + ")");
     }
 
-    public void submitDecreaseAllowance(String contractHex, String spenderHex, BigInteger amount,
-                                        BigInteger gasPrice, BigInteger gasLimit) {
+    public void submitDecreaseAllowance(String spenderHex, BigInteger amount, BigInteger gasPrice, BigInteger gasLimit) {
         Address spender = Address.fromHexString(spenderHex);
         byte[] calldata = Erc20Abi.decreaseAllowance(spender, amount);
-        submitContractCall(contractHex, calldata, gasPrice, gasLimit,
-                "erc20.decreaseAllowance(" + spenderHex + "," + amount + ")");
+        submitContractCall(calldata, gasPrice, gasLimit, "erc20.decreaseAllowance(" + spenderHex + "," + amount + ")");
     }
 
-    public void submitTransferFrom(String contractHex, String fromHex, String toHex, BigInteger amount,
-                                   BigInteger gasPrice, BigInteger gasLimit) {
+    public void submitTransferFrom(String fromHex, String toHex, BigInteger amount, BigInteger gasPrice, BigInteger gasLimit) {
         Address from = Address.fromHexString(fromHex);
         Address to = Address.fromHexString(toHex);
         byte[] calldata = Erc20Abi.transferFrom(from, to, amount);
-        submitContractCall(contractHex, calldata, gasPrice, gasLimit,
-                "erc20.transferFrom(" + fromHex + "," + toHex + "," + amount + ")");
+        submitContractCall(calldata, gasPrice, gasLimit, "erc20.transferFrom(" + fromHex + "," + toHex + "," + amount + ")");
     }
 
-    private void submitContractCall(String contractHex, byte[] calldata, BigInteger gasPrice, BigInteger gasLimit, String description) {
-        Address contractAddress = Address.fromHexString(contractHex);
+    private void submitContractCall(byte[] calldata, BigInteger gasPrice, BigInteger gasLimit, String description) {
+        Address contractAddress = clientContext.getConfig().getIstContractAddress();
         long nonce = clientContext.getNonce();
 
-        Transaction unsignedTx = new Transaction(
-                clientContext.getSelfAddress(),
-                contractAddress,
-                BigInteger.ZERO,
-                calldata,
-                gasPrice,
-                gasLimit,
-                nonce,
-                null
-        );
+        Transaction unsignedTx = new Transaction(clientContext.getSelfAddress(), contractAddress, BigInteger.ZERO, calldata, gasPrice, gasLimit, nonce, null);
 
-        Transaction signedTx = TransactionSigner.sign(
-                unsignedTx,
-                clientContext.getPrivateKey(),
-                clientContext.getConfig().getSignatureAlgorithm()
-        );
+        Transaction signedTx = TransactionSigner.sign(unsignedTx, clientContext.getPrivateKey(), clientContext.getConfig().getSignatureAlgorithm());
 
         int reqId = clientContext.getRequestId().incrementAndGet();
         String desc = description + " nonce=" + nonce;
@@ -111,7 +98,7 @@ public class ClientLibrary {
         submitSignedTransaction(reqId, signedTx, desc);
 
         System.out.println("[COMMITTED] contract tx reqId=" + reqId + " nonce=" + nonce
-                + " to=" + contractHex
+                + " to=" + contractAddress.toHexString()
                 + " data=0x" + Numeric.toHexStringNoPrefix(calldata));
     }
 

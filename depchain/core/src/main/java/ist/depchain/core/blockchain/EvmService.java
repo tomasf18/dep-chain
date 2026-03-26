@@ -24,9 +24,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import org.apache.tuweni.units.bigints.UInt256;
-import org.web3j.utils.Numeric;
-
 public final class EvmService {
 
     private EvmService() {}
@@ -203,7 +200,7 @@ public final class EvmService {
         return decodeAbiUint(result.getReturnData());
     }
 
-    // ---------- Artifact / ABI helpers ----------
+    // ---------- Convenience helpers ----------
 
     public static String readHexFile(String path) throws IOException {
         String raw = Files.readString(Path.of(path), StandardCharsets.UTF_8).trim();
@@ -211,32 +208,6 @@ public final class EvmService {
             raw = raw.substring(2);
         }
         return raw.replaceAll("\\s+", "");
-    }
-
-    public static String selector(String signature) {
-        String hashHex = Hash.sha3String(signature);
-        return hashHex.substring(2, 10);
-    }
-
-    public static String encodeAddressArgument(Address address) {
-        String hex = address.toHexString().substring(2);
-        return "000000000000000000000000" + hex;
-    }
-
-    public static String encodeUint256Argument(BigInteger value) {
-        String hex = value.toString(16);
-        if (hex.length() > 64) {
-            throw new IllegalArgumentException("uint256 value too large");
-        }
-        return "0".repeat(64 - hex.length()) + hex;
-    }
-
-    public static String encodeAddressAndUint256(Address address, BigInteger value) {
-        return encodeAddressArgument(address) + encodeUint256Argument(value);
-    }
-
-    public static String encodeTwoAddresses(Address a1, Address a2) {
-        return encodeAddressArgument(a1) + encodeAddressArgument(a2);
     }
 
     // ---------- Decoding ----------
@@ -302,13 +273,13 @@ public final class EvmService {
             return "EVM revert";
         }
 
-        // Error(string) selector = 0x08c379a0
+        // Error(string) smartContractMethodIdentifier = 0x08c379a0
         if (!hex.startsWith("08c379a0")) {
             return "EVM revert: " + returnData.toHexString();
         }
 
         try {
-            String payload = hex.substring(8); // strip selector
+            String payload = hex.substring(8); // strip smartContractMethodIdentifier
             int stringOffset = Integer.parseInt(payload.substring(0, 64), 16);
             int stringLength = Integer.parseInt(
                     payload.substring(stringOffset * 2, stringOffset * 2 + 64), 16);
@@ -375,41 +346,5 @@ public final class EvmService {
             throw new IllegalStateException(
                     "Assertion failed for " + label + ": expected=" + expected + ", actual=" + actual);
         }
-    }
-
-    public static UInt256 erc20BalanceSlot(Address owner) {
-        String paddedAddress = padTo32(owner.toHexString().substring(2));
-        String slotIndex = padTo32("0");
-        String hash = Numeric.toHexStringNoPrefix(
-                Hash.sha3(Numeric.hexStringToByteArray(paddedAddress + slotIndex))
-        );
-        return UInt256.fromHexString("0x" + hash);
-    }
-
-    public static UInt256 erc20AllowanceSlot(Address owner, Address spender) {
-        String paddedOwner = padTo32(owner.toHexString().substring(2));
-        String allowancesSlot = padTo32("1");
-
-        String inner = Numeric.toHexStringNoPrefix(
-                Hash.sha3(Numeric.hexStringToByteArray(paddedOwner + allowancesSlot))
-        );
-
-        String paddedSpender = padTo32(spender.toHexString().substring(2));
-        String outer = Numeric.toHexStringNoPrefix(
-                Hash.sha3(Numeric.hexStringToByteArray(paddedSpender + inner))
-        );
-
-        return UInt256.fromHexString("0x" + outer);
-    }
-
-    public static UInt256 erc20TotalSupplySlot() {
-        return UInt256.valueOf(2);
-    }
-
-    private static String padTo32(String hex) {
-        if (hex.startsWith("0x") || hex.startsWith("0X")) {
-            hex = hex.substring(2);
-        }
-        return "0".repeat(64 - hex.length()) + hex;
     }
 }

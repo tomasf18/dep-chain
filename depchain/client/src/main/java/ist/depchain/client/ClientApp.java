@@ -30,6 +30,7 @@ public class ClientApp {
             Scanner in = new Scanner(System.in);
             while (true) {
                 System.out.println("\n=== DepChain Client ===");
+                System.out.println("0 - Check balance");
                 System.out.println("1 - Submit native transfer");
                 System.out.println("2 - ERC20 transfer");
                 System.out.println("3 - ERC20 increaseAllowance");
@@ -40,6 +41,10 @@ public class ClientApp {
                 String line = in.nextLine();
 
                 switch (line) {
+                    case "0": {
+                        clientLib.submitBalanceCheck();
+                        break;
+                    }
                     case "1": {
                         System.out.print("Destination address (0x...): ");
                         String to = in.nextLine();
@@ -58,7 +63,6 @@ public class ClientApp {
                     }
 
                     case "2": {
-                        String contract = config.getIstContractAddress().toHexString();
 
                         System.out.print("Token recipient address (0x...): ");
                         String to = in.nextLine();
@@ -72,12 +76,11 @@ public class ClientApp {
                         System.out.print("Gas limit: ");
                         BigInteger gasLimit = new BigInteger(in.nextLine());
 
-                        clientLib.submitTokenTransfer(contract, to, amount, gasPrice, gasLimit);
+                        clientLib.submitTokenTransfer(to, amount, gasPrice, gasLimit);
                         break;
                     }
 
                     case "3": {
-                        String contract = config.getIstContractAddress().toHexString();
 
                         System.out.print("Spender address (0x...): ");
                         String spender = in.nextLine();
@@ -91,12 +94,11 @@ public class ClientApp {
                         System.out.print("Gas limit: ");
                         BigInteger gasLimit = new BigInteger(in.nextLine());
 
-                        clientLib.submitIncreaseAllowance(contract, spender, amount, gasPrice, gasLimit);
+                        clientLib.submitIncreaseAllowance(spender, amount, gasPrice, gasLimit);
                         break;
                     }
 
                     case "4": {
-                        String contract = config.getIstContractAddress().toHexString();
 
                         System.out.print("Spender address (0x...): ");
                         String spender = in.nextLine();
@@ -110,12 +112,11 @@ public class ClientApp {
                         System.out.print("Gas limit: ");
                         BigInteger gasLimit = new BigInteger(in.nextLine());
 
-                        clientLib.submitDecreaseAllowance(contract, spender, amount, gasPrice, gasLimit);
+                        clientLib.submitDecreaseAllowance(spender, amount, gasPrice, gasLimit);
                         break;
                     }
 
                     case "5": {
-                        String contract = config.getIstContractAddress().toHexString();
 
                         System.out.print("From address (token owner): ");
                         String from = in.nextLine();
@@ -132,7 +133,7 @@ public class ClientApp {
                         System.out.print("Gas limit: ");
                         BigInteger gasLimit = new BigInteger(in.nextLine());
 
-                        clientLib.submitTransferFrom(contract, from, to, amount, gasPrice, gasLimit);
+                        clientLib.submitTransferFrom(from, to, amount, gasPrice, gasLimit);
                         break;
                     }
 

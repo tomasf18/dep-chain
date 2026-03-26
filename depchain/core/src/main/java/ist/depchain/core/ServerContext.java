@@ -1,6 +1,7 @@
 package ist.depchain.core;
 
 import ist.depchain.common.utils.Config;
+import ist.depchain.common.utils.Erc20Abi;
 import ist.depchain.common.utils.AddressUtils;
 import ist.depchain.core.blockchain.BlockChainBlock;
 import ist.depchain.core.blockchain.DepChainWorldState;
@@ -63,10 +64,7 @@ public class ServerContext {
                 throw new IllegalStateException("IST contract code missing after bootstrap");
             }
 
-            System.out.println("[SERVER_CONTEXT] Genesis block loaded with "
-                    + genesis.getTransactions().size()
-                    + " transactions; IST contract bootstrapped at "
-                    + istAddress.toHexString());
+            System.out.println("[SERVER_CONTEXT] Genesis block loaded with " + genesis.getTransactions().size() + " transactions; IST contract bootstrapped at " + istAddress.toHexString());
 
             System.out.println("=== After Deployment ===");
             EvmService.printAccount(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), "InitialTokenHolder");
@@ -74,16 +72,15 @@ public class ServerContext {
             System.out.println();
 
             MutableAccount contractAccount = (MutableAccount) worldState.getSimpleWorld().get(config.getIstContractAddress());
-            // 5. Read-only calls
-            String name = EvmService.callString(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("name()"));
-            String symbol = EvmService.callString(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("symbol()"));
-            BigInteger decimals = EvmService.callUint(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("decimals()"));
-            BigInteger totalSupply = EvmService.callUint(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), EvmService.selector("totalSupply()"));
 
-            String balanceOfInitialTokenHolderCalldata = EvmService.selector("balanceOf(address)") + EvmService.encodeAddressArgument(config.getInitialTokenHolderAddress());
+            String name = EvmService.callString(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), Erc20Abi.smartContractMethodIdentifier("name()"));
+            String symbol = EvmService.callString(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), Erc20Abi.smartContractMethodIdentifier("symbol()"));
+            BigInteger decimals = EvmService.callUint(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), Erc20Abi.smartContractMethodIdentifier("decimals()"));
+            BigInteger totalSupply = EvmService.callUint(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), Erc20Abi.smartContractMethodIdentifier("totalSupply()"));
+
+            String balanceOfInitialTokenHolderCalldata = Erc20Abi.smartContractMethodIdentifier("balanceOf(address)") + Erc20Abi.encodeAddress(config.getInitialTokenHolderAddress());
             BigInteger initialTokenHolderBalance = EvmService.callUint(worldState, config.getInitialTokenHolderAddress(), config.getIstContractAddress(), contractAccount.getCode(), balanceOfInitialTokenHolderCalldata);
 
-            // 6. Print results
             System.out.println("=== ERC-20 Read Calls ===");
             System.out.println("name():        " + name);
             System.out.println("symbol():      " + symbol);

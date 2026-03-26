@@ -4,7 +4,6 @@ import java.math.BigInteger;
 
 import org.hyperledger.besu.datatypes.Address;
 import org.apache.tuweni.bytes.Bytes;
-import org.apache.tuweni.units.bigints.UInt256;
 
 import ist.depchain.common.Transaction;
 
@@ -152,7 +151,6 @@ public class TransactionExecutor {
             return TransactionReceipt.failure(txHash, gasUsed, fee, result.getErrorMessage() == null ? "contract call failed" : result.getErrorMessage());
         }
 
-        trackKnownErc20MutationSlots(state, tx);
         return TransactionReceipt.success(txHash, gasUsed, fee, result.getReturnData().toArrayUnsafe(), null);
     }
 
@@ -164,64 +162,5 @@ public class TransactionExecutor {
             state.createEOA(proposer, 0, BigInteger.ZERO);
         }
         state.addBalance(proposer, fee);
-    }
-
-    private void trackKnownErc20MutationSlots(DepChainWorldState state, Transaction tx) {
-        Address contractAddress = tx.getTo();
-        if (contractAddress == null) return;
-
-        String calldataHex = Bytes.wrap(tx.getData()).toHexString().substring(2);
-        if (calldataHex.length() < 8) return;
-
-        String selector = calldataHex.substring(0, 8);
-
-        // transfer(address,uint256)
-        if (selector.equalsIgnoreCase(EvmService.selector("transfer(address,uint256)"))) {
-            Address sender = tx.getFrom();
-            Address recipient = decodeAddressArg(calldataHex, 0);
-
-            refreshErc20BalanceSlot(state, contractAddress, sender);
-            refreshErc20BalanceSlot(state, contractAddress, recipient);
-            return;
-        }
-
-        // increaseAllowance(address,uint256)
-        if (selector.equalsIgnoreCase(EvmService.selector("increaseAllowance(address,uint256)"))
-                || selector.equalsIgnoreCase(EvmService.selector("decreaseAllowance(address,uint256)"))) {
-            Address owner = tx.getFrom();
-            Address spender = decodeAddressArg(calldataHex, 0);
-
-            UInt256 slot = EvmService.erc20AllowanceSlot(owner, spender);
-            state.registerStorageSlot(contractAddress, slot);
-            state.refreshTrackedStorageValue(contractAddress, slot);
-            return;
-        }
-
-        // transferFrom(address,address,uint256)
-        if (selector.equalsIgnoreCase(EvmService.selector("transferFrom(address,address,uint256)"))) {
-            Address owner = decodeAddressArg(calldataHex, 0);
-            Address recipient = decodeAddressArg(calldataHex, 1);
-            Address spender = tx.getFrom();
-
-            refreshErc20BalanceSlot(state, contractAddress, owner);
-            refreshErc20BalanceSlot(state, contractAddress, recipient);
-
-            UInt256 allowanceSlot = EvmService.erc20AllowanceSlot(owner, spender);
-            state.registerStorageSlot(contractAddress, allowanceSlot);
-            state.refreshTrackedStorageValue(contractAddress, allowanceSlot);
-        }
-    }
-
-    private void refreshErc20BalanceSlot(DepChainWorldState state, Address contractAddress, Address owner) {
-        UInt256 slot = EvmService.erc20BalanceSlot(owner);
-        state.registerStorageSlot(contractAddress, slot);
-        state.refreshTrackedStorageValue(contractAddress, slot);
-    }
-
-    private Address decodeAddressArg(String calldataHex, int argIndex) {
-        int start = 8 + argIndex * 64;
-        String word = calldataHex.substring(start, start + 64);
-        String addressHex = word.substring(24);
-        return Address.fromHexString("0x" + addressHex);
     }
 }
