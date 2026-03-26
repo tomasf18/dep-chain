@@ -32,11 +32,7 @@ public class TransactionValidator {
         }
 
         try {
-            boolean sigOk = Crypto.verifySignature(
-                    tx.toUnsignedBytes(),
-                    tx.getSignature(),
-                    clientPublicKey,
-                    signatureAlgorithm);
+            boolean sigOk = Crypto.verifySignature(tx.toUnsignedBytes(), tx.getSignature(), clientPublicKey, signatureAlgorithm);
 
             if (!sigOk) {
                 return ValidationResult.fail("invalid transaction signature");

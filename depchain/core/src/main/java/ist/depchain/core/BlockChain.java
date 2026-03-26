@@ -14,7 +14,7 @@ import ist.depchain.core.blockchain.BlockChainBlock;
 import ist.depchain.core.blockchain.BlockSerializer;
 
 public class BlockChain {
-    private static final String persistenceBaseDir = "data/blocks/";
+    private static final String PERSISTENCE_BASE_DIR = "data/blocks/";
     private final List<BlockChainBlock> blocks;
     private final String persistenceDir; // null = no persistence
 
@@ -27,7 +27,7 @@ public class BlockChain {
         if (replicaId != null) {
             // if it's an absolute path, use it directly; otherwise, treat as replicaId and prepend baseDir
             File file = new File(replicaId);
-            this.persistenceDir = file.isAbsolute() ? replicaId : persistenceBaseDir + replicaId;
+            this.persistenceDir = file.isAbsolute() ? replicaId : PERSISTENCE_BASE_DIR + replicaId;
         } else {
             this.persistenceDir = null;
         }
@@ -42,6 +42,7 @@ public class BlockChain {
         }
 
         if (blocks.isEmpty()) {
+            // genesis block validation
             if (block.getBlockNumber() != 0) {
                 throw new IllegalStateException("Genesis block must have number 0");
             }
@@ -52,13 +53,11 @@ public class BlockChain {
             BlockChainBlock latest = getLatestBlock();
 
             if (!latest.getBlockHash().equals(block.getPreviousBlockHash())) {
-                throw new IllegalStateException("Invalid block linkage: expected previous hash "
-                        + latest.getBlockHash() + " but got " + block.getPreviousBlockHash());
+                throw new IllegalStateException("Invalid block linkage: expected previous hash " + latest.getBlockHash() + " but got " + block.getPreviousBlockHash());
             }
 
             if (block.getBlockNumber() != latest.getBlockNumber() + 1) {
-                throw new IllegalStateException("Invalid block number: expected "
-                        + (latest.getBlockNumber() + 1) + " but got " + block.getBlockNumber());
+                throw new IllegalStateException("Invalid block number: expected " + (latest.getBlockNumber() + 1) + " but got " + block.getBlockNumber());
             }
         }
 
@@ -84,17 +83,6 @@ public class BlockChain {
         return Collections.unmodifiableList(blocks);
     }
     
-    public void showLog() {
-        System.out.println("=== BlockChain Log ===");
-        System.out.println("Total blocks: " + blocks.size());
-        for (int i = 0; i < blocks.size(); i++) {
-            BlockChainBlock b = blocks.get(i);
-            if (i > 0) System.out.print(" <- ");
-            System.out.print(i + ": [hash=" + b.getBlockHash() + ", txs=" + b.getTransactions().size() + "]");
-        }
-        System.out.println("\n=====================");
-    }
-    
     private void persistBlock(BlockChainBlock block) {
         if (persistenceDir == null) return;
         try {
@@ -107,20 +95,5 @@ public class BlockChain {
             System.err.println("[BLOCKCHAIN | ERROR] Failed to persist block "
                     + block.getBlockNumber() + ": " + e.getMessage());
         }
-    }
-
-    /**
-     * Legacy append for backward compatibility with Stage 1 consensus only.
-     * DO NOT USE this for Stage 2.
-     */
-    public void append(String data) {
-        String prevHash = blocks.isEmpty() ? null : getLatestBlock().getBlockHash();
-        BlockChainBlock block = new BlockChainBlock(
-            String.valueOf(data.hashCode()),
-            prevHash,
-            Collections.emptyList(),
-            blocks.size()
-        );
-        blocks.add(block);
     }
 }

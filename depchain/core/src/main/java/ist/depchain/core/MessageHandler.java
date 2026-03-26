@@ -67,15 +67,15 @@ public class MessageHandler {
         }
 
         switch (clientRequest.getPayloadCase()) {
-            case TRANSACTION -> handleTransactionRequest(clientRequest, requestKey);
-            case PAYLOAD_NOT_SET -> {
+            case TRANSACTION:
+                 handleTransactionRequest(clientRequest, requestKey);
+            case PAYLOAD_NOT_SET:
                 pendingRequests.remove(requestKey);
                 System.err.println("[MESSAGE_HANDLER | ERROR] Empty client payload");
-            }
-            default -> {
+                break;
+            default: 
                 pendingRequests.remove(requestKey);
                 System.err.println("[MESSAGE_HANDLER | ERROR] Unsupported payload type: " + clientRequest.getPayloadCase());
-            }
         }
     }
 
@@ -104,6 +104,10 @@ public class MessageHandler {
 
         coordinator.enqueueClientRequest(clientRequest);
     }
+    
+    private void handleHotStuffMessage(String sourceId, HotStuffMessage hotstuffMsg) {
+        coordinator.processMessage(sourceId, hotstuffMsg);
+    }
 
     private void sendRejectionResponse(String clientId, int reqId) {
         try {
@@ -112,7 +116,7 @@ public class MessageHandler {
                     .setRequestId(reqId)
                     .setCommitted(false)
                     .setStatus("REJECTED")
-                    .setError("validation failed")
+                    .setError("tx validation failed")
                     .build();
             serverContext.getPerfectLink().send(clientId, rejection.toByteArray());
         } catch (Exception e) {
@@ -146,10 +150,6 @@ public class MessageHandler {
         } catch (Exception e) {
             return false;
         }
-    }
-
-    private void handleHotStuffMessage(String sourceId, HotStuffMessage hotstuffMsg) {
-        coordinator.processMessage(sourceId, hotstuffMsg);
     }
 
     private static final class RequestKey {
