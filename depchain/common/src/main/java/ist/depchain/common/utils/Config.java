@@ -30,6 +30,8 @@ public class Config {
     private Address istContractAddress;
     private String istCreationBinPath;
     private String istAbiPath;
+    private final int max_batch_size = 10; // maximum number of requests to include in a proposed block; can be tuned for performance vs. latency
+    private final long min_fee_threshold = 63000L; // minimum total fee (in wei)/DepCoin) required for a batch to be proposed as a block
 
     // fault injection configuration
     private double dropProbability;
@@ -159,8 +161,10 @@ public class Config {
     public Address getIstContractAddress() { return istContractAddress; }
     public String getIstCreationBinPath() { return istCreationBinPath; }
     public String getIstAbiPath() { return istAbiPath; }
+    public int getMaxBatchSize() { return max_batch_size; }
+    public long getMinFeeThreshold() { return min_fee_threshold; }
+    
     public ProcessInfo getProcessInfo(String processId) { return processes.get(processId); }
-
     public String resolveProcessId(String host, int port) {
         for (Map.Entry<String, ProcessInfo> entry : processes.entrySet()) {
             ProcessInfo info = entry.getValue();

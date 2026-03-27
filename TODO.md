@@ -2,6 +2,7 @@
 
 ## Not started
 
+- add logging options: nothing, info, debug
 - Order transactions by fee, but for the same client order by nonce
 - Clients should see their balance by requesting nodes for it. Sending an entire chain of blocks is very inefficient since it can be huge. Consider a better alternative to ensure the client receives the state and can verify it is correct (merkle proofs, or maybe a snapshot of the state at a certain block number, etc)
 - Separate 2 Client API calls for getting balance: one that returns the balance in the native currency (DepCoin) and another that returns the balance of a specific token (ERC-20). This is because they are stored differently in the world state and require different logic to retrieve.
@@ -39,8 +40,7 @@ The solution: Changed how client requests are tracked on the server
 - The message handler marks the request as executed and responds to the client
 - This is necessary to prevent replay attacks and to guarantee that the client receives a response even if the request is re-proposed multiple times (for example, if the leader fails after proposing but before commit)
 
-
-
+---
 
 # Native currency vs Tokens 
 Native currency
@@ -65,299 +65,84 @@ Final comparison
 | Analogy | The Electricity (Infrastructure) | The Appliances (Applications) |
 
 
+---
 
+# HotStuff Patchws
 
+Just for ref for the report: implementation changes made to stabilize the HotStuff flow 
 
+## 1 - the fee-threshold batch selection was made deterministic and order-independent
 
-I need to find the following bug in the code: whenever a transation is committed, I run printWorldState() to see the changes in the world state on each replica. However, I noticed that the changes are not equal in all replicas, namely, the HotStuff leader who proposed the block does not see its own account details, which means the world state diverges from the others. Another bad thing that is happening is that the line "Proposer account 0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd does not exist in world state. Creating it to credit fees." is being printed 2 times in the replicas. 
-Analyse the following outputs and then the code to find the bugs:
+### Files changed
+- CommandMempool
+- BasicHotStuffCoordinator
+- CommandMempoolTest
 
-[REPLICA 0]
-```
-(env) [15:28:45] tomas@tomas-ASUS /home/tomas/Workstation/uni/dep-chain/depchain/core [SIGINT] 
-> mvn exec:java -Dexec.args='../config/config-dev.json s0'                                       (base) 
-[INFO] Scanning for projects...
-[INFO] 
-[INFO] -----------------------< ist.depchain.core:core >-----------------------
-[INFO] Building core 1.0.0
-[INFO]   from pom.xml
-[INFO] --------------------------------[ jar ]---------------------------------
-[INFO] 
-[INFO] --- exec:3.6.3:java (default-cli) @ core ---
-[AUTHENTICATOR | INFO] - Derived session keys with 6 peers from static keys.
-[SERVER_CONTEXT] Genesis block loaded with 1 transactions 
-IST contract bootstrapped at 0x9999999999999999999999999999999999999999
+### What changed
+- Added fee-aware batch selection in the mempoool.
+- The coordinator now selects the highest-fee sufficient batch from the full pending set instead of trusting fifo order
+- Fee totals are now computed with BigInteger instead of th brittle "long" conversion from raw protobuf bytes
+- Added a test for a high-fee transaction sitting behind lower-fee ones in the queue
 
-=== After Deployment ===
-InitialTokenHolder Account
-  Address: 0x1000000000000000000000000000000000000001
-  Balance: 1000000000000000000000 DepCoin
-  Nonce: 0
-  Code size: 0
-Contract Account
-  Address: 0x9999999999999999999999999999999999999999
-  Balance: 0 DepCoin
-  Nonce: 0
-  Code size: 2283
-client2 Account
-  Address: 0x172bf398d2a931323199521625f471fb1c28879a
-  Balance: 500000000 DepCoin
-  Nonce: 0
-  Code size: 0
-client1 Account
-  Address: 0xfe37d77266b312ca364bd3f9386e1df4d193e9d9
-  Balance: 1000000000 DepCoin
-  Nonce: 0
-  Code size: 0
+### Problem solved
+- The proposer was sometimes waiting even though the mempool already contained enough fees
+- FIFO ordering could block a fee-sufficient transaction behind lower-fee transactions
+- The previous fee calculation could misreport totals and even produce negative values
 
-=== ERC-20 Read Calls ===
-name():        IST Coin
-symbol():      IST
-decimals():    2
-totalSupply(): 10000000000
-balanceOf(initialTokenHolder): 10000000000
+## 2 - Late DECIDE handling is now view-tolerant
 
-[BLS | INFO] - BLS12-381 initialized
-[BLS | INFO] - Loaded BLS keys for replica index 1
-[SERVER_APP | INFO] Successfully started
-[MESSAGE_HANDLER | INFO] Accepted tx request RequestKey{clientId='client1', requestId=1} from=0xfe37d77266b312ca364bd3f9386e1df4d193e9d9 nonce=0
-[COORDINATOR] Checking fees for next batch in mempool...
-[COORDINATOR] Current batch total fees: 63000 / 63000
-World State:
-- 0x1000000000000000000000000000000000000001 (Unknown): balance=1000000000000000000000, nonce=0
-- 0x172bf398d2a931323199521625f471fb1c28879a (client2): balance=500100000, nonce=0
-- 0xfe37d77266b312ca364bd3f9386e1df4d193e9d9 (client1): balance=999837000, nonce=1
+### File changed
+- BasicHotStuffCoordinator
 
-[COORDINATOR] Committed block #1 with 1 txs, hash=92e999f5f68f7f9db39c630542d3df0a69c2871ffa857a0a7705dfc3ad732dfa, stateHash=ee526669746b4faf8fd28169e95d62c06bbf888f3c32ab2e38b64e5382b54e7f
-```
+### What changed
+- DECIDE messages are no longer discarded just because the replica has already advanced to a later view
+- The decide handler now validates the message using the decide message’s own view and leader
+- If a valid decide arrives for an earlier committed view, the replica can still execute it
+- A lagging replica now fast-forwards to the decided view’s successor before continuing
 
-[REPLICA 1]
-```
-[15:28:46] tomas@tomas-ASUS /home/tomas/Workstation/uni/dep-chain/depchain/core [SIGINT] 
-> mvn exec:java -Dexec.args='../config/config-dev.json s1'                                      (base) 
-[INFO] Scanning for projects...
-[INFO] 
-[INFO] -----------------------< ist.depchain.core:core >-----------------------
-[INFO] Building core 1.0.0
-[INFO]   from pom.xml
-[INFO] --------------------------------[ jar ]---------------------------------
-[INFO] 
-[INFO] --- exec:3.6.3:java (default-cli) @ core ---
-[AUTHENTICATOR | INFO] - Derived session keys with 6 peers from static keys.
-[SERVER_CONTEXT] Genesis block loaded with 1 transactions 
-IST contract bootstrapped at 0x9999999999999999999999999999999999999999
+### Problem solved
+- A slower replica could receive the client transactions, advance views due to timeouts, and then ignore the already-decided block
+- This caused replicas to diverge in execution even though consensus had completed
 
-=== After Deployment ===
-InitialTokenHolder Account
-  Address: 0x1000000000000000000000000000000000000001
-  Balance: 1000000000000000000000 DepCoin
-  Nonce: 0
-  Code size: 0
-Contract Account
-  Address: 0x9999999999999999999999999999999999999999
-  Balance: 0 DepCoin
-  Nonce: 0
-  Code size: 2283
-client2 Account
-  Address: 0x172bf398d2a931323199521625f471fb1c28879a
-  Balance: 500000000 DepCoin
-  Nonce: 0
-  Code size: 0
-client1 Account
-  Address: 0xfe37d77266b312ca364bd3f9386e1df4d193e9d9
-  Balance: 1000000000 DepCoin
-  Nonce: 0
-  Code size: 0
+### result
+- Valid decided blocks are executed even if the replica has already moved on
+- The node no longer gets stuck one view behind the rest of the quorum
 
-=== ERC-20 Read Calls ===
-name():        IST Coin
-symbol():      IST
-decimals():    2
-totalSupply(): 10000000000
-balanceOf(initialTokenHolder): 10000000000
+## 3- out-of-order HotStuff messages are now buffered and recovered
 
-[BLS | INFO] - BLS12-381 initialized
-[BLS | INFO] - Loaded BLS keys for replica index 2
-[SERVER_APP | INFO] Successfully started
-[MESSAGE_HANDLER | INFO] Accepted tx request RequestKey{clientId='client1', requestId=1} from=0xfe37d77266b312ca364bd3f9386e1df4d193e9d9 nonce=0
-[WARN] Proposer account 0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd does not exist in world state. Creating it to credit fees.
-[WARN] Proposer account 0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd does not exist in world state. Creating it to credit fees.
-World State:
-- 0x1000000000000000000000000000000000000001 (Unknown): balance=1000000000000000000000, nonce=0
-- 0x172bf398d2a931323199521625f471fb1c28879a (client2): balance=500100000, nonce=0
-- 0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd (s0): balance=63000, nonce=0
-- 0xfe37d77266b312ca364bd3f9386e1df4d193e9d9 (client1): balance=999837000, nonce=1
+### File changed
+- BasicHotStuffCoordinator
 
-[COORDINATOR] Committed block #1 with 1 txs, hash=0e46c38ac2245f416c601010405efdb095b5d8ccdf9eb9bdb34ea9e2f10838de, stateHash=577d4167edb1f0919604522fba637bb3ba1068a63901d2ce496cc5eb5ba5643c
-```
+### what changed
+- valid PREPARE blocks are cached even if they arrive while a replica is behind or ahead of the current view
+- DECIDE messages are buffered if the block is not yet known in the local tree
+- once the block arrives, a pending DECIDE is executed immediately
+- a replica can fast-forward to the decided view’s successor after executing a valid DECIDE
 
-[REPLICA 2]
-```
-[15:28:45] tomas@tomas-ASUS /home/tomas/Workstation/uni/dep-chain/depchain/core [SIGINT] 
-> mvn exec:java -Dexec.args='../config/config-dev.json s2'                                   (base) 
-[INFO] Scanning for projects...
-[INFO] 
-[INFO] -----------------------< ist.depchain.core:core >-----------------------
-[INFO] Building core 1.0.0
-[INFO]   from pom.xml
-[INFO] --------------------------------[ jar ]---------------------------------
-[INFO] 
-[INFO] --- exec:3.6.3:java (default-cli) @ core ---
-[AUTHENTICATOR | INFO] - Derived session keys with 6 peers from static keys.
-[SERVER_CONTEXT] Genesis block loaded with 1 transactions 
-IST contract bootstrapped at 0x9999999999999999999999999999999999999999
+### problem solved
+- a replica could fall behind if it timed out and advanced views before receiving the matching PREPARE/DECIDE pair
+- the block would then never be executed locally even though consensus had completed
 
-=== After Deployment ===
-InitialTokenHolder Account
-  Address: 0x1000000000000000000000000000000000000001
-  Balance: 1000000000000000000000 DepCoin
-  Nonce: 0
-  Code size: 0
-Contract Account
-  Address: 0x9999999999999999999999999999999999999999
-  Balance: 0 DepCoin
-  Nonce: 0
-  Code size: 2283
-client2 Account
-  Address: 0x172bf398d2a931323199521625f471fb1c28879a
-  Balance: 500000000 DepCoin
-  Nonce: 0
-  Code size: 0
-client1 Account
-  Address: 0xfe37d77266b312ca364bd3f9386e1df4d193e9d9
-  Balance: 1000000000 DepCoin
-  Nonce: 0
-  Code size: 0
+### result
+- lagging replicas can catch up instead of getting stuck permanently behind
+- out-of-order message delivery is handled more safely
 
-=== ERC-20 Read Calls ===
-name():        IST Coin
-symbol():      IST
-decimals():    2
-totalSupply(): 10000000000
-balanceOf(initialTokenHolder): 10000000000
+## 4 - Null and stale consensus inputs are now better handled
 
-[BLS | INFO] - BLS12-381 initialized
-[BLS | INFO] - Loaded BLS keys for replica index 3
-[SERVER_APP | INFO] Successfully started
-[MESSAGE_HANDLER | INFO] Accepted tx request RequestKey{clientId='client1', requestId=1} from=0xfe37d77266b312ca364bd3f9386e1df4d193e9d9 nonce=0
-[COORDINATOR] Checking fees for next batch in mempool...
-[COORDINATOR] Current batch total fees: 63000 / 63000
-[WARN] Proposer account 0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd does not exist in world state. Creating it to credit fees.
-[WARN] Proposer account 0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd does not exist in world state. Creating it to credit fees.
-World State:
-- 0x1000000000000000000000000000000000000001 (Unknown): balance=1000000000000000000000, nonce=0
-- 0x172bf398d2a931323199521625f471fb1c28879a (client2): balance=500100000, nonce=0
-- 0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd (s0): balance=63000, nonce=0
-- 0xfe37d77266b312ca364bd3f9386e1df4d193e9d9 (client1): balance=999837000, nonce=1
+### File changed
+- BasicHotStuffCoordinator
 
-[COORDINATOR] Committed block #1 with 1 txs, hash=0e46c38ac2245f416c601010405efdb095b5d8ccdf9eb9bdb34ea9e2f10838de, stateHash=577d4167edb1f0919604522fba637bb3ba1068a63901d2ce496cc5eb5ba5643c
-```
+### What changed
+- Added null checks before using blocks fetched from the HotStuff tree
+- PRE-COMMIT and COMMIT handlers now refuse to move QC state backwards when older QCs arrive late
+- Duplicate votes from the same sender are ignored instead of silently overwriting existing votes
 
-[REPLICA 3]
-```
-[15:28:44] tomas@tomas-ASUS /home/tomas/Workstation/uni/dep-chain/depchain/core [SIGINT] 
-> mvn exec:java -Dexec.args='../config/config-dev.json s3'                                   (base) 
-[INFO] Scanning for projects...
-[INFO] 
-[INFO] -----------------------< ist.depchain.core:core >-----------------------
-[INFO] Building core 1.0.0
-[INFO]   from pom.xml
-[INFO] --------------------------------[ jar ]---------------------------------
-[INFO] 
-[INFO] --- exec:3.6.3:java (default-cli) @ core ---
-[AUTHENTICATOR | INFO] - Derived session keys with 6 peers from static keys.
-[SERVER_CONTEXT] Genesis block loaded with 1 transactions 
-IST contract bootstrapped at 0x9999999999999999999999999999999999999999
+### Problem solved
+- Byzantine or delayed messages could trigger null-pointer crashes
+- Older QCs could overwrite newer local state
+- Duplicate sender votes could hide equivocation and weaken traceability
+- Single-thread wakeups could miss the right waiting path under contention
 
-=== After Deployment ===
-InitialTokenHolder Account
-  Address: 0x1000000000000000000000000000000000000001
-  Balance: 1000000000000000000000 DepCoin
-  Nonce: 0
-  Code size: 0
-Contract Account
-  Address: 0x9999999999999999999999999999999999999999
-  Balance: 0 DepCoin
-  Nonce: 0
-  Code size: 2283
-client2 Account
-  Address: 0x172bf398d2a931323199521625f471fb1c28879a
-  Balance: 500000000 DepCoin
-  Nonce: 0
-  Code size: 0
-client1 Account
-  Address: 0xfe37d77266b312ca364bd3f9386e1df4d193e9d9
-  Balance: 1000000000 DepCoin
-  Nonce: 0
-  Code size: 0
-
-=== ERC-20 Read Calls ===
-name():        IST Coin
-symbol():      IST
-decimals():    2
-totalSupply(): 10000000000
-balanceOf(initialTokenHolder): 10000000000
-
-[BLS | INFO] - BLS12-381 initialized
-[BLS | INFO] - Loaded BLS keys for replica index 4
-[SERVER_APP | INFO] Successfully started
-[MESSAGE_HANDLER | INFO] Accepted tx request RequestKey{clientId='client1', requestId=1} from=0xfe37d77266b312ca364bd3f9386e1df4d193e9d9 nonce=0
-[WARN] Proposer account 0xdb710290c98c770c5ee6b312ea42b89cdbd23cc2 does not exist in world state. Creating it to credit fees.
-[COORDINATOR] Checking fees for next batch in mempool...
-[COORDINATOR] Current batch total fees: 63000 / 63000
-[WARN] Proposer account 0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd does not exist in world state. Creating it to credit fees.
-[WARN] Proposer account 0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd does not exist in world state. Creating it to credit fees.
-World State:
-- 0x1000000000000000000000000000000000000001 (Unknown): balance=1000000000000000000000, nonce=0
-- 0x172bf398d2a931323199521625f471fb1c28879a (client2): balance=500100000, nonce=0
-- 0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd (s0): balance=63000, nonce=0
-- 0xfe37d77266b312ca364bd3f9386e1df4d193e9d9 (client1): balance=999837000, nonce=1
-
-[COORDINATOR] Committed block #1 with 1 txs, hash=0e46c38ac2245f416c601010405efdb095b5d8ccdf9eb9bdb34ea9e2f10838de, stateHash=577d4167edb1f0919604522fba637bb3ba1068a63901d2ce496cc5eb5ba5643c
-```
-
-[Client 1]
-```
-[15:32:14] tomas@tomas-ASUS /home/tomas/Workstation/uni/dep-chain/depchain/client  
-> mvn exec:java -Dexec.args='../config/config-dev.json client1'                              (base) 
-[INFO] Scanning for projects...
-[INFO] 
-[INFO] ---------------------< ist.depchain.client:client >---------------------
-[INFO] Building client 1.0.0
-[INFO]   from pom.xml
-[INFO] --------------------------------[ jar ]---------------------------------
-[INFO] 
-[INFO] --- exec:3.6.3:java (default-cli) @ client ---
-[AUTHENTICATOR | INFO] - Derived session keys with 5 peers from static keys.
-[INFO] Successfully started:
-    - Client ID: client1
-    - Blockchain address: 0xfe37d77266b312ca364bd3f9386e1df4d193e9d9
-
-=== DepChain Client ===
-0 - Check balance
-1 - Submit native transfer
-2 - ERC20 transfer
-3 - ERC20 increaseAllowance
-4 - ERC20 decreaseAllowance
-5 - ERC20 transferFrom
-exit - Quit
-> 1
-Destination address (0x...): 0x172bf398d2a931323199521625f471fb1c28879a
-Value: 100000
-Gas price: 3
-Gas limit: 21000
-[SENT] reqId=1 from=0xfe37d77266b312ca364bd3f9386e1df4d193e9d9 to=0x172bf398d2a931323199521625f471fb1c28879a value=100000 nonce=0
-[✓] (1, s0): ACCEPTED - transaction is being processed
-[ACCEPTED] reqId=1 nonce=0 - transaction is now being processed
-[SUBMITTED] native tx reqId=1 nonce=0
-
-=== DepChain Client ===
-0 - Check balance
-1 - Submit native transfer
-2 - ERC20 transfer
-3 - ERC20 increaseAllowance
-4 - ERC20 decreaseAllowance
-5 - ERC20 transferFrom
-exit - Quit
-> 
-```
+### result
+- The replica is more resilient to late, duplicate, malformed and reordered consensus messages
+- The protocol state is less likely to diverge under stress or Byzantine behavior

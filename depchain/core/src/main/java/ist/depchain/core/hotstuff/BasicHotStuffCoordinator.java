@@ -18,12 +18,18 @@ import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.byzantine.MaliciousUtils;
 import org.hyperledger.besu.datatypes.Address;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.math.BigInteger;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import ist.depchain.core.blockchain.BlockValidator;
@@ -32,14 +38,16 @@ import ist.depchain.core.blockchain.ValidationResult;
 
 public class BasicHotStuffCoordinator {
     public interface RequestCommitListener {
-        // same arguments as MessageHandler.markRequestExecuted, that is the main use case for this callback; but named to reflect the semantics of being called when a request is committed, rather than the internal implementation of marking it executed in the MessageHandler
+        // same arguments as MessageHandler.markRequestExecuted, that is the main use case for this callback
+        // but named to reflect the semantics of being called when a request is committed, rather than the internal implementation of marking it executed in the MessageHandler
         void onRequestCommitted(String clientId, int requestId);
     }
 
     protected final ServerContext serverContext;
     protected final BasicHotStuffUtils utils;
     protected final AtomicInteger currentView = new AtomicInteger(1); // incremented either by finishing a decision or by a NEXT_VIEW interrupt
-    private int n, f;
+    private int n;
+    private int f;
     private final int hotStuffQuorum; // n - f, the number of votes needed to form a QC
 
     private QC lockedQC; // [PHASE 3] - The latest QC that was locked (highest QC - a.k.a. lockedQC.viewNumber - for which the replica voted COMMIT)
@@ -60,14 +68,20 @@ public class BasicHotStuffCoordinator {
 
     private RequestCommitListener requestCommitListener; // callback to notify MessageHandler when a request is committed, so it can mark it as executed
     private final Set<ByteString> executedBlockIds = ConcurrentHashMap.newKeySet(); // blocks whose commands have been executed; guards against double-execution on DECIDE retransmission
+    private static final class PendingDecide {
+        private final String sourceId;
+        private final HotStuffMessage message;
+
+        private PendingDecide(String sourceId, HotStuffMessage message) {
+            this.sourceId = sourceId;
+            this.message = message;
+        }
+    }
+    private final Map<ByteString, PendingDecide> pendingDecides = new ConcurrentHashMap<>();
 
     private boolean quorumReady = false;
     private List<ClientRequest> lastProposedBatch = null; // track in-flight proposal so we can re-enqueue on timeout
-    private static final int MAX_BATCH_SIZE = 10;
-    // Minimum total fee (in wei) required for a batch to be proposed as a non-empty block.
-    // If batch total fees are below this threshold, an empty block is proposed instead (maintaining liveness)
-    // For reference: native transfer costs 21000 gas at 1 wei/gas = 21000 wei threshold
-    private static final long MIN_FEE_THRESHOLD = 63000L;
+
     private Thread proposalLoopThread;
 
     public BasicHotStuffCoordinator(ServerContext serverContext, boolean isByzantine) {
@@ -113,10 +127,11 @@ public class BasicHotStuffCoordinator {
         while (true) {
             synchronized (this) {
                 try {
-                    // Wait for: (1) quorum ready, (2) mempool not empty, AND (3) sufficient fees
+                    // wait for: (1) quorum ready, (2) mempool not empty, AND (3) sufficient fees
                     while (!quorumReady || mempool.isEmpty() || !hasSufficientFees()) {
                         wait();
                     }
+                    System.out.println("[COORDINATOR | PROPOSER] view=" + currentView.get() + " quorumReady=" + quorumReady + " mempoolSize>0=" + !mempool.isEmpty());
                     doPropose();
                     quorumReady = false;
                 } catch (InterruptedException e) {
@@ -128,7 +143,7 @@ public class BasicHotStuffCoordinator {
     }
 
     public synchronized void processMessage(String sourceId, HotStuffMessage m) {
-        // System.out.println("[COORDINATOR | INFO] - Received message of type " + m.getType() + " from " + sourceId + " for view " + m.getViewNumber());
+        System.out.println("[COORDINATOR | IN] source=" + sourceId + " type=" + m.getType() + " view=" + m.getViewNumber() + " currentView=" + currentView.get() + " hasSig=" + !m.getPartialSig().isEmpty());
         
         // only restart the timer for messages that represent progress in the current view, future-view messages are buffered but should noti delay our own timeout
         boolean isCurrentView = (m.getViewNumber() == currentView.get());
@@ -137,8 +152,10 @@ public class BasicHotStuffCoordinator {
             restartTimer();
         }
 
-        if (m.getViewNumber() < currentView.get() && m.getType() != HotStuffMessage.Type.NEW_VIEW) {
-            // System.out.println("[COORDINATOR | INFO] - Ignoring old message from " + sourceId + " for view " + m.getViewNumber() + ", current view is " + currentView.get());
+        if (m.getViewNumber() < currentView.get() && m.getType() != HotStuffMessage.Type.NEW_VIEW && m.getType() != HotStuffMessage.Type.DECIDE && m.getType() != HotStuffMessage.Type.PREPARE) {
+            // we can still accept old NEW_VIEW messages to buffer them for our next view, and we must accept old DECIDE and PREPARE messages to be able to execute decisions based on them
+            // but other old messages are not useful and may represent delayed or replayed messages that should not interfere with our current state, so we ignore them
+            System.out.println("[COORDINATOR | DROP] old message ignored source=" + sourceId + " type=" + m.getType() + " view=" + m.getViewNumber() + " currentView=" + currentView.get());
             return;
         }
 
@@ -183,7 +200,6 @@ public class BasicHotStuffCoordinator {
     public synchronized void restartTimer() {
         if (viewTimerFuture != null) viewTimerFuture.cancel(false);
         viewTimerFuture = timerExecutor.schedule(() -> {
-            // System.out.println("[COORDINATOR | TIMEOUT] - Starting new view");
             startNextView();
         }, currentTimeoutMs, TimeUnit.MILLISECONDS);
     }
@@ -211,11 +227,13 @@ public class BasicHotStuffCoordinator {
             newViewMsgs.computeIfAbsent(view, k -> new HashMap<>()).put(sourceId, m);
 
             int count = newViewMsgs.get(view).size();
-            // System.out.println("[COORDINATOR | LEADER] - Received " + count + "/" + hotStuffQuorum + " NEW_VIEW messages for view " + view + " (targeting view " + targetView + ")");
+                System.out.println("[COORDINATOR | NEW_VIEW] leader=" + serverContext.getConfig().getSelfId() + " buffered view=" + view + " targetView=" + targetView
+                    + " source=" + sourceId
+                    + " count=" + count
+                    + " currentView=" + currentView.get());
 
             // but only signal the proposalLoop if we've actually advanced to targetView already; if not, the messages are buffered, startNextView() checks them on arrival
             if (reachedQuorum(count) && currentView.get() == targetView) {
-                // System.out.println("[COORDINATOR | LEADER] - Quorum reached for view " + targetView + ", ready to propose");
                 quorumReady = true;
                 notify();
             }
@@ -225,6 +243,8 @@ public class BasicHotStuffCoordinator {
     protected void doPropose() {
         int oldView = currentView.get() - 1;
         Map<String, HotStuffMessage> msgs = newViewMsgs.getOrDefault(oldView, new HashMap<>());
+
+        System.out.println("[COORDINATOR | PROPOSE] currentView=" + currentView.get() + " oldView=" + oldView + " bufferedNewViewMsgs=" + msgs.size());
 
         QC highQC = utils.getGenesisQC();
         for (Map.Entry<String, HotStuffMessage> entry : msgs.entrySet()) {
@@ -241,13 +261,16 @@ public class BasicHotStuffCoordinator {
         }
 
         // Drain the best fee-sufficient batch, regardless of queue arrival order.
-        List<ClientRequest> batch = mempool.drainFeeBatch(MAX_BATCH_SIZE, java.math.BigInteger.valueOf(MIN_FEE_THRESHOLD));
+        List<ClientRequest> batch = mempool.drainFeeBatch(serverContext.getConfig().getMaxBatchSize(), BigInteger.valueOf(serverContext.getConfig().getMinFeeThreshold()));
         List<TransactionPayload> txPayloads = new ArrayList<>();
         List<ClientRequestMeta> metaList = new ArrayList<>();
 
         if (batch.isEmpty()) {
+            System.out.println("[COORDINATOR | PROPOSE] no fee-sufficient batch available after wakeup");
             return;
         }
+
+        System.out.println("[COORDINATOR | PROPOSE] selectedBatchSize=" + batch.size() + " blockParent=" + (parent == null ? "<genesis>" : parent.getId().toStringUtf8()) + " currentView=" + currentView.get());
 
         lastProposedBatch = batch;
         for (ClientRequest req : batch) {
@@ -276,9 +299,15 @@ public class BasicHotStuffCoordinator {
         ByteString blockId = vote.getBlock().getId();
 
         Map<String, HotStuffMessage> votes = voteCollector.get(HotStuffMessage.Type.PREPARE).computeIfAbsent(blockId, k -> new HashMap<>());
+        if (votes.containsKey(sourceId)) {
+            // means that the same replica is sending multiple PREPARE votes for the same block and view, which should not happen in a correct execution
+            // we ignore subsequent votes from the same replica to prevent them from interfering with our vote counting, but we do not restart the timer 
+            // as this may be a Byzantine replica trying to disrupt the protocol by spamming votes
+            return;
+        }
         votes.put(sourceId, vote);
+        System.out.println("[COORDINATOR | VOTE] PREPARE source=" + sourceId + " view=" + vote.getViewNumber() + " block=" + blockId.toStringUtf8() + " count=" + votes.size());
 
-        // System.out.println("[COORDINATOR | LEADER] - Received PREPARE vote from " + sourceId + " for block " + blockId.toStringUtf8() + " in view " + vote.getViewNumber() + ". Total votes for this block: " + votes.size() + "/" + hotStuffQuorum);
         if (amILeaderOfView(vote.getViewNumber()) && reachedQuorum(votes.size())) {
             this.prepareQC = utils.createQC(votes.values());
 
@@ -299,7 +328,14 @@ public class BasicHotStuffCoordinator {
         ByteString blockId = vote.getBlock().getId();
 
         Map<String, HotStuffMessage> votes = voteCollector.get(HotStuffMessage.Type.PRE_COMMIT).computeIfAbsent(blockId, k -> new HashMap<>());
+        if (votes.containsKey(sourceId)) {
+            // means that the same replica is sending multiple PRE_COMMIT votes for the same block and view, which should not happen in a correct execution
+            // we ignore subsequent votes from the same replica to prevent them from interfering with our vote counting, but we do not restart the timer 
+            // as this may be a Byzantine replica trying to disrupt the protocol by spamming votes
+            return;
+        }
         votes.put(sourceId, vote);
+        System.out.println("[COORDINATOR | VOTE] PRE_COMMIT source=" + sourceId + " view=" + vote.getViewNumber() + " block=" + blockId.toStringUtf8() + " count=" + votes.size());
 
         if (amILeaderOfView(vote.getViewNumber()) && reachedQuorum(votes.size())) {
             QC preCommitQC = utils.createQC(votes.values());
@@ -319,7 +355,14 @@ public class BasicHotStuffCoordinator {
         voteCollector.putIfAbsent(HotStuffMessage.Type.COMMIT, new HashMap<>());
         ByteString blockId = vote.getBlock().getId(); 
         Map<String, HotStuffMessage> votes = voteCollector.get(HotStuffMessage.Type.COMMIT).computeIfAbsent(blockId, k -> new HashMap<>());
+        if (votes.containsKey(sourceId)) {
+            // means that the same replica is sending multiple COMMIT votes for the same block and view, which should not happen in a correct execution
+            // we ignore subsequent votes from the same replica to prevent them from interfering with our vote counting, but we do not restart the timer 
+            // as this may be a Byzantine replica trying to disrupt the protocol by spamming votes
+            return;
+        }
         votes.put(sourceId, vote);
+        System.out.println("[COORDINATOR | VOTE] COMMIT source=" + sourceId + " view=" + vote.getViewNumber() + " block=" + blockId.toStringUtf8() + " count=" + votes.size());
 
         if (amILeaderOfView(vote.getViewNumber()) && reachedQuorum(votes.size())) {
             QC commitQC = utils.createQC(votes.values());
@@ -332,24 +375,15 @@ public class BasicHotStuffCoordinator {
 
     /** PREPARE phase as Replica **/
     public void onReceivePrepare(String sourceId, HotStuffMessage m) {
-        if (!utils.matchingMSG(m, HotStuffMessage.Type.PREPARE, currentView.get()) || !getLeaderForView(currentView.get()).equals(sourceId))
+        if (!getLeaderForView(m.getViewNumber()).equals(sourceId))
             return;
 
-        // System.out.println("[COORDINATOR | REPLICA] - PREPARE message is for current view and from correct leader, processing...");
+        System.out.println("[COORDINATOR | PREPARE] source=" + sourceId + " messageView=" + m.getViewNumber() + " currentView=" + currentView.get());
 
         Block node = m.getBlock();
         QC justify = m.getJustify();
 
         if (!utils.verifyQC(justify)) {
-            // System.out.println("[COORDINATOR | REPLICA] - Received PREPARE with invalid QC from " + sourceId);
-            return;
-        }
-        // System.out.println("[COORDINATOR | REPLICA] - Received PREPARE with valid QC from " + sourceId + ", justify QC view number: " + justify.getViewNumber());
-
-        boolean extendsJustify = utils.extendsFrom(node, justify.getBlockId());
-        boolean safeNode = utils.safeNode(node, justify, lockedQC);
-
-        if (!extendsJustify || !safeNode) {
             return;
         }
 
@@ -367,28 +401,55 @@ public class BasicHotStuffCoordinator {
         }
 
         tree.putBlock(node);
+        System.out.println("[COORDINATOR | PREPARE] cached block=" + node.getId().toStringUtf8() + " parent=" + node.getParentId().toStringUtf8() + " currentView=" + currentView.get());
+
+        PendingDecide pendingDecide = pendingDecides.remove(node.getId());
+        if (pendingDecide != null && executeDecideIfReady(pendingDecide.sourceId, pendingDecide.message)) {
+            System.out.println("[COORDINATOR | PREPARE] executed pending DECIDE for block=" + node.getId().toStringUtf8());
+            return;
+        }
+
+        if (m.getViewNumber() != currentView.get()) {
+            System.out.println("[COORDINATOR | PREPARE] cached out-of-view block=" + node.getId().toStringUtf8() + " messageView=" + m.getViewNumber() + " currentView=" + currentView.get());
+            return;
+        }
+
+        // We only cast a vote for the current view. Older/future views are cached so the block can still
+        // be executed later if a matching DECIDE arrives.
+        boolean extendsJustify = utils.extendsFrom(node, justify.getBlockId());
+        boolean safeNode = utils.safeNode(node, justify, lockedQC);
+
+        if (!extendsJustify || !safeNode) {
+            return;
+        }
+
         sendVote(HotStuffMessage.Type.PREPARE, node, null);
     }
 
     /** PRE-COMMIT phase as Replica **/
     public void onReceivePreCommit(String sourceId, HotStuffMessage m) {
-        // System.out.println("[COORDINATOR | REPLICA] - Received PRE-COMMIT from " + sourceId + " for view " + m.getViewNumber());
         if (!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.PREPARE, currentView.get())
                 || !getLeaderForView(currentView.get()).equals(sourceId))
             return;
 
         QC newPrepareQC = m.getJustify();
         if (!utils.verifyQC(newPrepareQC)) {
-            // System.out.println("[COORDINATOR | REPLICA] - Received PRE-COMMIT with invalid QC from " + sourceId);
             return;
         }
-        // System.out.println("[COORDINATOR | REPLICA] - Received PRE-COMMIT with valid QC from " + sourceId + ", QC view number: " + newPrepareQC.getViewNumber());
+        if (prepareQC != null && newPrepareQC.getViewNumber() < prepareQC.getViewNumber()) {
+            // if the PRE-COMMIT justify QC is for a lower view than our current prepareQC, it means the leader is trying to make us vote for an old block that may no longer be safe
+            // we should ignore it and not update our prepareQC, as this may be a Byzantine leader trying to disrupt the protocol by sending outdated PRE-COMMIT messages
+            return;
+        }
         this.prepareQC = newPrepareQC;
+        System.out.println("[COORDINATOR | PRE_COMMIT] source=" + sourceId + " qcView=" + newPrepareQC.getViewNumber() + " block=" + newPrepareQC.getBlockId().toStringUtf8() + " currentView=" + currentView.get());
 
         Block node = tree.getBlock(prepareQC.getBlockId());
+        if (node == null) {
+            System.out.println("[COORDINATOR | PRE_COMMIT] missing block for qc blockId=" + prepareQC.getBlockId().toStringUtf8());
+            return;
+        }
         sendVote(HotStuffMessage.Type.PRE_COMMIT, node, prepareQC);
-
-        // System.out.println("[COORDINATOR | REPLICA] - Voted PRE-COMMIT for view " + currentView.get());
     }
 
     /** COMMIT phase as Replica **/
@@ -399,24 +460,33 @@ public class BasicHotStuffCoordinator {
 
         QC newLockedQC = m.getJustify();
         if (!utils.verifyQC(newLockedQC)) {
-            // System.out.println("[COORDINATOR | REPLICA] - Received COMMIT with invalid QC from " + sourceId);
             return;
         }
-        // System.out.println("[COORDINATOR | REPLICA] - Received COMMIT with valid QC from " + sourceId + ", QC view number: " + newLockedQC.getViewNumber());
-        this.lockedQC = newLockedQC;
+        if (lockedQC != null && newLockedQC.getViewNumber() < lockedQC.getViewNumber()) {
+            // if the COMMIT justify QC is for a lower view than our current lockedQC, it means the leader is trying to make us vote for an old block that may no longer be safe
+            // we should ignore it and not update our lockedQC, as this may be a Byzantine leader trying to disrupt the protocol by sending outdated COMMIT messages
+            return;
 
-        // System.out.println("[COORDINATOR | REPLICA] - Locked QC for view " + currentView.get());
+        }
+        this.lockedQC = newLockedQC;
+        System.out.println("[COORDINATOR | COMMIT] source=" + sourceId + " qcView=" + newLockedQC.getViewNumber() + " block=" + newLockedQC.getBlockId().toStringUtf8() + " currentView=" + currentView.get());
 
         Block node = tree.getBlock(lockedQC.getBlockId());
+        if (node == null) {
+            System.out.println("[COORDINATOR | COMMIT] missing block for qc blockId=" + lockedQC.getBlockId().toStringUtf8());
+            // if we don't have the block corresponding to the lockedQC, it means the leader is trying to make us vote for a block we don't know about, which should not happen in a correct execution
+            // we ignore the COMMIT message as we cannot safely vote for it, but we do not update our view or prune the tree as this may be a Byzantine leader trying to disrupt the protocol by sending COMMIT messages for unknown blocks
+            return;
+        }
         sendVote(HotStuffMessage.Type.COMMIT, node, lockedQC);
 
-        // System.out.println("[COORDINATOR | REPLICA] - Voted COMMIT for view " + currentView.get());
     }
 
     /** DECIDE phase as Replica **/
     public void onReceiveDecide(String sourceId, HotStuffMessage m) {
-        if (!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.COMMIT, currentView.get())
-                || !getLeaderForView(currentView.get()).equals(sourceId))
+        int decideView = m.getViewNumber();
+        if (!utils.matchingQC(m.getJustify(), HotStuffMessage.Type.COMMIT, decideView)
+                || !getLeaderForView(decideView).equals(sourceId))
             return;
 
         if (!utils.verifyQC(m.getJustify())) {
@@ -424,19 +494,49 @@ public class BasicHotStuffCoordinator {
         }
 
         Block commitedBlock = tree.getBlock(m.getJustify().getBlockId());
+        if (commitedBlock == null) {
+            pendingDecides.put(m.getJustify().getBlockId(), new PendingDecide(sourceId, m));
+            System.out.println("[COORDINATOR | DECIDE] pending unknown blockId=" + m.getJustify().getBlockId().toStringUtf8() + " source=" + sourceId + " decideView=" + decideView + " currentView=" + currentView.get());
+            return;
+        }
+
+        executeDecideIfReady(sourceId, m);
+    }
+
+    private boolean executeDecideIfReady(String sourceId, HotStuffMessage m) {
+        Block commitedBlock = tree.getBlock(m.getJustify().getBlockId());
+        if (commitedBlock == null) {
+            pendingDecides.put(m.getJustify().getBlockId(), new PendingDecide(sourceId, m));
+            System.out.println("[COORDINATOR | DECIDE] still pending unknown blockId=" + m.getJustify().getBlockId().toStringUtf8() + " source=" + sourceId + " decideView=" + m.getViewNumber());
+            return false;
+        }
+
         ByteString blockId = commitedBlock.getId();
 
         // guard against double-execution: only execute once per block
         boolean isFirstExecution = executedBlockIds.add(blockId);
         if (!isFirstExecution) {
-            return;
+            pendingDecides.remove(blockId);
+            return false;
         }
 
+        int decideView = m.getViewNumber();
+        System.out.println("[COORDINATOR | DECIDE] executing block=" + blockId.toStringUtf8() + " source=" + sourceId + " decideView=" + decideView + " currentViewBefore=" + currentView.get());
         executeStage2Block(commitedBlock, blockId, sourceId);
 
+        if (currentView.get() < decideView) {
+            // this means we are behind the decided view, likely due to a missed DECIDE message or a slow timer
+            // we fast-forward our view to the (safely) decided view to avoid losing future decisions.
+            // if we end up jumping views, it's okay, since we also accept DECIDE messages from previous views.
+            currentView.set(decideView);
+        }
+
+        pendingDecides.remove(blockId);
         tree.pruneSiblings(commitedBlock);
         onCommit();
         startNextView();
+        System.out.println("[COORDINATOR | DECIDE] finished execution block=" + blockId.toStringUtf8() + " currentViewAfter=" + currentView.get());
+        return true;
     }
 
     /**
@@ -478,9 +578,7 @@ public class BasicHotStuffCoordinator {
         serverContext.getWorldState().replaceWith(workingState);
         serverContext.getBlockChain().addBlock(finalBlock);
 
-        System.out.println("[COORDINATOR] Committed block #" + finalBlock.getBlockNumber()
-                + " with " + txList.size() + " txs, hash=" + finalBlock.getBlockHash()
-                + ", stateHash=" + stateHash);
+        System.out.println("[COORDINATOR] Committed block #" + finalBlock.getBlockNumber() + " with " + txList.size() + " txs, hash=" + finalBlock.getBlockHash() + ", stateHash=" + stateHash);
 
         // 7. Discard committed requests from mempool and notify MessageHandler
         List<ClientRequestMeta> metaList = protoBlock.getRequestMetaList();
@@ -518,8 +616,7 @@ public class BasicHotStuffCoordinator {
                         .setFee(ByteString.copyFrom(receipt.getFee().toByteArray()));
 
                 if (receipt.getContractAddress() != null) {
-                    responseBuilder.setContractAddress(
-                            ByteString.copyFrom(receipt.getContractAddress().toArrayUnsafe()));
+                    responseBuilder.setContractAddress(ByteString.copyFrom(receipt.getContractAddress().toArrayUnsafe()));
                 }
             }
 
@@ -528,8 +625,7 @@ public class BasicHotStuffCoordinator {
             try {
                 serverContext.getPerfectLink().send(meta.getClientId(), response.toByteArray());
             } catch (Exception e) {
-                System.err.println("[COORDINATOR | ERROR] Failed to send response to " + meta.getClientId()
-                        + ": " + e.getMessage());
+                System.err.println("[COORDINATOR | ERROR] Failed to send response to " + meta.getClientId() + ": " + e.getMessage());
             }
         }
     }
@@ -542,19 +638,18 @@ public class BasicHotStuffCoordinator {
      */
     private boolean hasSufficientFees() {
         System.out.println("[COORDINATOR] Checking fees for next batch in mempool...");
-        List<ClientRequest> batch = mempool.peekFeeBatch(MAX_BATCH_SIZE, java.math.BigInteger.valueOf(MIN_FEE_THRESHOLD));
+        List<ClientRequest> batch = mempool.peekFeeBatch(serverContext.getConfig().getMaxBatchSize(), BigInteger.valueOf(serverContext.getConfig().getMinFeeThreshold()));
         if (batch.isEmpty()) {
             return false;  // No requests to propose
         }
-        java.math.BigInteger totalFees = java.math.BigInteger.ZERO;
+        BigInteger totalFees = BigInteger.ZERO;
         for (ClientRequest req : batch) {
             if (req.hasTransaction()) {
-                totalFees = totalFees.add(new java.math.BigInteger(1, req.getTransaction().getGasPrice().toByteArray())
-                        .multiply(new java.math.BigInteger(1, req.getTransaction().getGasLimit().toByteArray())));
+                totalFees = totalFees.add(new BigInteger(1, req.getTransaction().getGasPrice().toByteArray()).multiply(new BigInteger(1, req.getTransaction().getGasLimit().toByteArray())));
             }
         }
-        System.out.println("[COORDINATOR] Current batch total fees: " + totalFees + " / " + MIN_FEE_THRESHOLD);
-        return totalFees.compareTo(java.math.BigInteger.valueOf(MIN_FEE_THRESHOLD)) >= 0;
+        System.out.println("[COORDINATOR] Current batch total fees: " + totalFees + " / " + serverContext.getConfig().getMinFeeThreshold());
+        return totalFees.compareTo(BigInteger.valueOf(serverContext.getConfig().getMinFeeThreshold())) >= 0;
     }
 
     // Method to start a new view
@@ -590,9 +685,8 @@ public class BasicHotStuffCoordinator {
         if (amILeaderOfView(newView)) {
             Map<String, HotStuffMessage> buffered = newViewMsgs.get(oldView);
             if (buffered != null && reachedQuorum(buffered.size())) {
-                // System.out.println("[COORDINATOR | LEADER] - Found buffered quorum on view advance to " + newView);
                 quorumReady = true;
-                notify();
+                notifyAll();
             }
         }
 
@@ -612,17 +706,11 @@ public class BasicHotStuffCoordinator {
     // Enqueue a client request for processing
     public synchronized void enqueueClientRequest(ClientRequest clientRequest) {
         mempool.enqueue(clientRequest);
-        notify(); 
+        notifyAll(); 
     }
 
     public synchronized void setRequestCommitListener(RequestCommitListener listener) {
         this.requestCommitListener = listener;
-    }
-
-    private synchronized void notifyRequestCommitted(String clientId, int requestId) {
-        if (requestCommitListener != null) {
-            requestCommitListener.onRequestCommitted(clientId, requestId);
-        }
     }
 
     // General send vote function for replicas
