@@ -38,7 +38,7 @@ public class MessageHandler {
                 CompletableFuture<Void> future = pendingFutures.get(reqId);
                 if (future == null || future.isDone()) return;
 
-                System.out.println("[✓] (" + reqId + ", " + sourceId + "): ACCEPTED - transaction is being processed");
+                System.out.println("[*] (" + reqId + ", " + sourceId + "): ACCEPTED - transaction is being processed");
                 future.complete(null);
                 return;
             }
