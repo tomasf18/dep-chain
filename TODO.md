@@ -1,17 +1,30 @@
 # TODO List
 
+## Almost done
+
+(ERC20 = IST Coin -> see "Native currency vs Tokens" section below)
+- ERC20 token transfers (client should be able to ask to transfer tokens to another account, and the replica should execute it if the client has enough balance)
+- ERC20 increaseAllowance (client should be able to ask to increase the allowance they have given to another account, and the replica should execute it)
+- ERC20 decreaseAllowance (client should be able to ask to decrease the allowance they have given to another account, and the replica should execute it if the client has enough allowance)
+- ERC20 transferFrom (client should be able to ask to transfer tokens on behalf of another account, and the replica should execute it if the client has enough allowance)
+- ERC20 balanceOf (client should be able to ask for their token balance and the replica should reply with it, provided the replica response includes the information needed to verify the balance is correct)
+- Native balance retrieval (client should be able to ask for their balance and the replica should reply with it)
+
+For the previous points, pay attention to:
+- The returnData should be used when required to send response data to the client. For example, in the case of balanceOf, it should carry the client's balance in the reply.
+- Clients should see their balance by requesting nodes for it. But replicas sending an entire chain of blocks is very inefficient since it can be huge. We must consider a better alternative to ensure the client receives the state and can verify it is correct (merkle proofs, or maybe a snapshot of the state at a certain block number, etc)
+- Separate 2 Client API calls for getting balance: one that returns the balance in the native currency (DepCoin) and another that returns the balance of a specific token (ERC-20). This is because they are stored differently in the world state and require different logic to retrieve.
+
 ## Not started
 
-- add logging options: nothing, info, debug
-- Order transactions by fee, but for the same client order by nonce
-- Clients should see their balance by requesting nodes for it. Sending an entire chain of blocks is very inefficient since it can be huge. Consider a better alternative to ensure the client receives the state and can verify it is correct (merkle proofs, or maybe a snapshot of the state at a certain block number, etc)
-- Separate 2 Client API calls for getting balance: one that returns the balance in the native currency (DepCoin) and another that returns the balance of a specific token (ERC-20). This is because they are stored differently in the world state and require different logic to retrieve.
-- The returnData should be used when required to send response data to the client. For example, in the case of balanceOf, it should carry the client's balance in the reply
+- Add logging options: nothing, info, debug
+- Order transactions by fee, **but for the same client order by nonce - "the transactions of each client are ordered by its nonce/submission order"**
+- If we are a replica should we validate if a transaction of depchain is possible due to account balances after or before the consensus for the block is reached? Could we accept a block with that transaction and when we are executing it if it fails we simple don't change the state and still make the sender pay the gas fee? PROFESSOR ANSWER: You should reason about the implications of the various design options and explain your choices in the report and in the discussion.
 
 ## To Verify
 
-- When just transferring DepCoin, should we create an EVM or just change the SimpleWorld directly? -> No, DepCoin does not require executing smart contract code so the EVM does not need to be invoked
-- It's okay if a replica receives a transaction in a block from the leader that it hasn't yet received from the client
+- When just transferring DepCoin, should we create an EVM or just change the SimpleWorld directly? -> PROFESSOR ANSWER: No, DepCoin does not require executing smart contract code so the EVM does not need to be invoked
+- Approval Frontrunning attacks are handled (create tests)
 
 ## Doubts:
 - For system liveness, is it enough to always have newViews after timeout, or is it necessary to always be proposing new blocks even without transactions?
@@ -21,17 +34,30 @@ Ultimately, the client defines the price because only the user knows the economi
 
 ## Completed
 
+- native transfers working with EVM execution
 - Clients need to sign requests and replicas need to verify
 - Application-level sequence numbers to prevent replay attacks (application tracks client state: "Paulo has 10 transactions")
-
 - Line in verifyQC
 - 2f+1 fix code and report
 - Guarantee that the f+1 received responses are actually identical (use hash)
-
 - Management of tree pruning for conflicting values (when locked, prune the non-locked ones)
 - Create tests where this happens (conflicting values)
 
-### Request Tracking Architecture
+
+
+
+
+
+----
+
+
+
+
+
+
+Other stuff, just to recall for the report:
+
+### Request Tracking 
 Before, the server rejected any client request whose requestId was not strictly greater than the highest seen one. This was too brittle over UDP and incompatible with the richer transaction flow needed in Stage 2. A valid delayed request could be discarded just because a later one arrived first.
 
 The solution: Changed how client requests are tracked on the server
