@@ -32,6 +32,7 @@ public class GenesisLoader {
 
         String genesisFilePath = config.getGenesisPath();
 
+        // First try loading from filesystem, then fallback to classpath resource
         File file = new File(genesisFilePath);
         if (file.exists()) {
             try (Reader reader = new FileReader(file)) {
@@ -101,12 +102,7 @@ public class GenesisLoader {
                 }
 
                 // Execute deployment into the fixed, known IST contract address
-                EvmService.deployContract(
-                        worldState,
-                        tx.getFrom(),
-                        expectedContractAddress,
-                        tx.getData()
-                );
+                EvmService.deployContract(worldState, tx.getFrom(), expectedContractAddress, tx.getData());
             }
         }
 

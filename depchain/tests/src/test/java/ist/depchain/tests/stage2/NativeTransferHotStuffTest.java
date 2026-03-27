@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *   → TransactionExecutor → BlockChain persist → ClientResponse
  */
 public class NativeTransferHotStuffTest {
-    private static final String CONFIG_FILE = "../config-test.json";
+    private static final String CONFIG_FILE = "../config/config-dev.json";
     private static final String[] REPLICAS = {"s0", "s1", "s2", "s3"};
 
     private static final String RECEIVER_HEX = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";

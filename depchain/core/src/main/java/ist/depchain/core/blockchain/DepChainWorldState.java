@@ -96,8 +96,7 @@ public class DepChainWorldState {
     public void subtractBalance(Address address, BigInteger amount) {
         BigInteger current = getBalance(address);
         if (current.compareTo(amount) < 0) {
-            throw new IllegalStateException("Insufficient balance for " + address
-                    + ": has " + current + ", needs " + amount);
+            throw new IllegalStateException("Insufficient balance for " + address + ": has " + current + ", needs " + amount);
         }
         setBalance(address, current.subtract(amount));
     }

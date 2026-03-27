@@ -79,15 +79,14 @@ public final class EvmService {
 
     /**
      * Deploys a contract by executing creation bytecode (+ constructor args) into a given address.
-     * Used for bootstrap/genesis or any deterministic project-specific deployment flow.
+     * Used for bootstrap/genesis or any deterministic deployment flow.
      */
     public static EvmResult deployContract(DepChainWorldState worldState, Address sender, Address contractAddress, byte[] deploymentData) {
-
         ByteArrayOutputStream traceOutput = new ByteArrayOutputStream();
         PrintStream tracePrint = new PrintStream(traceOutput);
         StandardJsonTracer tracer = new StandardJsonTracer(tracePrint, true, true, true, true);
 
-        var executor = EVMExecutor.evm(EvmSpecVersion.CANCUN);
+        EVMExecutor executor = EVMExecutor.evm(EvmSpecVersion.CANCUN);
         executor.tracer(tracer);
 
         if (worldState.getSimpleWorld().get(contractAddress) == null) {
@@ -108,21 +107,11 @@ public final class EvmService {
         Bytes returnBytes = extractReturnBytes(traceOutput);
 
         if ("REVERT".equalsIgnoreCase(opName)) {
-            return new EvmResult(
-                    false,
-                    returnBytes,
-                    Bytes.EMPTY,
-                    decodeRevertReason(returnBytes)
-            );
+            return new EvmResult(false, returnBytes, Bytes.EMPTY, decodeRevertReason(returnBytes));
         }
 
         if (!"RETURN".equalsIgnoreCase(opName)) {
-            return new EvmResult(
-                    false,
-                    returnBytes,
-                    Bytes.EMPTY,
-                    "unexpected final EVM op: " + opName
-            );
+            return new EvmResult(false, returnBytes, Bytes.EMPTY, "unexpected final EVM op: " + opName);
         }
 
         MutableAccount contractAccount = (MutableAccount) worldState.getSimpleWorld().get(contractAddress);
@@ -144,7 +133,7 @@ public final class EvmService {
         PrintStream tracePrint = new PrintStream(traceOutput);
         StandardJsonTracer tracer = new StandardJsonTracer(tracePrint, true, true, true, true);
 
-        var executor = EVMExecutor.evm(EvmSpecVersion.CANCUN);
+        EVMExecutor executor = EVMExecutor.evm(EvmSpecVersion.CANCUN);
         executor.tracer(tracer);
         executor.sender(sender);
         executor.receiver(contractAddress);
@@ -160,21 +149,11 @@ public final class EvmService {
         Bytes returnBytes = extractReturnBytes(traceOutput);
 
         if ("REVERT".equalsIgnoreCase(opName)) {
-            return new EvmResult(
-                    false,
-                    returnBytes,
-                    Bytes.EMPTY,
-                    decodeRevertReason(returnBytes)
-            );
+            return new EvmResult(false, returnBytes, Bytes.EMPTY, decodeRevertReason(returnBytes));
         }
 
         if (!"RETURN".equalsIgnoreCase(opName)) {
-            return new EvmResult(
-                    false,
-                    returnBytes,
-                    Bytes.EMPTY,
-                    "unexpected final EVM op: " + opName
-            );
+            return new EvmResult(false, returnBytes, Bytes.EMPTY, "unexpected final EVM op: " + opName);
         }
 
         return new EvmResult(true, returnBytes, Bytes.EMPTY, null);
@@ -182,6 +161,9 @@ public final class EvmService {
 
     // ---------- Convenience read helpers ----------
 
+    /**
+     * Calls a contract function that returns a string (e.g. name or symbol of an ERC-20 token).
+     */
     public static String callString(DepChainWorldState worldState, Address sender, Address contractAddress, Bytes runtimeCode, String calldataHex) {
 
         EvmResult result = callContract(worldState, sender, contractAddress, runtimeCode, Bytes.fromHexString(calldataHex).toArrayUnsafe());
@@ -191,6 +173,9 @@ public final class EvmService {
         return decodeAbiString(result.getReturnData());
     }
 
+    /**
+     * Calls a contract function that returns a uint (e.g. balanceOf).
+     */
     public static BigInteger callUint(DepChainWorldState worldState, Address sender, Address contractAddress, Bytes runtimeCode, String calldataHex) {
 
         EvmResult result = callContract(worldState, sender, contractAddress, runtimeCode, Bytes.fromHexString(calldataHex).toArrayUnsafe());
@@ -198,16 +183,6 @@ public final class EvmService {
             throw new IllegalStateException("EVM uint call failed: " + result.getErrorMessage());
         }
         return decodeAbiUint(result.getReturnData());
-    }
-
-    // ---------- Convenience helpers ----------
-
-    public static String readHexFile(String path) throws IOException {
-        String raw = Files.readString(Path.of(path), StandardCharsets.UTF_8).trim();
-        if (raw.startsWith("0x") || raw.startsWith("0X")) {
-            raw = raw.substring(2);
-        }
-        return raw.replaceAll("\\s+", "");
     }
 
     // ---------- Decoding ----------
@@ -233,6 +208,9 @@ public final class EvmService {
         return Bytes.fromHexString("0x" + returnData);
     }
 
+    /**
+     * Decodes a string return value from ABI-encoded EVM return data.
+     */
     public static String decodeAbiString(Bytes returnData) {
         if (returnData == null || returnData.isEmpty()) {
             return "";
@@ -252,6 +230,9 @@ public final class EvmService {
         return new String(hexStringToByteArray(hexString), StandardCharsets.UTF_8);
     }
 
+    /**
+     * Decodes a uint return value from ABI-encoded EVM return data.
+     */
     public static BigInteger decodeAbiUint(Bytes returnData) {
         if (returnData == null || returnData.isEmpty()) {
             return BigInteger.ZERO;
@@ -297,6 +278,10 @@ public final class EvmService {
 
     // ---------- Trace helpers ----------
 
+    /**
+     * Parses the EVM execution trace output from Besu's StandardJsonTracer and returns the last JSON object.
+     * The last JSON object corresponds to the final EVM operation (RETURN or REVERT) that determines the call result.
+     */
     public static JsonObject getLastTraceObject(ByteArrayOutputStream output) {
         String[] lines = output.toString(StandardCharsets.UTF_8).split("\\r?\\n");
         for (int i = lines.length - 1; i >= 0; i--) {

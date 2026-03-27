@@ -10,19 +10,21 @@ import ist.depchain.common.Transaction;
 /**
  * Executes transactions against a provided world state.
  *
- * Currently supports native DepCoin transfers with gas accounting.
- * EVM contract deployment/calls will be added in Step 6.
+ * Currently supports native DepCoin transfers with gas accounting, 
+ * EVM-based contract deployments and calls without gas accounting 
+ * (i.e. we charge the max fee regardless of actual gas used, and do not refund unused gas).
  *
  * Gas rules:
  * fee = min(gasPrice * gasLimit, gasPrice * gasUsed)
  * If gasUsed > gasLimit -> tx aborted, gas NOT refunded.
+ * If gasUsed < gasLimit -> tx success, refund (gasLimit - gasUsed) * gasPrice to sender.
  * Fees are deducted from sender's native DepCoin balance.
  * Fees are credited to the block proposer (leader).
  */
 public class TransactionExecutor {
 
     /** Fixed gas cost for a native DepCoin transfer (no EVM involved). */
-    private static final BigInteger NATIVE_TRANSFER_GAS = BigInteger.valueOf(21_000);
+    private static final BigInteger NATIVE_TRANSFER_GAS = BigInteger.valueOf(21000);
 
     public TransactionReceipt execute(DepChainWorldState state, Transaction tx, Address proposer) {
         byte[] txHash = tx.txHash();
@@ -34,8 +36,7 @@ public class TransactionExecutor {
         }
 
         if (state.getBalance(sender).compareTo(upfrontCost) < 0) {
-            return TransactionReceipt.failure(txHash, BigInteger.ZERO, BigInteger.ZERO,
-                    "insufficient balance for upfront cost");
+            return TransactionReceipt.failure(txHash, BigInteger.ZERO, BigInteger.ZERO, "insufficient balance for upfront cost");
         }
 
         // Reserve max upfront cost immediately.
@@ -82,6 +83,7 @@ public class TransactionExecutor {
         }
         state.addBalance(receiver, tx.getValue());
 
+        // Charge fee based on actual gas used, not the limit. Refund the difference.
         BigInteger fee = feeByLimit.min(feeByUsed);
         creditFee(state, proposer, fee);
 
@@ -95,7 +97,7 @@ public class TransactionExecutor {
 
     private TransactionReceipt executeContractDeployment(DepChainWorldState state, Transaction tx, byte[] txHash, Address proposer) {
         BigInteger gasUsed = tx.getGasLimit();
-        BigInteger fee = tx.getMaxFee();
+        BigInteger fee = tx.getMaxFee(); // charge max fee for simplicity, regardless of actual gas used (max fee is gas_price * gas_limit)
 
         if (tx.getValue().signum() > 0) { // if the transaction tries to transfer native value while deploying a contract, we simply refund the value and charge the fee
             creditFee(state, proposer, fee);
@@ -125,6 +127,7 @@ public class TransactionExecutor {
             return TransactionReceipt.failure(txHash, gasUsed, fee, "contract call with non-zero native value not supported");
         }
 
+        // Checks if the target account exists and has code before attempting the call, to avoid creating new accounts 
         Address contractAddress = tx.getTo();
         if (contractAddress == null) {
             creditFee(state, proposer, fee);
