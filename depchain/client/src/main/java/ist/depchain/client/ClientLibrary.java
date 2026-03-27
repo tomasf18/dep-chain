@@ -32,10 +32,6 @@ public class ClientLibrary {
         this.messageHandler = messageHandler;
     }
 
-    // Stage 1 compatibility placeholders
-    public void append(String data) {}
-    public void showLog() {}
-
     public void submitBalanceCheck() {
         Address selfAddress = clientContext.getSelfAddress();
         byte[] calldata = Erc20Abi.balanceOf(selfAddress);
@@ -97,9 +93,7 @@ public class ClientLibrary {
 
         submitSignedTransaction(reqId, signedTx, desc);
 
-        System.out.println("[SUBMITTED] contract tx reqId=" + reqId + " nonce=" + nonce
-                + " to=" + contractAddress.toHexString()
-                + " data=0x" + Numeric.toHexStringNoPrefix(calldata));
+        System.out.println("[SUBMITTED] contract tx reqId=" + reqId + " nonce=" + nonce + " to=" + contractAddress.toHexString() + " data=0x" + Numeric.toHexStringNoPrefix(calldata));
     }
 
     private void submitSignedTransaction(int reqId, Transaction signedTx, String requestDescription) {
@@ -123,11 +117,7 @@ public class ClientLibrary {
         Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
         clientContext.getAuthenticatedPerfectLink().broadcast(destinations, appMsg.toByteArray());
 
-        System.out.println("[SENT] reqId=" + reqId
-                + " from=" + signedTx.getFrom()
-                + " to=" + signedTx.getTo()
-                + " value=" + signedTx.getValue()
-                + " nonce=" + signedTx.getNonce());
+        System.out.println("[SENT] reqId=" + reqId + " from=" + signedTx.getFrom() + " to=" + signedTx.getTo() + " value=" + signedTx.getValue() + " nonce=" + signedTx.getNonce());
 
         // Increment nonce immediately after broadcast so next transaction gets unique nonce
         clientContext.incrementNonce();
