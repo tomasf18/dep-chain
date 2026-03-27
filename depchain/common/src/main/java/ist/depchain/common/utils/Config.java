@@ -106,7 +106,7 @@ public class Config {
                     processJson.get("host").getAsString(),
                     processJson.get("port").getAsInt(),
                     processJson.get("role").getAsString(),
-                    processJson.get("address").getAsString()
+                    Address.fromHexString(processJson.get("address").getAsString())
             );
             processes.put(processId, info);
         }
@@ -142,6 +142,14 @@ public class Config {
     public boolean isSelfClient() { return getSelfInfo().isClient(); }
     public boolean isSelfServer() { return getSelfInfo().isServer(); }
     public Map<String, ProcessInfo> getProcesses() { return processes; }
+    public ProcessInfo getProcessByAddress(Address address) {
+        for (ProcessInfo info : processes.values()) {
+            if (info.getAddress().equals(address)) {
+                return info;
+            }
+        }
+        return null;
+    }
     public Map<String, ProcessInfo> getClients() { return clients; }
     public Map<String, ProcessInfo> getBlockChainServers() { return blockChainServers; }
     public int getResendPeriodMillis() { return resendPeriodMillis; }

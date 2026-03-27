@@ -69,9 +69,7 @@ public class GenesisLoader {
                 throw new IllegalArgumentException("Genesis state entry missing balance for address " + addressString);
             }
 
-            BigInteger balance = parseNonNegativeBigInteger(
-                    accountData.get("balance").getAsString(),
-                    "balance for " + addressString);
+            BigInteger balance = parseNonNegativeBigInteger(accountData.get("balance").getAsString(), "balance for " + addressString);
 
             long nonce = 0;
             if (accountData.has("nonce")) {

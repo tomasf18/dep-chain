@@ -26,7 +26,12 @@ public class TransactionExecutor {
     /** Fixed gas cost for a native DepCoin transfer (no EVM involved). */
     private static final BigInteger NATIVE_TRANSFER_GAS = BigInteger.valueOf(21000);
 
-    public TransactionReceipt execute(DepChainWorldState state, Transaction tx, Address proposer) {
+    public TransactionExecutor() {
+        // Empty constructor 
+    }
+    
+
+    public TransactionReceipt execute(DepChainWorldState state, Transaction tx, Address proposer, boolean logging) {
         byte[] txHash = tx.txHash();
         Address sender = tx.getFrom();
 
@@ -47,15 +52,15 @@ public class TransactionExecutor {
         state.incrementNonce(sender);
 
         if (tx.isContractDeployment()) {
-            return executeContractDeployment(state, tx, txHash, proposer);
+            return executeContractDeployment(state, tx, txHash, proposer, logging);
         } else if (tx.isContractCall()) {
-            return executeContractCall(state, tx, txHash, proposer);
+            return executeContractCall(state, tx, txHash, proposer, logging);
         } else {
-            return executeNativeTransfer(state, tx, txHash, proposer);
+            return executeNativeTransfer(state, tx, txHash, proposer, logging);
         }
     }
 
-    private TransactionReceipt executeNativeTransfer(DepChainWorldState state, Transaction tx, byte[] txHash, Address proposer) {
+    private TransactionReceipt executeNativeTransfer(DepChainWorldState state, Transaction tx, byte[] txHash, Address proposer, boolean logging) {
         BigInteger gasUsed = NATIVE_TRANSFER_GAS;
         BigInteger gasLimit = tx.getGasLimit();
         BigInteger gasPrice = tx.getGasPrice();
@@ -92,10 +97,14 @@ public class TransactionExecutor {
             state.addBalance(tx.getFrom(), refund);
         }
 
+        if (logging) {
+            System.out.println(state.printWorldState());
+        }
+
         return TransactionReceipt.success(txHash, gasUsed, fee);
     }
 
-    private TransactionReceipt executeContractDeployment(DepChainWorldState state, Transaction tx, byte[] txHash, Address proposer) {
+    private TransactionReceipt executeContractDeployment(DepChainWorldState state, Transaction tx, byte[] txHash, Address proposer, boolean logging) {
         BigInteger gasUsed = tx.getGasLimit();
         BigInteger fee = tx.getMaxFee(); // charge max fee for simplicity, regardless of actual gas used (max fee is gas_price * gas_limit)
 
@@ -117,7 +126,7 @@ public class TransactionExecutor {
         return TransactionReceipt.success(txHash, gasUsed, fee, result.getReturnData().toArrayUnsafe(), contractAddress);
     }
 
-    private TransactionReceipt executeContractCall(DepChainWorldState state, Transaction tx, byte[] txHash, Address proposer) {
+    private TransactionReceipt executeContractCall(DepChainWorldState state, Transaction tx, byte[] txHash, Address proposer, boolean logging) {
         BigInteger gasUsed = tx.getGasLimit();
         BigInteger fee = tx.getMaxFee();
 
@@ -157,10 +166,13 @@ public class TransactionExecutor {
     }
 
     private void creditFee(DepChainWorldState state, Address proposer, BigInteger fee) {
-        if (proposer == null || fee == null || fee.signum() <= 0) {
+        String proposerLabel = proposer == null ? "<null>" : proposer.toHexString();
+        System.out.println("[DEBUG] Crediting fee of " + fee.toString() + " to proposer " + proposerLabel);
+        if (proposer == null || fee.signum() <= 0) {
             return;
         }
         if (!state.accountExists(proposer)) {
+            System.out.println("[WARN] Proposer account " + proposer.toHexString() + " does not exist in world state. Creating it to credit fees.");
             state.createEOA(proposer, 0, BigInteger.ZERO);
         }
         state.addBalance(proposer, fee);

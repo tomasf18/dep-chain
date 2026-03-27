@@ -31,8 +31,20 @@ public class MessageHandler {
         try {
             ClientResponse clientResponse = ClientResponse.parseFrom(data);
             int reqId = clientResponse.getRequestId();
+            String status = clientResponse.getStatus();
 
-            if (!clientResponse.getCommitted()) {
+            // Handle ACCEPTED status - transaction is being processed
+            if ("ACCEPTED".equals(status)) {
+                CompletableFuture<Void> future = pendingFutures.get(reqId);
+                if (future == null || future.isDone()) return;
+
+                System.out.println("[✓] (" + reqId + ", " + sourceId + "): ACCEPTED - transaction is being processed");
+                future.complete(null);
+                return;
+            }
+
+            // Handle REJECTED status
+            if ("REJECTED".equals(status)) {
                 if (!pendingFutures.containsKey(reqId)) return;
 
                 Set<String> rejectors = rejectionSenders.computeIfAbsent(reqId, k -> ConcurrentHashMap.newKeySet());
@@ -52,43 +64,45 @@ public class MessageHandler {
                 return;
             }
 
-            Map<String, Set<String>> differentResponseSenders = pendingRequests.get(reqId);
-            if (differentResponseSenders == null) {
-                System.out.println("[ ] (" + reqId + ", " + sourceId + "): nothing to do...");
+            // Handle COMMITTED status
+            if ("COMMITTED".equals(status)) {
+                Map<String, Set<String>> differentResponseSenders = pendingRequests.get(reqId);
+                if (differentResponseSenders == null) {
+                    System.out.println("[ ] (" + reqId + ", " + sourceId + "): COMMITTED but request already processed");
+                    return;
+                }
+
+                String responseId = makeResponseId(clientResponse);
+                Set<String> senders = differentResponseSenders.computeIfAbsent(responseId, key -> ConcurrentHashMap.newKeySet());
+                boolean isNewSender = senders.add(sourceId);
+                int count = senders.size();
+
+                if (!isNewSender) {
+                    System.out.println("[ ] (" + reqId + ", " + sourceId + "): duplicate sender ignored for [" + responseId + "] (" + count + "/" + responsesThreshold + ")");
+                    return;
+                }
+
+                if (count >= responsesThreshold) {
+                    System.out.println("[*] (" + reqId + ", " + sourceId + "): [" + responseId + "] (" + count + "/" + responsesThreshold + ") COMMITTED");
+
+                    printReceiptInfo(clientResponse);
+
+                    String originalData = clientContext.getRequestDataMap().get(reqId);
+                    if (originalData != null && !clientContext.getCommitedLog().contains(originalData)) {
+                        clientContext.getCommitedLog().add(originalData);
+                    }
+
+                    pendingRequests.remove(reqId);
+                    rejectionSenders.remove(reqId);
+                    clientContext.getRequestDataMap().remove(reqId);
+
+                    // Don't remove from pendingFutures here - it was already completed on ACCEPTED
+                } else {
+                    System.out.println("[+] (" + reqId + ", " + sourceId + "): [" + responseId + "] (" + count + "/" + responsesThreshold + ")");
+                }
                 return;
             }
 
-            String responseId = makeResponseId(clientResponse);
-            Set<String> senders = differentResponseSenders.computeIfAbsent(responseId, key -> ConcurrentHashMap.newKeySet());
-            boolean isNewSender = senders.add(sourceId);
-            int count = senders.size();
-
-            if (!isNewSender) {
-                System.out.println("[ ] (" + reqId + ", " + sourceId + "): duplicate sender ignored for [" + responseId + "] (" + count + "/" + responsesThreshold + ")");
-                return;
-            }
-
-            if (count >= responsesThreshold) {
-                System.out.println("[*] (" + reqId + ", " + sourceId + "): [" + responseId + "] (" + count + "/" + responsesThreshold + ") COMMITTED");
-
-                printReceiptInfo(clientResponse);
-
-                String originalData = clientContext.getRequestDataMap().get(reqId);
-                if (originalData != null && !clientContext.getCommitedLog().contains(originalData)) {
-                    clientContext.getCommitedLog().add(originalData);
-                }
-
-                pendingRequests.remove(reqId);
-                rejectionSenders.remove(reqId);
-                clientContext.getRequestDataMap().remove(reqId);
-
-                CompletableFuture<Void> future = pendingFutures.remove(reqId);
-                if (future != null) {
-                    future.complete(null);
-                }
-            } else {
-                System.out.println("[+] (" + reqId + ", " + sourceId + "): [" + responseId + "] (" + count + "/" + responsesThreshold + ")");
-            }
         } catch (Exception e) {
             System.out.println("[ERROR] Error while processing response: " + e.getMessage());
         }

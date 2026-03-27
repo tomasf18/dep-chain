@@ -2,6 +2,7 @@ package ist.depchain.core;
 
 import ist.depchain.common.utils.Config;
 import ist.depchain.common.utils.Erc20Abi;
+import ist.depchain.common.utils.ProcessInfo;
 import ist.depchain.common.utils.AddressUtils;
 import ist.depchain.core.blockchain.BlockChainBlock;
 import ist.depchain.core.blockchain.DepChainWorldState;
@@ -17,6 +18,9 @@ import ist.depchain.network.crypto.Authenticator;
 import ist.depchain.network.crypto.KeyLoader;
 
 import java.security.PublicKey;
+import java.util.List;
+import java.util.Set;
+
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.evm.account.MutableAccount;
 
@@ -43,7 +47,7 @@ public class ServerContext {
         authenticatedPerfectLink = new AuthenticatedPerfectLink(config, stubbornLink, fairLossLink, new Authenticator(config));
 
         blockChain = new BlockChain(config.getSelfId());
-        worldState = new DepChainWorldState();
+        worldState = new DepChainWorldState(config);
         transactionExecutor = new TransactionExecutor();
         loadGenesis();
 
@@ -64,11 +68,19 @@ public class ServerContext {
                 throw new IllegalStateException("IST contract code missing after bootstrap");
             }
 
-            System.out.println("[SERVER_CONTEXT] Genesis block loaded with " + genesis.getTransactions().size() + " transactions; IST contract bootstrapped at " + istAddress.toHexString());
-
-            System.out.println("=== After Deployment ===");
+            System.out.println("[SERVER_CONTEXT] Genesis block loaded with " + genesis.getTransactions().size() + " transactions \nIST contract bootstrapped at " + istAddress.toHexString());
+            
+            System.out.println("\n=== After Deployment ===");
             EvmService.printAccount(worldState.getSimpleWorld(), config.getInitialTokenHolderAddress(), "InitialTokenHolder");
             EvmService.printAccount(worldState.getSimpleWorld(), config.getIstContractAddress(), "Contract");
+            for (Address addr : worldState.getTrackedAccounts()) {
+                if (addr.equals(config.getInitialTokenHolderAddress()) || addr.equals(config.getIstContractAddress())) {
+                    continue; // already printed above
+                }
+                ProcessInfo processInfo = config.getProcessByAddress(addr);
+                String processId = processInfo != null ? processInfo.getId() : "Unknown";
+                EvmService.printAccount(worldState.getSimpleWorld(), addr, processId);
+            }
             System.out.println();
 
             MutableAccount contractAccount = (MutableAccount) worldState.getSimpleWorld().get(config.getIstContractAddress());
@@ -137,6 +149,10 @@ public class ServerContext {
      * its trusted public key.
      */
     public Address deriveAddressForProcess(String processId) {
+        if (processId != null && processId.equals(config.getSelfId())) {
+            return config.getSelfAddress();
+        }
+
         String keyPath = config.getTrustedProcessKeyPathString(processId);
         PublicKey pubKey = KeyLoader.loadPublicKey(keyPath);
         if (pubKey == null) {

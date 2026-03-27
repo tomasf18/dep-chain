@@ -33,7 +33,7 @@ class TransactionExecutionTest {
 
     @BeforeEach
     void setup() {
-        ws = new DepChainWorldState();
+        ws = new DepChainWorldState(null);
         executor = new TransactionExecutor();
     }
 
@@ -46,7 +46,7 @@ class TransactionExecutionTest {
         ws.createEOA(PROPOSER, 0, BigInteger.ZERO);
 
         Transaction tx = nativeTransfer(ALICE, BOB, 500, GAS_PRICE, GAS_LIMIT, 0);
-        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER);
+        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER, false);
 
         assertTrue(receipt.isSuccess());
         assertEquals(NATIVE_TRANSFER_GAS, receipt.getGasUsed());
@@ -75,7 +75,7 @@ class TransactionExecutionTest {
 
         for (int i = 0; i < 3; i++) {
             Transaction tx = nativeTransfer(ALICE, BOB, 100, GAS_PRICE, GAS_LIMIT, i);
-            TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER);
+            TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER, false);
             assertTrue(receipt.isSuccess(), "tx " + i + " failed: " + receipt.getError());
         }
 
@@ -93,7 +93,7 @@ class TransactionExecutionTest {
         ws.createEOA(PROPOSER, 0, BigInteger.ZERO);
 
         Transaction tx = nativeTransfer(ALICE, BOB, 1000, GAS_PRICE, highGasLimit, 0);
-        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER);
+        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER, false);
 
         assertTrue(receipt.isSuccess());
 
@@ -118,7 +118,7 @@ class TransactionExecutionTest {
         ws.createEOA(PROPOSER, 0, BigInteger.ZERO);
 
         Transaction tx = nativeTransfer(ALICE, BOB, 500, GAS_PRICE, tooLowGasLimit, 0);
-        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER);
+        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER, false);
 
         assertFalse(receipt.isSuccess());
         assertNotNull(receipt.getError());
@@ -148,7 +148,7 @@ class TransactionExecutionTest {
         ws.createEOA(BOB, 0, BigInteger.ZERO);
 
         Transaction tx = nativeTransfer(ALICE, BOB, 500, GAS_PRICE, GAS_LIMIT, 0);
-        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER);
+        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER, false);
 
         assertFalse(receipt.isSuccess());
         assertTrue(receipt.getError().contains("insufficient balance"));
@@ -170,7 +170,7 @@ class TransactionExecutionTest {
         assertFalse(ws.accountExists(unknown));
 
         Transaction tx = nativeTransfer(ALICE, unknown, 5000, GAS_PRICE, GAS_LIMIT, 0);
-        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER);
+        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER, false);
 
         assertTrue(receipt.isSuccess());
         assertTrue(ws.accountExists(unknown));
@@ -186,7 +186,7 @@ class TransactionExecutionTest {
         ws.createEOA(PROPOSER, 0, BigInteger.ZERO);
 
         Transaction tx = nativeTransfer(ALICE, BOB, 0, GAS_PRICE, GAS_LIMIT, 0);
-        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER);
+        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER, false);
 
         // Zero-value with no data is technically a native transfer
         // It should still succeed and charge gas
@@ -208,7 +208,7 @@ class TransactionExecutionTest {
         ws.createEOA(PROPOSER, 0, BigInteger.ZERO);
 
         Transaction tx = nativeTransfer(ALICE, BOB, 100, highGasPrice, GAS_LIMIT, 0);
-        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER);
+        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER, false);
 
         assertTrue(receipt.isSuccess());
         // fee = min(10*21000, 10*21000) = 210000
@@ -231,7 +231,7 @@ class TransactionExecutionTest {
 
         for (int i = 0; i < 5; i++) {
             Transaction tx = nativeTransfer(ALICE, BOB, 100, GAS_PRICE, GAS_LIMIT, i);
-            assertTrue(executor.execute(ws, tx, PROPOSER).isSuccess());
+            assertTrue(executor.execute(ws, tx, PROPOSER, false).isSuccess());
         }
 
         assertEquals(feePerTx.multiply(BigInteger.valueOf(5)), ws.getBalance(PROPOSER));
@@ -245,7 +245,7 @@ class TransactionExecutionTest {
         ws.createEOA(BOB, 0, BigInteger.ZERO);
 
         Transaction tx = nativeTransfer(ALICE, BOB, 500, GAS_PRICE, GAS_LIMIT, 0);
-        TransactionReceipt receipt = executor.execute(ws, tx, null);
+        TransactionReceipt receipt = executor.execute(ws, tx, null, false);
 
         assertTrue(receipt.isSuccess());
         // Alice still pays gas
@@ -269,7 +269,7 @@ class TransactionExecutionTest {
                 GAS_PRICE, GAS_LIMIT, 0, null
         );
 
-        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER);
+        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER, false);
         assertFalse(receipt.isSuccess());
         assertTrue(receipt.getError().contains("not yet implemented"));
         // Nonce still incremented
@@ -288,7 +288,7 @@ class TransactionExecutionTest {
                 GAS_PRICE, GAS_LIMIT, 0, null
         );
 
-        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER);
+        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER, false);
         assertFalse(receipt.isSuccess());
         assertTrue(receipt.getError().contains("not yet implemented"));
         assertEquals(1, ws.getNonce(ALICE));

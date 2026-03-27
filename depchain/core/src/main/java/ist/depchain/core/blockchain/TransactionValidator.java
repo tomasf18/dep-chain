@@ -1,6 +1,7 @@
 package ist.depchain.core.blockchain;
 
 import java.security.PublicKey;
+import java.util.Set;
 
 import org.hyperledger.besu.datatypes.Address;
 
@@ -21,7 +22,7 @@ import ist.depchain.common.Transaction;
  */
 public class TransactionValidator {
 
-    public static ValidationResult validate(Transaction tx, PublicKey clientPublicKey, String signatureAlgorithm, DepChainWorldState worldState) {
+    public static ValidationResult validate(Transaction tx, PublicKey clientPublicKey, String signatureAlgorithm, DepChainWorldState worldState, Set<Long> pendingNonces) {
 
         if (tx == null) {
             return ValidationResult.fail("missing transaction");
@@ -50,9 +51,17 @@ public class TransactionValidator {
             return ValidationResult.fail("unknown sender account");
         }
 
-        long expectedNonce = worldState.getNonce(tx.getFrom());
-        if (tx.getNonce() != expectedNonce) {
-            return ValidationResult.fail("invalid nonce: expected " + expectedNonce + ", got " + tx.getNonce());
+        long committedNonce = worldState.getNonce(tx.getFrom());
+        long txNonce = tx.getNonce();
+        
+        // Check for replays: nonce must be fresh (not already committed)
+        if (txNonce < committedNonce) {
+            return ValidationResult.fail("invalid nonce: expected " + committedNonce + " or higher, but got " + txNonce);
+        }
+        
+        // Check for duplicates: nonce must not already be pending
+        if (pendingNonces != null && pendingNonces.contains(txNonce)) {
+            return ValidationResult.fail("invalid nonce: nonce " + txNonce + " already pending");
         }
 
         if (tx.getGasPrice().signum() <= 0) {

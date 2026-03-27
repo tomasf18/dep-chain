@@ -25,7 +25,7 @@ class TransactionValidationTest {
         Address from = AddressUtils.deriveAddress(pub);
         Address to = Address.fromHexString("0x1111111111111111111111111111111111111111");
 
-        DepChainWorldState ws = new DepChainWorldState();
+        DepChainWorldState ws = new DepChainWorldState(null);
         ws.createEOA(from, 0, BigInteger.valueOf(1_000_000));
 
         Transaction unsignedTx = new Transaction(
@@ -36,7 +36,7 @@ class TransactionValidationTest {
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
         Transaction signed = unsignedTx.withSignature(sig);
 
-        var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws);
+        var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws, null);
         assertTrue(result.isValid(), result.getErrorMessage());
     }
 
@@ -47,7 +47,7 @@ class TransactionValidationTest {
         Address from = AddressUtils.deriveAddress(pub);
         Address to = Address.fromHexString("0x1111111111111111111111111111111111111111");
 
-        DepChainWorldState ws = new DepChainWorldState();
+        DepChainWorldState ws = new DepChainWorldState(null);
         ws.createEOA(from, 2, BigInteger.valueOf(1_000_000));
 
         Transaction unsignedTx = new Transaction(
@@ -58,7 +58,7 @@ class TransactionValidationTest {
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
         Transaction signed = unsignedTx.withSignature(sig);
 
-        var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws);
+        var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws, null);
         assertFalse(result.isValid());
         assertTrue(result.getErrorMessage().contains("nonce"));
     }
@@ -70,7 +70,7 @@ class TransactionValidationTest {
         Address from = AddressUtils.deriveAddress(pub);
         Address to = Address.fromHexString("0x1111111111111111111111111111111111111111");
 
-        DepChainWorldState ws = new DepChainWorldState();
+        DepChainWorldState ws = new DepChainWorldState(null);
         ws.createEOA(from, 0, BigInteger.valueOf(10));
 
         Transaction unsignedTx = new Transaction(
@@ -81,7 +81,7 @@ class TransactionValidationTest {
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
         Transaction signed = unsignedTx.withSignature(sig);
 
-        var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws);
+        var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws, null);
         assertFalse(result.isValid());
         assertTrue(result.getErrorMessage().contains("balance"));
     }
@@ -95,7 +95,7 @@ class TransactionValidationTest {
         Address from1 = AddressUtils.deriveAddress(pub1);
         Address to = Address.fromHexString("0x1111111111111111111111111111111111111111");
 
-        DepChainWorldState ws = new DepChainWorldState();
+        DepChainWorldState ws = new DepChainWorldState(null);
         ws.createEOA(from1, 0, BigInteger.valueOf(1_000_000));
 
         Transaction unsignedTx = new Transaction(
@@ -106,7 +106,7 @@ class TransactionValidationTest {
         byte[] wrongSig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp2.getPrivate(), "SHA256withECDSA");
         Transaction signed = unsignedTx.withSignature(wrongSig);
 
-        var result = TransactionValidator.validate(signed, pub1, "SHA256withECDSA", ws);
+        var result = TransactionValidator.validate(signed, pub1, "SHA256withECDSA", ws, null);
         assertFalse(result.isValid());
     }
 

@@ -14,12 +14,17 @@ import ist.depchain.core.blockchain.ValidationResult;
 import java.security.PublicKey;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
+
+import org.hyperledger.besu.datatypes.Address;
 
 public class MessageHandler {
     private final ServerContext serverContext;
     private final BasicHotStuffCoordinator coordinator;
     private final Set<RequestKey> pendingRequests = ConcurrentHashMap.newKeySet();
     private final Set<RequestKey> executedRequests = ConcurrentHashMap.newKeySet();
+    // Track the highest nonce seen per sender address to support pipelined transactions
+    private final Map<Address, Set<Long>> pendingNonces = new ConcurrentHashMap<>();
 
     public MessageHandler(ServerContext serverContext, BasicHotStuffCoordinator coordinator) {
         this.serverContext = serverContext;
@@ -42,7 +47,8 @@ public class MessageHandler {
                     System.err.println("[MESSAGE_HANDLER | ERROR] - Unknown message type from " + sourceId);
             }
         } catch (Exception e) {
-            System.err.println("[MESSAGE_HANDLER | ERROR] - Failed to parse ApplicationMessage from " + sourceId);
+            System.err.println("[MESSAGE_HANDLER | ERROR] - Failed to handle message from " + sourceId + ": " + e.getMessage());
+            e.printStackTrace(System.err);
         }
     }
 
@@ -69,6 +75,7 @@ public class MessageHandler {
         switch (clientRequest.getPayloadCase()) {
             case TRANSACTION:
                  handleTransactionRequest(clientRequest, requestKey);
+                 break;
             case PAYLOAD_NOT_SET:
                 pendingRequests.remove(requestKey);
                 System.err.println("[MESSAGE_HANDLER | ERROR] Empty client payload");
@@ -91,36 +98,64 @@ public class MessageHandler {
             return;
         }
 
-        ValidationResult result = TransactionValidator.validate(tx, clientPublicKey, serverContext.getConfig().getSignatureAlgorithm(), serverContext.getWorldState());
+        Set<Long> pendingNoncesForSender = pendingNonces.computeIfAbsent(tx.getFrom(), k -> ConcurrentHashMap.newKeySet());
+        
+        // Validate transaction (signature, account, balance, gas, nonce, etc.)
+        ValidationResult result = TransactionValidator.validate(tx, clientPublicKey, serverContext.getConfig().getSignatureAlgorithm(), serverContext.getWorldState(), pendingNoncesForSender);
 
         if (!result.isValid()) {
             pendingRequests.remove(requestKey);
-            System.err.println("[MESSAGE_HANDLER | ERROR] Rejected tx from " + clientId + ": " + result.getErrorMessage());
-            sendRejectionResponse(clientId, clientRequest.getRequestId());
+            System.err.println("[MESSAGE_HANDLER | ERROR] Transaction validation failed for " + requestKey + ": " + result.getErrorMessage());
+            sendRejectionResponse(clientId, clientRequest.getRequestId(), result.getErrorMessage());
             return;
         }
 
+        // Transaction is valid - track this nonce as pending and accept it
+        if (tx.getNonce() == serverContext.getWorldState().getNonce(tx.getFrom()) + 1) {
+            // If this transaction has the next expected nonce, we can clean up any pending nonces that are now stale (already committed)
+            pendingNoncesForSender.removeIf(nonce -> nonce <= tx.getNonce());
+        }
+        pendingNoncesForSender.add(tx.getNonce());
         System.out.println("[MESSAGE_HANDLER | INFO] Accepted tx request " + requestKey + " from=" + tx.getFrom() + " nonce=" + tx.getNonce());
 
         coordinator.enqueueClientRequest(clientRequest);
+        // Send immediate ACCEPTED response to client
+        sendAcceptedResponse(clientId, clientRequest.getRequestId());
     }
+        
     
     private void handleHotStuffMessage(String sourceId, HotStuffMessage hotstuffMsg) {
         coordinator.processMessage(sourceId, hotstuffMsg);
     }
 
-    private void sendRejectionResponse(String clientId, int reqId) {
+    private void sendRejectionResponse(String clientId, int reqId, String reason) {
         try {
+            String errorMessage = (reason == null || reason.isBlank()) ? "tx validation failed" : reason;
+
             ClientResponse rejection = ClientResponse.newBuilder()
                     .setClientId(clientId)
                     .setRequestId(reqId)
                     .setCommitted(false)
                     .setStatus("REJECTED")
-                    .setError("tx validation failed")
+                    .setError(errorMessage)
                     .build();
             serverContext.getPerfectLink().send(clientId, rejection.toByteArray());
         } catch (Exception e) {
             System.err.println("[MESSAGE_HANDLER | ERROR] Failed to send rejection to " + clientId + ": " + e.getMessage());
+        }
+    }
+
+    private void sendAcceptedResponse(String clientId, int reqId) {
+        try {
+            ClientResponse accepted = ClientResponse.newBuilder()
+                    .setClientId(clientId)
+                    .setRequestId(reqId)
+                    .setCommitted(false)
+                    .setStatus("ACCEPTED")
+                    .build();
+            serverContext.getPerfectLink().send(clientId, accepted.toByteArray());
+        } catch (Exception e) {
+            System.err.println("[MESSAGE_HANDLER | ERROR] Failed to send ACCEPTED response to " + clientId + ": " + e.getMessage());
         }
     }
 
@@ -132,6 +167,7 @@ public class MessageHandler {
         RequestKey requestKey = new RequestKey(clientId, requestId);
         pendingRequests.remove(requestKey);
         executedRequests.add(requestKey);
+        
     }
 
     private boolean verifyClientSignature(ClientRequest clientRequest) {

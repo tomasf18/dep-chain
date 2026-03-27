@@ -321,7 +321,8 @@ public final class EvmService {
             return;
         }
 
-        System.out.println("  Balance: " + account.getBalance());
+        // show wei balance and then convert from wei to decimal representation of DepCoin
+        System.out.println("  Balance: " + account.getBalance().toBigInteger() + " DepCoin");
         System.out.println("  Nonce: " + account.getNonce());
         System.out.println("  Code size: " + (account.getCode() == null ? 0 : account.getCode().size()));
     }

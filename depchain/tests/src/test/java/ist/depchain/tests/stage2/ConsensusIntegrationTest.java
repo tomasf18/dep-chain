@@ -48,7 +48,7 @@ class ConsensusIntegrationTest {
 
     @BeforeEach
     void setup() {
-        ws = new DepChainWorldState();
+        ws = new DepChainWorldState(null);
         executor = new TransactionExecutor();
     }
 
@@ -159,7 +159,7 @@ class ConsensusIntegrationTest {
         // Execute
         List<TransactionReceipt> receipts = new ArrayList<>();
         for (Transaction t : block.getTransactions()) {
-            receipts.add(executor.execute(ws, t, PROPOSER));
+            receipts.add(executor.execute(ws, t, PROPOSER, false));
         }
 
         assertEquals(1, receipts.size());
@@ -189,7 +189,7 @@ class ConsensusIntegrationTest {
         // Execute in order
         List<TransactionReceipt> receipts = new ArrayList<>();
         for (Transaction t : block.getTransactions()) {
-            receipts.add(executor.execute(ws, t, PROPOSER));
+            receipts.add(executor.execute(ws, t, PROPOSER, false));
         }
 
         assertTrue(receipts.get(0).isSuccess());
@@ -209,7 +209,7 @@ class ConsensusIntegrationTest {
 
         List<TransactionReceipt> receipts = new ArrayList<>();
         for (Transaction t : block.getTransactions()) {
-            receipts.add(executor.execute(ws, t, PROPOSER));
+            receipts.add(executor.execute(ws, t, PROPOSER, false));
         }
 
         BlockChainBlock finalized = BlockBuilder.finalize(block, receipts, "");
@@ -228,7 +228,7 @@ class ConsensusIntegrationTest {
         chain.addBlock(genesis);
 
         BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
-        List<TransactionReceipt> receipts = List.of(executor.execute(ws, tx, PROPOSER));
+        List<TransactionReceipt> receipts = List.of(executor.execute(ws, tx, PROPOSER, false));
         BlockChainBlock finalized = BlockBuilder.finalize(block, receipts, "");
         chain.addBlock(finalized);
 
@@ -261,7 +261,7 @@ class ConsensusIntegrationTest {
         List<TransactionReceipt> receipts = new ArrayList<>();
         List<Transaction> orderedTxs = block.getTransactions();
         for (Transaction t : orderedTxs) {
-            receipts.add(executor.execute(ws, t, PROPOSER));
+            receipts.add(executor.execute(ws, t, PROPOSER, false));
         }
 
         // Build receipt map by tx hash (same logic as executeStage2Block)
@@ -303,7 +303,7 @@ class ConsensusIntegrationTest {
         BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
         BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
 
-        TransactionReceipt receipt = executor.execute(ws, block.getTransactions().get(0), PROPOSER);
+        TransactionReceipt receipt = executor.execute(ws, block.getTransactions().get(0), PROPOSER, false);
         assertFalse(receipt.isSuccess());
 
         // Block still has the tx
@@ -321,7 +321,7 @@ class ConsensusIntegrationTest {
         BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
         BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
 
-        TransactionReceipt receipt = executor.execute(ws, block.getTransactions().get(0), PROPOSER);
+        TransactionReceipt receipt = executor.execute(ws, block.getTransactions().get(0), PROPOSER, false);
         assertTrue(receipt.isSuccess());
 
         // Proposer should have received the gas fee
@@ -340,14 +340,14 @@ class ConsensusIntegrationTest {
         // Block 1
         Transaction tx1 = tx(ALICE, BOB, 100, 1, 21_000, 0);
         BlockChainBlock block1 = BlockBuilder.build(List.of(tx1), genesis, PROPOSER);
-        TransactionReceipt r1 = executor.execute(ws, block1.getTransactions().get(0), PROPOSER);
+        TransactionReceipt r1 = executor.execute(ws, block1.getTransactions().get(0), PROPOSER, false);
         BlockChainBlock finalized1 = BlockBuilder.finalize(block1, List.of(r1), "");
         chain.addBlock(finalized1);
 
         // Block 2
         Transaction tx2 = tx(ALICE, CAROL, 200, 1, 21_000, 1);
         BlockChainBlock block2 = BlockBuilder.build(List.of(tx2), finalized1, PROPOSER);
-        TransactionReceipt r2 = executor.execute(ws, block2.getTransactions().get(0), PROPOSER);
+        TransactionReceipt r2 = executor.execute(ws, block2.getTransactions().get(0), PROPOSER, false);
         BlockChainBlock finalized2 = BlockBuilder.finalize(block2, List.of(r2), "");
         chain.addBlock(finalized2);
 
@@ -368,7 +368,7 @@ class ConsensusIntegrationTest {
         BlockChainBlock block = BlockBuilder.build(List.of(tx1, tx2), genesis, PROPOSER);
 
         for (Transaction t : block.getTransactions()) {
-            TransactionReceipt r = executor.execute(ws, t, PROPOSER);
+            TransactionReceipt r = executor.execute(ws, t, PROPOSER, false);
             assertTrue(r.isSuccess());
         }
 
@@ -397,7 +397,7 @@ class ConsensusIntegrationTest {
 
         List<TransactionReceipt> receipts = new ArrayList<>();
         for (Transaction t : ordered) {
-            receipts.add(executor.execute(ws, t, PROPOSER));
+            receipts.add(executor.execute(ws, t, PROPOSER, false));
         }
 
         // After tx0: 150_000 - 73_000 = 77_000 remaining

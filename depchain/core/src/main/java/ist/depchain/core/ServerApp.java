@@ -58,7 +58,5 @@ public class ServerApp {
         hotStuffCoordinator.start();
         
         System.out.println("[SERVER_APP | INFO] Successfully started");
-        System.out.println("    - Server ID: " + selfId);
-        System.out.println("    - Blockchain address: " + config.getProcessInfo(selfId).getAddress());
     }
 }

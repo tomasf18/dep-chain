@@ -64,6 +64,10 @@ public class BasicHotStuffCoordinator {
     private boolean quorumReady = false;
     private List<ClientRequest> lastProposedBatch = null; // track in-flight proposal so we can re-enqueue on timeout
     private static final int MAX_BATCH_SIZE = 10;
+    // Minimum total fee (in wei) required for a batch to be proposed as a non-empty block.
+    // If batch total fees are below this threshold, an empty block is proposed instead (maintaining liveness)
+    // For reference: native transfer costs 21000 gas at 1 wei/gas = 21000 wei threshold
+    private static final long MIN_FEE_THRESHOLD = 63000L;
     private Thread proposalLoopThread;
 
     public BasicHotStuffCoordinator(ServerContext serverContext, boolean isByzantine) {
@@ -109,13 +113,10 @@ public class BasicHotStuffCoordinator {
         while (true) {
             synchronized (this) {
                 try {
-                    while (!quorumReady || mempool.isEmpty()) {
+                    // Wait for: (1) quorum ready, (2) mempool not empty, AND (3) sufficient fees
+                    while (!quorumReady || mempool.isEmpty() || !hasSufficientFees()) {
                         wait();
                     }
-                    // Brief accumulation window: allow concurrent transactions from
-                    // multiple clients to pile up before draining the mempool, so
-                    // they are batched into the same block rather than one per block.
-                    wait(50);
                     doPropose();
                     quorumReady = false;
                 } catch (InterruptedException e) {
@@ -223,7 +224,7 @@ public class BasicHotStuffCoordinator {
 
     protected void doPropose() {
         int oldView = currentView.get() - 1;
-        Map<String, HotStuffMessage> msgs = newViewMsgs.get(oldView);
+        Map<String, HotStuffMessage> msgs = newViewMsgs.getOrDefault(oldView, new HashMap<>());
 
         QC highQC = utils.getGenesisQC();
         for (Map.Entry<String, HotStuffMessage> entry : msgs.entrySet()) {
@@ -239,13 +240,16 @@ public class BasicHotStuffCoordinator {
             parent = tree.getGenesisBlock();
         }
 
-        // Drain a batch of client requests from the mempool
-        List<ClientRequest> batch = mempool.drainBatch(MAX_BATCH_SIZE);
-        lastProposedBatch = batch;
-
-        // Build multi-tx block from transaction payloads
+        // Drain the best fee-sufficient batch, regardless of queue arrival order.
+        List<ClientRequest> batch = mempool.drainFeeBatch(MAX_BATCH_SIZE, java.math.BigInteger.valueOf(MIN_FEE_THRESHOLD));
         List<TransactionPayload> txPayloads = new ArrayList<>();
         List<ClientRequestMeta> metaList = new ArrayList<>();
+
+        if (batch.isEmpty()) {
+            return;
+        }
+
+        lastProposedBatch = batch;
         for (ClientRequest req : batch) {
             txPayloads.add(req.getTransaction());
             metaList.add(ClientRequestMeta.newBuilder()
@@ -253,8 +257,8 @@ public class BasicHotStuffCoordinator {
                     .setRequestId(req.getRequestId())
                     .build());
         }
-        Block curProposal = utils.createLeaf(parent, txPayloads, metaList);
 
+        Block curProposal = utils.createLeaf(parent, txPayloads, metaList);
         tree.putBlock(curProposal);
 
         HotStuffMessage prepareMsg = utils.msg(HotStuffMessage.Type.PREPARE, curProposal, highQC, currentView.get());
@@ -354,13 +358,7 @@ public class BasicHotStuffCoordinator {
         // Replicas must not vote for a block just because it has a valid QC chain. They must also verify the payload
         Address proposerAddress = serverContext.deriveAddressForProcess(sourceId);
 
-        ValidationResult validation =
-                BlockValidator.validateProposedBlock(
-                        node,
-                        serverContext.getWorldState(),
-                        serverContext.getTransactionExecutor(),
-                        serverContext.getConfig(),
-                        proposerAddress);
+        ValidationResult validation = BlockValidator.validateProposedBlock(node, serverContext.getWorldState(), serverContext.getConfig(), proposerAddress);
 
         if (!validation.isValid()) {
             System.err.println("[COORDINATOR | REPLICA] Rejecting proposed block " + node.getId().toStringUtf8()
@@ -456,6 +454,8 @@ public class BasicHotStuffCoordinator {
 
         // 2. Determine proposer address
         Address proposerAddress = serverContext.deriveAddressForProcess(leaderId);
+        System.out.println("[COORDINATOR] Executing block " + protoBlock.getId() + " proposed by " + leaderId
+                + " with " + txList.size() + " transactions");
 
         // 3. Build deterministic app-level block
         BlockChainBlock previousAppBlock = serverContext.getBlockChain().getLatestBlock();
@@ -466,7 +466,7 @@ public class BasicHotStuffCoordinator {
         List<TransactionReceipt> receipts = new ArrayList<>();
 
         for (Transaction tx : appBlock.getTransactions()) {
-            TransactionReceipt receipt = serverContext.getTransactionExecutor().execute(workingState, tx, proposerAddress);
+            TransactionReceipt receipt = serverContext.getTransactionExecutor().execute(workingState, tx, proposerAddress, true);
             receipts.add(receipt);
         }
 
@@ -535,6 +535,28 @@ public class BasicHotStuffCoordinator {
     }
 
     /** HELPER FUNCTIONS **/
+
+    /**
+     * Checks if the next batch in the mempool has sufficient total fees to meet the threshold.
+     * Peeks at the batch without removing it.
+     */
+    private boolean hasSufficientFees() {
+        System.out.println("[COORDINATOR] Checking fees for next batch in mempool...");
+        List<ClientRequest> batch = mempool.peekFeeBatch(MAX_BATCH_SIZE, java.math.BigInteger.valueOf(MIN_FEE_THRESHOLD));
+        if (batch.isEmpty()) {
+            return false;  // No requests to propose
+        }
+        java.math.BigInteger totalFees = java.math.BigInteger.ZERO;
+        for (ClientRequest req : batch) {
+            if (req.hasTransaction()) {
+                totalFees = totalFees.add(new java.math.BigInteger(1, req.getTransaction().getGasPrice().toByteArray())
+                        .multiply(new java.math.BigInteger(1, req.getTransaction().getGasLimit().toByteArray())));
+            }
+        }
+        System.out.println("[COORDINATOR] Current batch total fees: " + totalFees + " / " + MIN_FEE_THRESHOLD);
+        return totalFees.compareTo(java.math.BigInteger.valueOf(MIN_FEE_THRESHOLD)) >= 0;
+    }
+
     // Method to start a new view
     public synchronized void startNextView() {
         consecutiveTimeouts++;
@@ -561,7 +583,7 @@ public class BasicHotStuffCoordinator {
             .build();
         String nextLeader = getLeaderForView(newView);
 
-        // System.out.println("[COORDINATOR | REPLICA] - Moving to view " + newView + " with leader " + nextLeader);
+        System.out.println("[COORDINATOR | REPLICA] - Moving to view " + newView + " with leader " + nextLeader);
         serverContext.getPerfectLink().send(nextLeader, wrapper.toByteArray());
 
         // if we are the leader of the new view, check if messages arrived early and were buffered before we advanced

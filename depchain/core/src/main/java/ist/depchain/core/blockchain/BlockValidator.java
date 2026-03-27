@@ -27,7 +27,7 @@ public final class BlockValidator {
 
     private BlockValidator() {}
 
-    public static ValidationResult validateProposedBlock(Block protoBlock, DepChainWorldState committedState, TransactionExecutor executor, Config config, Address proposerAddress) {
+    public static ValidationResult validateProposedBlock(Block protoBlock, DepChainWorldState committedState, Config config, Address proposerAddress) {
 
         List<TransactionPayload> txPayloads = protoBlock.getTransactionsList();
         List<ClientRequestMeta> metaList = protoBlock.getRequestMetaList();
@@ -49,18 +49,10 @@ public final class BlockValidator {
                 return ValidationResult.fail("missing public key for client " + clientId);
             }
 
-            ValidationResult txResult = TransactionValidator.validate(tx, clientPublicKey, config.getSignatureAlgorithm(), snapshot);
+            ValidationResult txResult = TransactionValidator.validate(tx, clientPublicKey, config.getSignatureAlgorithm(), snapshot, null);
 
             if (!txResult.isValid()) {
                 return ValidationResult.fail("invalid tx at index " + i + ": " + txResult.getErrorMessage());
-            }
-
-            // Deterministically simulate the tx on the snapshot.
-            // Even failed txs (e.g. out-of-gas) are acceptable if they are valid and deterministic.
-            try {
-                executor.execute(snapshot, tx, proposerAddress);
-            } catch (Exception e) {
-                return ValidationResult.fail("execution simulation failed at index " + i + ": " + e.getMessage());
             }
         }
 

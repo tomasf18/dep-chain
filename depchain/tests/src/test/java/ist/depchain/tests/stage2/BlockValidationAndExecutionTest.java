@@ -28,7 +28,7 @@ class BlockValidationAndExecutionTest {
         Address from = AddressUtils.deriveAddress(kp.getPublic());
         Address to = Address.fromHexString("0x1111111111111111111111111111111111111111");
 
-        DepChainWorldState committed = new DepChainWorldState();
+        DepChainWorldState committed = new DepChainWorldState(null);
         committed.createEOA(from, 0, BigInteger.valueOf(1_000_000));
 
         Transaction unsignedTx = new Transaction(
@@ -40,7 +40,7 @@ class BlockValidationAndExecutionTest {
 
         DepChainWorldState working = committed.copy();
         TransactionExecutor executor = new TransactionExecutor();
-        TransactionReceipt receipt = executor.execute(working, tx, null);
+        TransactionReceipt receipt = executor.execute(working, tx, null, false);
 
         assertTrue(receipt.isSuccess());
         assertEquals(BigInteger.valueOf(1_000_000), committed.getBalance(from));
@@ -61,7 +61,7 @@ class BlockValidationAndExecutionTest {
 
     @Test
     void stateHashChangesWhenBalancesChange() {
-        DepChainWorldState ws = new DepChainWorldState();
+        DepChainWorldState ws = new DepChainWorldState(null);
         Address a = Address.fromHexString("0x1111111111111111111111111111111111111111");
 
         ws.createEOA(a, 0, BigInteger.TEN);

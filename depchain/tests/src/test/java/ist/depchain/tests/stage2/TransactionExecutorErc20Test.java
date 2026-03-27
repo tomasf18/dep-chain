@@ -46,7 +46,7 @@ class TransactionExecutorErc20Test {
 
     @BeforeEach
     void setUp() throws Exception {
-        worldState = new DepChainWorldState();
+        worldState = new DepChainWorldState(null);
         executor = new TransactionExecutor();
 
         treasuryKeys = genKeyPair();
@@ -92,7 +92,7 @@ class TransactionExecutorErc20Test {
                 null
         ), treasuryKeys);
 
-        TransactionReceipt receipt = executor.execute(worldState, tx, proposer);
+        TransactionReceipt receipt = executor.execute(worldState, tx, proposer, false);
 
         assertTrue(receipt.isSuccess(), receipt.getError());
         assertEquals(GAS_LIMIT, receipt.getGasUsed());
@@ -135,7 +135,7 @@ class TransactionExecutorErc20Test {
                 null
         ), treasuryKeys);
 
-        TransactionReceipt r1 = executor.execute(worldState, t1, proposer);
+        TransactionReceipt r1 = executor.execute(worldState, t1, proposer, false);
         assertTrue(r1.isSuccess(), r1.getError());
 
         assertEquals(BigInteger.valueOf(1000), tokenBalanceOf(alice));
@@ -158,7 +158,7 @@ class TransactionExecutorErc20Test {
                 null
         ), aliceKeys);
 
-        TransactionReceipt r2 = executor.execute(worldState, t2, proposer);
+        TransactionReceipt r2 = executor.execute(worldState, t2, proposer, false);
         assertTrue(r2.isSuccess(), r2.getError());
 
         assertEquals(BigInteger.valueOf(400), tokenAllowanceOf(alice, bob));
@@ -182,7 +182,7 @@ class TransactionExecutorErc20Test {
                 null
         ), bobKeys);
 
-        TransactionReceipt r3 = executor.execute(worldState, t3, proposer);
+        TransactionReceipt r3 = executor.execute(worldState, t3, proposer, false);
         assertTrue(r3.isSuccess(), r3.getError());
 
         assertEquals(BigInteger.valueOf(750), tokenBalanceOf(alice));
@@ -210,7 +210,7 @@ class TransactionExecutorErc20Test {
                 null
         ), aliceKeys);
 
-        TransactionReceipt receipt = executor.execute(worldState, tx, proposer);
+        TransactionReceipt receipt = executor.execute(worldState, tx, proposer, false);
 
         assertFalse(receipt.isSuccess());
         assertNotNull(receipt.getError());

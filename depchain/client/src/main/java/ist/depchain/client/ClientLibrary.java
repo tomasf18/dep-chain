@@ -24,7 +24,8 @@ public class ClientLibrary {
     private final ClientContext clientContext;
     private final MessageHandler messageHandler;
 
-    private static final long SUBMIT_TIMEOUT_SECONDS = 60;
+    // Timeout for ACCEPTED status (much shorter than commit timeout)
+    private static final long SUBMIT_TIMEOUT_SECONDS = 10;
 
     public ClientLibrary(ClientContext clientContext, MessageHandler messageHandler) {
         this.clientContext = clientContext;
@@ -55,14 +56,13 @@ public class ClientLibrary {
 
         submitSignedTransaction(reqId, signedTx, requestDescription);
 
-        System.out.println("[COMMITTED] native tx reqId=" + reqId + " nonce=" + nonce);
+        System.out.println("[SUBMITTED] native tx reqId=" + reqId + " nonce=" + nonce);
     }
 
     public void submitTokenTransfer(String toHex, BigInteger amount, BigInteger gasPrice, BigInteger gasLimit) {
         Address to = Address.fromHexString(toHex);
         byte[] calldata = Erc20Abi.transfer(to, amount);
-        submitContractCall(calldata, gasPrice, gasLimit,
-                "erc20.transfer(" + toHex + "," + amount + ")");
+        submitContractCall(calldata, gasPrice, gasLimit, "erc20.transfer(" + toHex + "," + amount + ")");
     }
 
     public void submitIncreaseAllowance(String spenderHex, BigInteger amount, BigInteger gasPrice, BigInteger gasLimit) {
@@ -97,7 +97,7 @@ public class ClientLibrary {
 
         submitSignedTransaction(reqId, signedTx, desc);
 
-        System.out.println("[COMMITTED] contract tx reqId=" + reqId + " nonce=" + nonce
+        System.out.println("[SUBMITTED] contract tx reqId=" + reqId + " nonce=" + nonce
                 + " to=" + contractAddress.toHexString()
                 + " data=0x" + Numeric.toHexStringNoPrefix(calldata));
     }
@@ -129,15 +129,18 @@ public class ClientLibrary {
                 + " value=" + signedTx.getValue()
                 + " nonce=" + signedTx.getNonce());
 
-        try {
-            committed.get(SUBMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        // Increment nonce immediately after broadcast so next transaction gets unique nonce
         clientContext.incrementNonce();
+
+        try {
+            // Wait only for ACCEPTED status (transaction is being processed)
+            committed.get(SUBMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            System.out.println("[ACCEPTED] reqId=" + reqId + " nonce=" + signedTx.getNonce() + " - transaction is now being processed");
         } catch (TimeoutException e) {
-            throw new RuntimeException(
-                    "Transaction timed out waiting for commit (reqId=" + reqId + ", nonce=" + signedTx.getNonce() + ")", e);
+            throw new RuntimeException("Transaction failed to receive acceptance from network (reqId=" + reqId + ", nonce=" + signedTx.getNonce() + ")", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Interrupted waiting for commit (reqId=" + reqId + ")", e);
+            throw new RuntimeException("Interrupted waiting for transaction acceptance (reqId=" + reqId + ")", e);
         } catch (ExecutionException e) {
             throw new RuntimeException(e.getCause().getMessage(), e.getCause());
         }

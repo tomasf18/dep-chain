@@ -1,0 +1,8 @@
+{
+  "block_hash": "55ccb661ff2e7598c40f696986a6708f4ba96d96667036bbf97a12b1ba9fbddd",
+  "previous_block_hash": "e7a1558222d81de10075b5f75a44d55001da638cad2e9a6b6b91283d969e89b3",
+  "block_number": 22,
+  "proposer": "0x163b745a57f26b27f3876c82b21a6d90bbe54bc9",
+  "transactions": [],
+  "state_hash": "af54687aaf2bc49cfb71fb3cca19b95248e9439d8e7dc1c24e51e03498375de0"
+}

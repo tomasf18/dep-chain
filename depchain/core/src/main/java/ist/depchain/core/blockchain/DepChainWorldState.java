@@ -18,6 +18,10 @@ import org.hyperledger.besu.evm.account.MutableAccount;
 import org.hyperledger.besu.evm.fluent.SimpleWorld;
 import org.web3j.crypto.Hash;
 import org.web3j.utils.Numeric;
+
+import ist.depchain.common.utils.ProcessInfo;
+import ist.depchain.common.utils.Config;
+
 import java.nio.ByteBuffer;
 
 /**
@@ -31,6 +35,7 @@ import java.nio.ByteBuffer;
  */
 public class DepChainWorldState {
     private SimpleWorld world;
+    private Config config; // for debug printing only, to resolve process info for tracked accounts
 
     /** Track all created accounts so we can copy/hash deterministically. */
     private final Set<Address> trackedAccounts = ConcurrentHashMap.newKeySet();
@@ -41,8 +46,9 @@ public class DepChainWorldState {
     // address -> set of slots 
     private final Map<Address, Set<UInt256>> trackedStorageSlots = new ConcurrentHashMap<>();
 
-    public DepChainWorldState() {
+    public DepChainWorldState(Config config) {
         this.world = new SimpleWorld();
+        this.config = config;
     }
 
     public SimpleWorld getSimpleWorld() {
@@ -56,7 +62,8 @@ public class DepChainWorldState {
     // --- Account creation ---
 
     public void createEOA(Address address, long nonce, BigInteger balanceUnits) {
-        world.createAccount(address, nonce, Wei.of(balanceUnits));
+        world.createAccount(address, nonce, Wei.of(balanceUnits)); // we use Besu's Wei wrapper just as a convenient numeric container for balances, but semantically these values represent the smallest unit of DepCoin
+        // when we use Wei.of(balanceUnits) (specifically within the context of Java-based EVM implementations), we are assigning native currency (DepCoin) to that account.
         trackedAccounts.add(address);
         trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet());
         trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>());
@@ -87,6 +94,9 @@ public class DepChainWorldState {
             throw new IllegalStateException("Account does not exist: " + address);
         }
         account.setBalance(Wei.of(balanceUnits));
+        trackedAccounts.add(address);
+        trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet());
+        trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>());
     }
 
     public void addBalance(Address address, BigInteger amount) {
@@ -156,7 +166,7 @@ public class DepChainWorldState {
     // --- Snapshot / replace ---
 
     public DepChainWorldState copy() {
-        DepChainWorldState cloned = new DepChainWorldState();
+        DepChainWorldState cloned = new DepChainWorldState(config);
 
         List<Address> orderedAccounts = new ArrayList<>(trackedAccounts);
         orderedAccounts.sort(Comparator.comparing(Address::toHexString));
@@ -187,6 +197,7 @@ public class DepChainWorldState {
         this.world = new SimpleWorld();
         this.trackedAccounts.clear();
         this.trackedStorageSlots.clear();
+        this.trackedStorageValues.clear();
 
         List<Address> orderedAccounts = new ArrayList<>(other.trackedAccounts);
         orderedAccounts.sort(Comparator.comparing(Address::toHexString));
@@ -248,5 +259,31 @@ public class DepChainWorldState {
         }
 
         return Numeric.toHexStringNoPrefix(Hash.sha3(buf.array()));
+    }
+
+    public Set<Address> getTrackedAccounts() {
+        return trackedAccounts;
+    }
+
+    public String printWorldState() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("World State:\n");
+        List<Address> orderedAccounts = new ArrayList<>(trackedAccounts);
+        orderedAccounts.sort(Comparator.comparing(Address::toHexString));
+        for (Address address : orderedAccounts) {
+            ProcessInfo processInfo = config.getProcessByAddress(address);
+            String processId = processInfo != null ? processInfo.getId() : "Unknown";
+            sb.append("- ").append(address.toHexString()).append(" (").append(processId).append(")")
+                    .append(": balance=").append(getBalance(address))
+                    .append(", nonce=").append(getNonce(address))
+                    .append("\n");
+            Map<UInt256, UInt256> values = trackedStorageValues.getOrDefault(address, Map.of());
+            List<UInt256> orderedSlots = new ArrayList<>(values.keySet());
+            orderedSlots.sort(Comparator.comparing(UInt256::toHexString));
+            for (UInt256 slot : orderedSlots) {
+                sb.append("    - storage[").append(slot.toHexString()).append("] = ").append(values.get(slot).toHexString()).append("\n");
+            }
+        }
+        return sb.toString();
     }
 }
