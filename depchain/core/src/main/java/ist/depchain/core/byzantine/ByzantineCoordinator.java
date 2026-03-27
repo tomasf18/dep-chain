@@ -5,6 +5,7 @@ import ist.depchain.common.*;
 import ist.depchain.core.ServerContext;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 
+import java.util.Collections;
 import java.util.Random;
 
 public class ByzantineCoordinator extends BasicHotStuffCoordinator {
@@ -35,12 +36,10 @@ public class ByzantineCoordinator extends BasicHotStuffCoordinator {
             QC highQC = super.utils.getGenesisQC();
             Block parent = super.tree.getGenesisBlock();
 
-            Command cmdA = Command.newBuilder().setData("BLOCK_A").build();
-            Block blockA = super.utils.createLeaf(parent, cmdA);
+            Block blockA = super.utils.createLeaf(parent, Collections.emptyList(), Collections.emptyList());
             super.tree.putBlock(blockA);
 
-            Command cmdB = Command.newBuilder().setData("BLOCK_B").build();
-            Block blockB = super.utils.createLeaf(parent, cmdB);
+            Block blockB = super.utils.createLeaf(parent, Collections.emptyList(), Collections.emptyList());
             super.tree.putBlock(blockB);
 
             HotStuffMessage msgA = super.utils.msg(HotStuffMessage.Type.PREPARE, blockA, highQC, super.currentView.get());
@@ -69,7 +68,7 @@ public class ByzantineCoordinator extends BasicHotStuffCoordinator {
                     .build();
 
             Block leaf = super.utils.createLeaf(super.tree.getGenesisBlock(),
-                    Command.newBuilder().setData("INVALID_QC_BLOCK").build());
+                    Collections.emptyList(), Collections.emptyList());
             super.tree.putBlock(leaf);
 
             HotStuffMessage prepareMsg = super.utils.msg(HotStuffMessage.Type.PREPARE, leaf, forgedQC, super.currentView.get());

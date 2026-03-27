@@ -1,0 +1,61 @@
+{
+  "networkConfig": {
+    "N": 4,
+    "f": 1,
+    "resendPeriodMillis": 1000,
+    "processes": {
+      "client1": {
+        "host": "localhost",
+        "port": 4001,
+        "role": "client",
+        "address": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9"
+      },
+      "client2": {
+        "host": "localhost",
+        "port": 4002,
+        "role": "client",
+        "address": "0x172bf398d2a931323199521625f471fb1c28879a"
+      },
+      "s0": {
+        "host": "localhost",
+        "port": 5000,
+        "role": "server",
+        "address": "0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd"
+      },
+      "s1": {
+        "host": "localhost",
+        "port": 5001,
+        "role": "server",
+        "address": "0x163b745a57f26b27f3876c82b21a6d90bbe54bc9"
+      },
+      "s2": {
+        "host": "localhost",
+        "port": 5002,
+        "role": "server",
+        "address": "0xdb710290c98c770c5ee6b312ea42b89cdbd23cc2"
+      },
+      "s3": {
+        "host": "localhost",
+        "port": 5003,
+        "role": "server",
+        "address": "0x76c6c1931f73ef9d9e9499c79d6bc34fd201ab15"
+      }
+    }
+  },
+  "faultConfig": {
+    "dropProbability": 0.05,
+    "duplicateProbability": 0.05,
+    "tamperProbability": 0.05,
+    "maxDelayMs": 100
+  },
+  "cryptoConfig": {
+    "signatureAlgorithm": "SHA256withECDSA"
+  },
+  "blockchainConfig": {
+    "genesisPath": "core/src/main/resources/genesis.json",
+    "initialTokenHolderAddress": "0x1000000000000000000000000000000000000001",
+    "istContractAddress": "0x9999999999999999999999999999999999999999",
+    "istCreationBinPath": "core/src/main/resources/contracts/ist/ISTCoin.creation.bin",
+    "istAbiPath": "core/src/main/resources/contracts/ist/ISTCoin.abi"
+  }
+}

@@ -13,7 +13,7 @@ import org.web3j.crypto.Hash;
 public class Transaction {
     private final Address from;
     private final Address to; // null for contract deployment
-    private final BigInteger value; // native DepCoin amount in smallest unit
+    private final BigInteger value; // how much native currency (DepCoin) to transfer; zero for contract calls and deployments
     private final byte[] data; // calldata or deployment bytecode
     private final BigInteger gasPrice;
     private final BigInteger gasLimit;
@@ -56,6 +56,14 @@ public class Transaction {
         return value.add(getMaxFee());
     }
 
+    public byte[] txHash() {
+        return Hash.sha3(toUnsignedBytes());
+    }
+
+    public Transaction withSignature(byte[] newSignature) {
+        return new Transaction(from, to, value, data, gasPrice, gasLimit, nonce, newSignature);
+    }
+
     /**
      * Canonical unsigned serialization to be used for signing, verification,
      * transaction hashing, tie-breaking, and receipts.
@@ -88,13 +96,10 @@ public class Transaction {
 
         return buf.array();
     }
-
-    public byte[] txHash() {
-        return Hash.sha3(toUnsignedBytes());
-    }
-
-    public Transaction withSignature(byte[] newSignature) {
-        return new Transaction(from, to, value, data, gasPrice, gasLimit, nonce, newSignature);
+    
+    private static void putWithLength(ByteBuffer buffer, byte[] bytes) {
+        buffer.putInt(bytes.length);
+        buffer.put(bytes);
     }
 
     public TransactionPayload toProto() {
@@ -126,11 +131,6 @@ public class Transaction {
                 proto.getNonce(),
                 proto.getSignature().toByteArray()
         );
-    }
-    
-    private static void putWithLength(ByteBuffer buffer, byte[] bytes) {
-        buffer.putInt(bytes.length);
-        buffer.put(bytes);
     }
 
     private static byte[] normalizeBigInt(BigInteger value) {

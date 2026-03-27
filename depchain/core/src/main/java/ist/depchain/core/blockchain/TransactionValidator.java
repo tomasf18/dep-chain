@@ -1,11 +1,12 @@
 package ist.depchain.core.blockchain;
 
 import java.security.PublicKey;
+import java.util.Set;
 
 import org.hyperledger.besu.datatypes.Address;
 
 import ist.depchain.common.utils.AddressUtils;
-import ist.depchain.network.crypto.Crypto;
+import ist.depchain.common.utils.Crypto;
 import ist.depchain.common.Transaction;
 
 /**
@@ -21,21 +22,7 @@ import ist.depchain.common.Transaction;
  */
 public class TransactionValidator {
 
-    public record ValidationResult(boolean valid, String error) {
-        public static ValidationResult ok() {
-            return new ValidationResult(true, "");
-        }
-
-        public static ValidationResult fail(String error) {
-            return new ValidationResult(false, error);
-        }
-    }
-
-    public static ValidationResult validate(
-            Transaction tx,
-            PublicKey clientPublicKey,
-            String signatureAlgorithm,
-            DepChainWorldState worldState) {
+    public static ValidationResult validate(Transaction tx, PublicKey clientPublicKey, String signatureAlgorithm, DepChainWorldState worldState, Set<Long> pendingNonces) {
 
         if (tx == null) {
             return ValidationResult.fail("missing transaction");
@@ -46,11 +33,7 @@ public class TransactionValidator {
         }
 
         try {
-            boolean sigOk = Crypto.verifySignature(
-                    tx.toUnsignedBytes(),
-                    tx.getSignature(),
-                    clientPublicKey,
-                    signatureAlgorithm);
+            boolean sigOk = Crypto.verifySignature(tx.toUnsignedBytes(), tx.getSignature(), clientPublicKey, signatureAlgorithm);
 
             if (!sigOk) {
                 return ValidationResult.fail("invalid transaction signature");
@@ -68,8 +51,17 @@ public class TransactionValidator {
             return ValidationResult.fail("unknown sender account");
         }
 
-        if (tx.getNonce() != worldState.getNonce(tx.getFrom())) {
-            return ValidationResult.fail("invalid nonce");
+        long committedNonce = worldState.getNonce(tx.getFrom());
+        long txNonce = tx.getNonce();
+        
+        // Check for replays: nonce must be fresh (not already committed)
+        if (txNonce < committedNonce) {
+            return ValidationResult.fail("invalid nonce: expected " + committedNonce + " or higher, but got " + txNonce);
+        }
+        
+        // Check for duplicates: nonce must not already be pending
+        if (pendingNonces != null && pendingNonces.contains(txNonce)) {
+            return ValidationResult.fail("invalid nonce: nonce " + txNonce + " already pending");
         }
 
         if (tx.getGasPrice().signum() <= 0) {
@@ -90,6 +82,10 @@ public class TransactionValidator {
 
         if (tx.isContractDeployment() && tx.getData().length == 0) {
             return ValidationResult.fail("contract deployment requires non-empty bytecode");
+        }
+
+        if ((tx.isContractCall() || tx.isContractDeployment()) && tx.getValue().signum() != 0) {
+            return ValidationResult.fail("contract transactions with non-zero native value are not supported");
         }
 
         return ValidationResult.ok();

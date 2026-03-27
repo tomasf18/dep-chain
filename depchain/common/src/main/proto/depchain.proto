@@ -9,102 +9,114 @@ option java_multiple_files = true;
 // Network Layer
 
 message Handshake {
-    bytes ecdhPublicKey = 1;
-    bool is_reply = 2;
+  bytes ecdhPublicKey = 1;
+  bool  is_reply      = 2;
 }
 
 message Envelope {
-    string sender_id = 1; // e.g., "replica1", "replica2", ...
-    uint64 sequence_number = 2; // unique per sender
+  string sender_id       = 1; // e.g., "replica1", "replica2", ...
+  uint64 sequence_number = 2; // unique per sender
 
-    oneof content {
-        bytes payload = 3; // serialized message (e.g., ClientRequest, HotStuffMessage, etc.)
-        Ack ack = 4;
-        Handshake handshake = 5;
-    }
+  oneof content {
+    bytes     payload   = 3; // serialized message (e.g., ClientRequest, HotStuffMessage, etc.)
+    Ack       ack       = 4;
+    Handshake handshake = 5;
+  }
 }
 
 message Ack {
-    string original_sender = 1; // who sent the original message being acknowledged
-    uint64 original_sequence_number = 2; // sequence number of the original message being acknowledged
+  string original_sender          = 1; // who sent the original message being acknowledged
+  uint64 original_sequence_number = 2; // sequence number of the original message being acknowledged
 }
 
 // Client <-> Replica Messages
 
 message ApplicationMessage { // serves to simplify the message handling logic by MessageHandler
-    oneof content {
-        ClientRequest  client_request   = 1;
-        HotStuffMessage hotstuff_message = 2;
-    }
-}
-
-message Command {
-    string type = 1;
-    string data = 2;
-    string client_id = 3;
-    uint32 request_id = 4;
-}
-
-message TransactionPayload {
-  bytes from = 1;        // 20-byte Ethereum-style address
-  bytes to = 2;          // empty for deployment
-  bytes value = 3;       // big-endian BigInteger
-  bytes data = 4;        // calldata / deployment bytecode
-  bytes gas_price = 5;   // big-endian BigInteger
-  bytes gas_limit = 6;   // big-endian BigInteger
-  uint64 nonce = 7;
-  bytes signature = 8;   // ECDSA signature over unsigned tx bytes
+  oneof content {
+    ClientRequest   client_request   = 1;
+    HotStuffMessage hotstuff_message = 2;
+  }
 }
 
 message ClientRequest {
-  string client_id = 1;
+  string client_id  = 1;
   uint32 request_id = 2;
 
   oneof payload {
-    Command command = 3;                 // legacy Stage 1
+    Command            command     = 3;                 // legacy Stage 1
     TransactionPayload transaction = 4;  // Stage 2
   }
 
   bytes signature = 10; // signature over request envelope (without this field)
 }
 
-message ClientResponse {
-  string client_id = 1;
-  uint32 request_id = 2;
-  bool committed = 3;
-  bytes block_id = 4;
+message Command {
+  string type       = 1;
+  string data       = 2;
+  string client_id  = 3;
+  uint32 request_id = 4;
+}
 
-  bytes tx_hash = 5;
-  string status = 6;   // ACCEPTED / REJECTED / COMMITTED
-  string error = 7;    // empty if none
+message TransactionPayload {
+  bytes  from      = 1;        // 20-byte Ethereum-style address
+  bytes  to        = 2;          // empty for deployment
+  bytes  value     = 3;       // big-endian BigInteger
+  bytes  data      = 4;        // calldata / deployment bytecode
+  bytes  gas_price = 5;   // big-endian BigInteger
+  bytes  gas_limit = 6;   // big-endian BigInteger
+  uint64 nonce     = 7;
+  bytes  signature = 8;   // ECDSA signature over unsigned tx bytes
+}
+
+message ClientResponse {
+  string client_id  = 1;
+  uint32 request_id = 2;
+  bool   committed  = 3;
+  bytes  block_id   = 4;
+
+  bytes  tx_hash          = 5;
+  string status           = 6;   // ACCEPTED / REJECTED / COMMITTED
+  string error            = 7;    // empty if none
+  bytes  return_data      = 8;
+  bytes  contract_address = 9;
+  bytes  gas_used         = 10;
+  bytes  fee              = 11;
 }
 
 // Replica <-> Replica Messages (HotStuff)
 
 message HotStuffMessage{
-    enum Type{                // [Pag 6, Data Structures, Messages]
-        NEW_VIEW = 0;
-        PREPARE = 1;
-        PRE_COMMIT = 2;
-        COMMIT = 3;
-        DECIDE = 4;
-    }
-    Type type = 1;            // [Line 2]  - m.type
-    int32 view_number = 2;    // [Line 3]  - m.viewNumber
-    Block block = 3;          // [Line 4]  - m.node
-    QC justify = 4;           // [Line 5]  - m.justify (optional)
-    bytes partial_sig = 5;    // [Line 9]  - m.partialSig (optional - sent only by replicas)
+  enum Type{                // [Pag 6, Data Structures, Messages]
+    NEW_VIEW   = 0;
+    PREPARE    = 1;
+    PRE_COMMIT = 2;
+    COMMIT     = 3;
+    DECIDE     = 4;
+  }
+  Type  type        = 1;            // [Line 2]  - m.type
+  int32 view_number = 2;    // [Line 3]  - m.viewNumber
+  Block block       = 3;          // [Line 4]  - m.node
+  QC    justify     = 4;           // [Line 5]  - m.justify (optional)
+  bytes partial_sig = 5;    // [Line 9]  - m.partialSig (optional - sent only by replicas)
 }
 
 message Block {
-    bytes id = 1;          // Unique digest of block - Cryptographic Security reasons
-    bytes parent_id = 2;   // [Line 12] - b.parent
-    Command command = 3;   // [Line 13] - b.cmd, command included in this block
+  bytes                       id           = 1;          // Unique digest of block - Cryptographic Security reasons
+  bytes                       parent_id    = 2;   // [Line 12] - b.parent
+  Command                     command      = 3;   // [Line 13] - b.cmd (legacy Stage 1, single command)
+  repeated TransactionPayload transactions = 4; // Stage 2: batch of transactions
+  repeated ClientRequestMeta  request_meta = 5;  // Maps each tx back to (clientId, requestId) for replies
+}
+
+// Lightweight metadata to track which client request each transaction belongs to
+message ClientRequestMeta {
+  string client_id  = 1;
+  uint32 request_id = 2;
 }
 
 message QC {
-    HotStuffMessage.Type type = 1;   // [Line 16] - qc.type
-    int32 view_number = 2;           // [Line 17] - qc.viewNumber
-    bytes block_id = 3;              // [Line 18] - qc.node
-    bytes threshold_sig = 4;         // [Line 19] - qc.sig, signature aggregated from a quorum of replicas (threshold signature)
+  HotStuffMessage.Type type          = 1;   // [Line 16] - qc.type
+  int32                view_number   = 2;           // [Line 17] - qc.viewNumber
+  bytes                block_id      = 3;              // [Line 18] - qc.node
+  bytes                threshold_sig = 4;         // [Line 19] - qc.sig, signature aggregated from a quorum of replicas (threshold signature)
 }

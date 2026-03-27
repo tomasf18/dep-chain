@@ -107,7 +107,7 @@ Two config files are provided:
 | `-n N` | Number of clients to start | `2` |
 | `-t` | Use `config-test.json` (fault injection enabled) | uses `config-dev.json` |
 | `-c` | Recompile before starting (generates EC keys + Maven build) | off |
-| `-b` | Build only — compile and generate keys without starting the tmux session (implies `-c`) | off |
+| `-b` | Build only - compile and generate keys without starting the tmux session (implies `-c`) | off |
 
 **Examples:**
 

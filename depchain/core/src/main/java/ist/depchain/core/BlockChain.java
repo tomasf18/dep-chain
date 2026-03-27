@@ -1,28 +1,76 @@
 package ist.depchain.core;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import ist.depchain.core.blockchain.Block;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParser;
+
+import ist.depchain.core.blockchain.BlockChainBlock;
+import ist.depchain.core.blockchain.BlockSerializer;
 
 public class BlockChain {
-    private final List<Block> blocks;
+    private static final String PERSISTENCE_BASE_DIR = "data/blocks/";
+    private final List<BlockChainBlock> blocks;
+    private final String persistenceDir; // null = no persistence
 
     public BlockChain() {
+        this(null);
+    }
+
+    public BlockChain(String replicaId) {
         this.blocks = new ArrayList<>();
+        if (replicaId != null) {
+            // if it's an absolute path, use it directly; otherwise, treat as replicaId and prepend baseDir
+            File file = new File(replicaId);
+            this.persistenceDir = file.isAbsolute() ? replicaId : PERSISTENCE_BASE_DIR + replicaId;
+        } else {
+            this.persistenceDir = null;
+        }
+        if (persistenceDir != null) {
+            new File(persistenceDir).mkdirs();
+        }
     }
 
-    public void addBlock(Block block) {
+    public synchronized void addBlock(BlockChainBlock block) {
+        if (block == null) {
+            throw new IllegalArgumentException("block cannot be null");
+        }
+
+        if (blocks.isEmpty()) {
+            // genesis block validation
+            if (block.getBlockNumber() != 0) {
+                throw new IllegalStateException("Genesis block must have number 0");
+            }
+            if (block.getPreviousBlockHash() != null) {
+                throw new IllegalStateException("Genesis block must have previousBlockHash = null");
+            }
+        } else {
+            BlockChainBlock latest = getLatestBlock();
+
+            if (!latest.getBlockHash().equals(block.getPreviousBlockHash())) {
+                throw new IllegalStateException("Invalid block linkage: expected previous hash " + latest.getBlockHash() + " but got " + block.getPreviousBlockHash());
+            }
+
+            if (block.getBlockNumber() != latest.getBlockNumber() + 1) {
+                throw new IllegalStateException("Invalid block number: expected " + (latest.getBlockNumber() + 1) + " but got " + block.getBlockNumber());
+            }
+        }
+
         blocks.add(block);
+        persistBlock(block);
     }
 
-    public Block getBlock(int index) {
+    public BlockChainBlock getBlock(int index) {
         if (index < 0 || index >= blocks.size()) return null;
         return blocks.get(index);
     }
 
-    public Block getLatestBlock() {
+    public BlockChainBlock getLatestBlock() {
         if (blocks.isEmpty()) return null;
         return blocks.get(blocks.size() - 1);
     }
@@ -31,34 +79,21 @@ public class BlockChain {
         return blocks.size();
     }
 
-    public List<Block> getBlocks() {
+    public List<BlockChainBlock> getBlocks() {
         return Collections.unmodifiableList(blocks);
     }
-
-    /**
-     * Legacy append for backward compatibility with Stage 1 consensus only.
-     * DO NOT USE this for Stage 2.
-     */ 
-    public void append(String data) {
-        String prevHash = blocks.isEmpty() ? null : getLatestBlock().getBlockHash();
-        Block block = new Block(
-            String.valueOf(data.hashCode()),
-            prevHash,
-            Collections.emptyList(),
-            blocks.size()
-        );
-        blocks.add(block);
-    }
-
-    public void showLog() {
-        System.out.println("=== BlockChain Log ===");
-        System.out.println("Total blocks: " + blocks.size());
-        for (int i = 0; i < blocks.size(); i++) {
-            Block b = blocks.get(i);
-            if (i > 0) System.out.print(" <- ");
-            System.out.print(i + ": [hash=" + b.getBlockHash()
-                    + ", txs=" + b.getTransactions().size() + "]");
+    
+    private void persistBlock(BlockChainBlock block) {
+        if (persistenceDir == null) return;
+        try {
+            String json = new GsonBuilder().setPrettyPrinting().create().toJson(JsonParser.parseString(BlockSerializer.toJson(block)));
+            File file = new File(persistenceDir, "block_" + block.getBlockNumber() + ".json");
+            try (FileWriter writer = new FileWriter(file)) {
+                writer.write(json);
+            }
+        } catch (IOException e) {
+            System.err.println("[BLOCKCHAIN | ERROR] Failed to persist block "
+                    + block.getBlockNumber() + ": " + e.getMessage());
         }
-        System.out.println("\n=====================");
     }
 }

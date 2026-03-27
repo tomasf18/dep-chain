@@ -2,6 +2,9 @@ package ist.depchain.core.blockchain;
 
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,38 +14,50 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-
+import java.io.File;
 import ist.depchain.common.Transaction;
+import ist.depchain.common.utils.Config;
 
 import org.hyperledger.besu.datatypes.Address;
 
 /**
- * Loads the genesis block (block 0) from a JSON file and initializes the world state.
- *
- *  - The "state" section is authoritative and is applied directly to the world state.
- *
- * Expected format:
- * {
- *   "block_hash": "0x...",
- *   "previous_block_hash": null,
- *   "transactions": [ ... ],
- *   "state": {
- *     "0xAddress": { "balance": "100000", "nonce": 0 }
- *   }
- * }
+ * Loads the genesis block (block 0), initializes world state,
+ * and executes the genesis deployment transaction(s).
  */
 public class GenesisLoader {
 
-    public static Block loadGenesis(String genesisFilePath, DepChainWorldState worldState) throws IOException {
+    public static BlockChainBlock loadGenesis(DepChainWorldState worldState, Config config) throws IOException {
         Gson gson = new Gson();
         JsonObject root;
-        try (FileReader reader = new FileReader(genesisFilePath)) {
-            root = gson.fromJson(reader, JsonObject.class);
+
+        String genesisFilePath = config.getGenesisPath();
+
+        // First try loading from filesystem, then fallback to classpath resource
+        File file = new File(genesisFilePath);
+        if (file.exists()) {
+            try (Reader reader = new FileReader(file)) {
+                root = gson.fromJson(reader, JsonObject.class);
+            }
+        } else {
+            String resourceName = genesisFilePath;
+            int lastSlash = resourceName.lastIndexOf('/');
+            if (lastSlash >= 0) resourceName = resourceName.substring(lastSlash + 1);
+            int lastBackslash = resourceName.lastIndexOf('\\');
+            if (lastBackslash >= 0) resourceName = resourceName.substring(lastBackslash + 1);
+
+            InputStream is = GenesisLoader.class.getClassLoader().getResourceAsStream(resourceName);
+            if (is == null) {
+                throw new IOException("Genesis file not found on filesystem (" + genesisFilePath
+                        + ") or classpath (" + resourceName + ")");
+            }
+            try (Reader reader = new InputStreamReader(is)) {
+                root = gson.fromJson(reader, JsonObject.class);
+            }
         }
 
         validateRoot(root);
 
-        // 1. Load authoritative initial account state
+        // 1. Load initial account state
         JsonObject state = root.getAsJsonObject("state");
         for (Map.Entry<String, JsonElement> accountEntry : state.entrySet()) {
             String addressString = accountEntry.getKey();
@@ -54,9 +69,7 @@ public class GenesisLoader {
                 throw new IllegalArgumentException("Genesis state entry missing balance for address " + addressString);
             }
 
-            BigInteger balance = parseNonNegativeBigInteger(
-                    accountData.get("balance").getAsString(),
-                    "balance for " + addressString);
+            BigInteger balance = parseNonNegativeBigInteger(accountData.get("balance").getAsString(), "balance for " + addressString);
 
             long nonce = 0;
             if (accountData.has("nonce")) {
@@ -66,7 +79,7 @@ public class GenesisLoader {
             worldState.createEOA(address, nonce, balance);
         }
 
-        // 2. Parse genesis transactions for metadata only
+        // 2. Parse genesis transactions
         List<Transaction> transactions = new ArrayList<>();
         if (root.has("transactions") && !root.get("transactions").isJsonNull()) {
             JsonArray txArray = root.getAsJsonArray("transactions");
@@ -76,7 +89,30 @@ public class GenesisLoader {
             }
         }
 
-        // 3. Build the genesis block
+        // 3. Execute genesis deployment transactions
+        Address expectedContractAddress = config.getIstContractAddress();
+        Address expectedInitialTokenHolderAddress = config.getInitialTokenHolderAddress();
+
+        for (Transaction tx : transactions) {
+            if (tx.isContractDeployment()) {
+                if (!tx.getFrom().equals(expectedInitialTokenHolderAddress)) {
+                    throw new IllegalArgumentException("Genesis deployment tx sender must equal treasuryAddress");
+                }
+
+                // Execute deployment into the fixed, known IST contract address
+                EvmService.deployContract(worldState, tx.getFrom(), expectedContractAddress, tx.getData());
+            }
+        }
+
+        // 4. Verify that the contract was actually installed
+        if (!worldState.accountExists(expectedContractAddress)) {
+            throw new IllegalStateException("IST contract account does not exist after genesis deployment");
+        }
+        if (worldState.getCode(expectedContractAddress) == null || worldState.getCode(expectedContractAddress).isEmpty()) {
+            throw new IllegalStateException("IST contract runtime code is empty after genesis deployment");
+        }
+
+        // 5. Build genesis block
         String blockHash = root.has("block_hash") && !root.get("block_hash").isJsonNull()
                 ? root.get("block_hash").getAsString()
                 : "0x0";
@@ -90,7 +126,7 @@ public class GenesisLoader {
             throw new IllegalArgumentException("Genesis block must have previous_block_hash = null");
         }
 
-        return new Block(blockHash, null, transactions, 0);
+        return new BlockChainBlock(blockHash, null, transactions, 0);
     }
 
     private static void validateRoot(JsonObject root) {

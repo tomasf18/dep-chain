@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ServerApp {
-    // Registry for test inspection — maps serverId to its coordinator
+    // Registry for test inspection - maps serverId to its coordinator
     private static final Map<String, BasicHotStuffCoordinator> coordinators = new ConcurrentHashMap<>();
 
     public static BasicHotStuffCoordinator getCoordinator(String serverId) {
@@ -18,7 +18,7 @@ public class ServerApp {
     public static void main(String[] args) {
         if (args.length < 2) {
             System.out.println("Usage: mvn exec:java -Dexec.args='<configFile> <serverId> <byzantine_flag> <attack_type>'");
-            System.out.println("Example: mvn exec:java -Dexec.args='../config-dev.json s1 true EQUIVOCATE'");
+            System.out.println("Example: mvn exec:java -Dexec.args='../config/config-dev.json s1 true EQUIVOCATE'");
             return;
         }
 
@@ -33,18 +33,22 @@ public class ServerApp {
         }
         ServerContext server = new ServerContext(config);
         BasicHotStuffCoordinator hotStuffCoordinator;
+
         if (byzantineFlag) {
-            ist.depchain.core.byzantine.ByzantineCoordinator byzantineCoordinator = new ByzantineCoordinator(server);
+            ByzantineCoordinator byzantineCoordinator = new ByzantineCoordinator(server);
             try {
                 byzantineCoordinator.setAttack(ByzantineCoordinator.AttackType.valueOf(attackType));
             }catch (IllegalArgumentException e) {
                 byzantineCoordinator.setAttack(ByzantineCoordinator.AttackType.SILENT);
             }
             hotStuffCoordinator = byzantineCoordinator;
+        } else {
+            hotStuffCoordinator = new BasicHotStuffCoordinator(server, byzantineFlag);
         }
-        else {hotStuffCoordinator = new BasicHotStuffCoordinator(server, byzantineFlag);}
+
         coordinators.put(selfId, hotStuffCoordinator);
         new MessageHandler(server, hotStuffCoordinator);
+        
         try {
             server.start();
         } catch (Exception e) {

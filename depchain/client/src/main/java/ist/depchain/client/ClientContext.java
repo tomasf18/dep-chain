@@ -5,7 +5,6 @@ import ist.depchain.network.abstractions.StubbornLink;
 import ist.depchain.network.abstractions.UdpFairLossLink;
 
 /* protobuf classes */
-import ist.depchain.common.ClientResponse;
 import ist.depchain.common.utils.Config;
 import ist.depchain.network.crypto.Authenticator;
 import ist.depchain.network.crypto.KeyLoader;
@@ -16,24 +15,25 @@ import java.security.PublicKey;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.hyperledger.besu.datatypes.Address;
 
 public class ClientContext {
     private final Config config;
+    private final Address selfAddress;
+    // Nonce managed client-side; only incremented after a successful commit
+    private final AtomicLong nonce = new AtomicLong(0);
     
     private final UdpFairLossLink fairLossLink;
     private final StubbornLink stubbornLink;
     private final AuthenticatedPerfectLink authenticatedPerfectLink;
     private final PrivateKey privateKey;
     private final PublicKey publicKey;
-    private final Address selfAddress;
 
     private final AtomicInteger requestId = new AtomicInteger(0);
-    // requestId -> (response digest -> set of distinct replica sender ids)
-    private final Map<Integer, Map<String, Set<String>>> pendingRequests = new ConcurrentHashMap<>();
-    private final int responsesThreshold; 
 
+    // requestId -> original request data (for logging committed transactions -> debugging)
     private final Map<Integer, String> requestDataMap = new ConcurrentHashMap<>();
     private final List<String> commitedLog = Collections.synchronizedList(new ArrayList<>());
 
@@ -46,61 +46,25 @@ public class ClientContext {
         if (this.privateKey == null) {
             throw new RuntimeException("Failed to load private key from " + config.getSelfPrivateKeyPathString());
         }
-        this.publicKey = KeyLoader.loadPublicKey(config.getTrustedProcessKeyPathString(config.getSelfId()));
+        this.publicKey = KeyLoader.loadPublicKey(config.getSelfPublicKeyPathString());
         if (this.publicKey == null) {
             throw new RuntimeException("Failed to load public key for " + config.getSelfId());
         }
         this.selfAddress = AddressUtils.deriveAddress(publicKey);
-        this.responsesThreshold = config.getThreshold();
     }
     
     public void start() {
-        authenticatedPerfectLink.registerReceiver(this::handleIncomingResponse);
         authenticatedPerfectLink.start();
     }
 
-    private void handleIncomingResponse(String sourceId, byte[] data) {
-        try {
-            ClientResponse clientResponse = ClientResponse.parseFrom(data);
-
-            int reqId = clientResponse.getRequestId();
-            Map<String, Set<String>> identitySenders = pendingRequests.get(reqId);
-            if (identitySenders == null || !clientResponse.getCommitted()) {
-                System.out.println("[ ] (" +  reqId + ", " + sourceId + "): nothing to do...");
-                return;
-            }
-
-            String replyIdentity = makeReplyIdentity(clientResponse);
-            Set<String> senders = identitySenders.computeIfAbsent(replyIdentity, key -> ConcurrentHashMap.newKeySet());
-            boolean isNewSender = senders.add(sourceId);
-            int count = senders.size();
-
-            if (!isNewSender) {
-                System.out.println("[ ] (" +  reqId + ", " + sourceId + "): duplicate sender ignored for [" + replyIdentity +"] (" + count + "/" + responsesThreshold + ")");
-                return;
-            }
-
-            if (count >= responsesThreshold) {
-                System.out.println("[*] (" +  reqId + ", " + sourceId + "): [" + replyIdentity +"] (" + count + "/" + responsesThreshold + ") COMMITED");
-                String originalData = requestDataMap.get(reqId);
-                if(originalData != null && !commitedLog.contains(originalData)) {
-                    commitedLog.add(originalData);
-                }
-                pendingRequests.remove(reqId);
-                requestDataMap.remove(reqId);
-            } else {
-                System.out.println("[+] (" +  reqId + ", " + sourceId + "): [" + replyIdentity +"] (" + count + "/" + responsesThreshold + ")");
-            }
-        } catch(Exception e) {
-            System.out.println("[ERROR] Error while processing request: " + e.getMessage());
-        }
+    /** Returns the current nonce without advancing it. */
+    public long getNonce() {
+        return nonce.get();
     }
 
-    private String makeReplyIdentity(ClientResponse response) {
-        // canonical reply identity based on essential fields only:
-        // requestId, committed, blockId - nice for stage 2
-        String blockIdStr = response.getBlockId().toStringUtf8();
-        return response.getRequestId() + ":" + blockIdStr + ":" + response.getCommitted();
+    /** Advances the nonce by one. Called only after a confirmed commit. */
+    public void incrementNonce() {
+        nonce.incrementAndGet();
     }
 
     public void stop() {
@@ -121,10 +85,6 @@ public class ClientContext {
         return requestId;
     }
 
-    public Map<Integer, Map<String, Set<String>>> getPendingRequests() {
-        return pendingRequests;
-    }
-
     public void registerRequestInMap(int requestId, String requestData) {
         requestDataMap.put(requestId, requestData);
     }
@@ -137,7 +97,19 @@ public class ClientContext {
         return selfAddress;
     }
 
+    public Map<Integer, String> getRequestDataMap() {
+        return requestDataMap;
+    }
+
     public List<String> getCommitedLog() {
         return commitedLog;
+    }
+
+    public void setNonce(long nonce) {
+        this.nonce.set(nonce);
+    }
+
+    public void setRequestId(int requestId) {
+        this.requestId.set(requestId);
     }
 }
