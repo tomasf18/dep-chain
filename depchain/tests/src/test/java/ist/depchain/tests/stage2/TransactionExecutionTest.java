@@ -256,44 +256,6 @@ class TransactionExecutionTest {
         assertEquals(expectedFee, receipt.getFee());
     }
 
-    // --- Contract deployment / call stubs return failure ---
-
-    @Test
-    void contractDeploymentReturnsFailureStub() {
-        ws.createEOA(ALICE, 0, BigInteger.valueOf(1_000_000));
-        ws.createEOA(PROPOSER, 0, BigInteger.ZERO);
-
-        // to=null means contract deployment
-        Transaction tx = new Transaction(
-                ALICE, null, BigInteger.ZERO, new byte[]{0x60, 0x60},
-                GAS_PRICE, GAS_LIMIT, 0, null
-        );
-
-        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER, false);
-        assertFalse(receipt.isSuccess());
-        assertTrue(receipt.getError().contains("not yet implemented"));
-        // Nonce still incremented
-        assertEquals(1, ws.getNonce(ALICE));
-    }
-
-    @Test
-    void contractCallReturnsFailureStub() {
-        ws.createEOA(ALICE, 0, BigInteger.valueOf(1_000_000));
-        ws.createEOA(BOB, 0, BigInteger.ZERO);
-        ws.createEOA(PROPOSER, 0, BigInteger.ZERO);
-
-        // to=BOB + non-empty data = contract call
-        Transaction tx = new Transaction(
-                ALICE, BOB, BigInteger.ZERO, new byte[]{0x01, 0x02, 0x03, 0x04},
-                GAS_PRICE, GAS_LIMIT, 0, null
-        );
-
-        TransactionReceipt receipt = executor.execute(ws, tx, PROPOSER, false);
-        assertFalse(receipt.isSuccess());
-        assertTrue(receipt.getError().contains("not yet implemented"));
-        assertEquals(1, ws.getNonce(ALICE));
-    }
-
     // --- Helper ---
 
     private static Transaction nativeTransfer(Address from, Address to, long value,

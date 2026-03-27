@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -29,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *   → PREPARE → PRE-COMMIT → COMMIT → DECIDE → executeStage2Block
  *   → TransactionExecutor → BlockChain persist → ClientResponse
  */
-public class NativeTransferHotStuffTest {
+class NativeTransferHotStuffTest {
     private static final String CONFIG_FILE = "../config/config-dev.json";
     private static final String[] REPLICAS = {"s0", "s1", "s2", "s3"};
 
@@ -42,7 +43,7 @@ public class NativeTransferHotStuffTest {
     private ClientLibrary clientLibrary;
 
     @BeforeEach
-    public void setup() throws Exception {
+    void setup() {
         System.out.println("[TEST] Starting NativeTransferHotStuffTest");
 
         for (String replica : REPLICAS) {
@@ -50,7 +51,7 @@ public class NativeTransferHotStuffTest {
         }
 
         System.out.println("[TEST] Waiting for replica handshake...");
-        TimeUnit.SECONDS.sleep(15);
+        LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(15));
 
         Config clientConfig = Config.loadConfiguration(CONFIG_FILE, "client1");
         clientContext = new ClientContext(clientConfig);
@@ -84,17 +85,22 @@ public class NativeTransferHotStuffTest {
     }
 
     @AfterEach
-    public void teardown() {
+    void teardown() {
         System.out.println("[TEST] Ending NativeTransferHotStuffTest");
     }
 
     @Test
     @DisplayName("Three sequential native transfers - each blocks until committed")
-    void testMultipleSequentialTransfers() throws InterruptedException {
-        TimeUnit.SECONDS.sleep(5);
+    void testMultipleSequentialTransfers() {
+        LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(5));
 
         int numTransfers = 3;
         long totalValue = 0;
+        Address sender = clientContext.getSelfAddress();
+        Address receiver = Address.fromHexString(RECEIVER_HEX);
+        DepChainWorldState initialState = ServerApp.getCoordinator("s0").getServerContext().getWorldState();
+        BigInteger initialSenderBalance = initialState.getBalance(sender);
+        BigInteger initialReceiverBalance = initialState.getBalance(receiver);
 
         for (int i = 0; i < numTransfers; i++) {
             BigInteger value = BigInteger.valueOf(100L * (i + 1));
@@ -105,17 +111,21 @@ public class NativeTransferHotStuffTest {
             System.out.println("[TEST] Transfer " + (i + 1) + " confirmed");
         }
 
-        // All transfers are committed by the time we reach here
-        assertEquals(numTransfers, clientContext.getCommitedLog().size(),
-                "Committed log should have " + numTransfers + " entries");
+        BigInteger expectedSenderBalance = waitForReplicaConvergence(sender, receiver,
+                initialSenderBalance, initialReceiverBalance, totalValue, numTransfers,
+                TimeUnit.SECONDS.toMillis(120));
 
-        DepChainWorldState ws = ServerApp.getCoordinator("s0").getServerContext().getWorldState();
-        Address receiver = Address.fromHexString(RECEIVER_HEX);
-        assertEquals(BigInteger.valueOf(totalValue), ws.getBalance(receiver),
-                "Receiver should have total transferred value");
+            BigInteger expectedReceiverBalance = BigInteger.valueOf(totalValue);
+            for (String replicaId : REPLICAS) {
+                DepChainWorldState ws = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState();
+                assertEquals(expectedSenderBalance, ws.getBalance(sender),
+                    "sender balance mismatch on " + replicaId);
+                assertEquals(expectedReceiverBalance, ws.getBalance(receiver),
+                    "receiver balance mismatch on " + replicaId);
+            }
 
-        System.out.println("[TEST] All " + numTransfers + " transfers committed. Receiver balance: "
-                + ws.getBalance(receiver));
+            System.out.println("[TEST] All " + numTransfers + " native transfers committed. Sender balance: "
+                + expectedSenderBalance + ", Receiver balance: " + expectedReceiverBalance);
     }
 
     // ========== Helpers ==========
@@ -131,5 +141,51 @@ public class NativeTransferHotStuffTest {
         });
         t.setDaemon(true);
         t.start();
+    }
+
+    private static BigInteger waitForReplicaConvergence(Address sender, Address receiver,
+                                                        BigInteger initialSenderBalance,
+                                                        BigInteger initialReceiverBalance,
+                                                        long totalValue, int numTransfers, long timeoutMs) {
+        BigInteger expectedReceiverBalance = initialReceiverBalance.add(BigInteger.valueOf(totalValue));
+        BigInteger gasFee = GAS_PRICE.multiply(GAS_LIMIT);
+        BigInteger expectedFeeTotal = gasFee.multiply(BigInteger.valueOf(numTransfers));
+        BigInteger expectedSenderBalance = initialSenderBalance.subtract(BigInteger.valueOf(totalValue)).subtract(expectedFeeTotal);
+
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            boolean allMatch = true;
+            String referenceBlockHash = null;
+
+            for (String replicaId : REPLICAS) {
+                BasicHotStuffCoordinator coord = ServerApp.getCoordinator(replicaId);
+                DepChainWorldState ws = coord.getServerContext().getWorldState();
+
+                if (!ws.getBalance(sender).equals(expectedSenderBalance)
+                        || !ws.getBalance(receiver).equals(expectedReceiverBalance)) {
+                    allMatch = false;
+                    break;
+                }
+
+                String blockHash = coord.getServerContext().getBlockChain().getLatestBlock().getBlockHash();
+                if (referenceBlockHash == null) {
+                    referenceBlockHash = blockHash;
+                } else if (!referenceBlockHash.equals(blockHash)) {
+                    allMatch = false;
+                    break;
+                }
+            }
+
+            if (allMatch) {
+                return expectedSenderBalance;
+            }
+
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(250));
+        }
+
+        DepChainWorldState ws = ServerApp.getCoordinator("s0").getServerContext().getWorldState();
+        fail("Native transfer state did not converge within " + timeoutMs + "ms; sender="
+                + ws.getBalance(sender) + ", receiver=" + ws.getBalance(receiver));
+        return expectedSenderBalance;
     }
 }

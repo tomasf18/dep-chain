@@ -1,5 +1,8 @@
 # TODO List
 
+Important:
+- Add logging options: nothing, info, debug
+
 ## Almost done
 
 (ERC20 = IST Coin -> see "Native currency vs Tokens" section below)
@@ -17,7 +20,6 @@ For the previous points, pay attention to:
 
 ## Not started
 
-- Add logging options: nothing, info, debug
 - Order transactions by fee, **but for the same client order by nonce - "the transactions of each client are ordered by its nonce/submission order"**
 - If we are a replica should we validate if a transaction of depchain is possible due to account balances after or before the consensus for the block is reached? Could we accept a block with that transaction and when we are executing it if it fails we simple don't change the state and still make the sender pay the gas fee? PROFESSOR ANSWER: You should reason about the implications of the various design options and explain your choices in the report and in the discussion.
 
@@ -35,6 +37,7 @@ Ultimately, the client defines the price because only the user knows the economi
 ## Completed
 
 - native transfers working with EVM execution
+- tests for native transfers and state convergenge among replicas
 - Clients need to sign requests and replicas need to verify
 - Application-level sequence numbers to prevent replay attacks (application tracks client state: "Paulo has 10 transactions")
 - Line in verifyQC

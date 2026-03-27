@@ -110,6 +110,75 @@ class TransactionValidationTest {
         assertFalse(result.isValid());
     }
 
+    @Test
+    void rejectsZeroGasPrice() throws Exception {
+        KeyPair kp = genKeyPair();
+        PublicKey pub = kp.getPublic();
+        Address from = AddressUtils.deriveAddress(pub);
+        Address to = Address.fromHexString("0x1111111111111111111111111111111111111111");
+
+        DepChainWorldState ws = new DepChainWorldState(null);
+        ws.createEOA(from, 0, BigInteger.valueOf(1_000_000));
+
+        Transaction unsignedTx = new Transaction(
+                from, to, BigInteger.valueOf(100), new byte[0],
+                BigInteger.ZERO, BigInteger.valueOf(21_000), 0, null
+        );
+
+        byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
+        Transaction signed = unsignedTx.withSignature(sig);
+
+        var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws, null);
+        assertFalse(result.isValid());
+        assertTrue(result.getErrorMessage().contains("gasPrice"));
+    }
+
+    @Test
+    void rejectsZeroGasLimit() throws Exception {
+        KeyPair kp = genKeyPair();
+        PublicKey pub = kp.getPublic();
+        Address from = AddressUtils.deriveAddress(pub);
+        Address to = Address.fromHexString("0x1111111111111111111111111111111111111111");
+
+        DepChainWorldState ws = new DepChainWorldState(null);
+        ws.createEOA(from, 0, BigInteger.valueOf(1_000_000));
+
+        Transaction unsignedTx = new Transaction(
+                from, to, BigInteger.valueOf(100), new byte[0],
+                BigInteger.ONE, BigInteger.ZERO, 0, null
+        );
+
+        byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
+        Transaction signed = unsignedTx.withSignature(sig);
+
+        var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws, null);
+        assertFalse(result.isValid());
+        assertTrue(result.getErrorMessage().contains("gasLimit"));
+    }
+
+    @Test
+    void rejectsNegativeValue() throws Exception {
+        KeyPair kp = genKeyPair();
+        PublicKey pub = kp.getPublic();
+        Address from = AddressUtils.deriveAddress(pub);
+        Address to = Address.fromHexString("0x1111111111111111111111111111111111111111");
+
+        DepChainWorldState ws = new DepChainWorldState(null);
+        ws.createEOA(from, 0, BigInteger.valueOf(1_000_000));
+
+        Transaction unsignedTx = new Transaction(
+                from, to, BigInteger.valueOf(-1), new byte[0],
+                BigInteger.ONE, BigInteger.valueOf(21_000), 0, null
+        );
+
+        byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
+        Transaction signed = unsignedTx.withSignature(sig);
+
+        var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws, null);
+        assertFalse(result.isValid());
+        assertTrue(result.getErrorMessage().contains("value"));
+    }
+
     private static KeyPair genKeyPair() throws Exception {
         KeyPairGenerator gen = KeyPairGenerator.getInstance("EC");
         gen.initialize(256);
