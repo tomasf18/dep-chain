@@ -25,15 +25,15 @@ import static org.junit.jupiter.api.Assertions.*;
  * of its balance to client2, then attempts a second transfer that should fail
  * because the remaining balance is insufficient.
  *
- * Uses client1 (sender) and client2 (receiver) — both are real configured
+ * Uses client1 (sender) and client2 (receiver) - both are real configured
  * clients with keystores and genesis-funded accounts.
  *
  * The test snapshots the actual balance from the world state and computes
  * transfer amounts relative to it, so it is independent of genesis values.
  *
  * Scenario (with actual genesis balance B for client1):
- *   - Transfer 1: (B - 163_000) to client2 → succeeds (remaining = 100_000 after gas)
- *   - Transfer 2: 50_000 to client2        → fails    (needs 113_000 but only 100_000 left)
+ *   - Transfer 1: (B - 163_000) to client2 -> succeeds (remaining = 100_000 after gas)
+ *   - Transfer 2: 50_000 to client2        -> fails    (needs 113_000 but only 100_000 left)
  */
 class InsufficientBalanceAfterTransferTest {
 
@@ -122,7 +122,7 @@ class InsufficientBalanceAfterTransferTest {
         BigInteger firstTransfer = initialSenderBalance.subtract(reserve);
         assertTrue(firstTransfer.signum() > 0, "sender balance too low for this test");
 
-        // Second transfer: 50_000 → needs 50_000 + 63_000 = 113_000 > 100_000 remaining
+        // Second transfer: 50_000 -> needs 50_000 + 63_000 = 113_000 > 100_000 remaining
         BigInteger secondTransfer = BigInteger.valueOf(50_000);
 
         // --- First transfer (should succeed) ---
@@ -130,7 +130,7 @@ class InsufficientBalanceAfterTransferTest {
         clientLibrary.submitNativeTransfer(CLIENT2_ADDR, firstTransfer, GAS_PRICE, GAS_LIMIT);
         System.out.println("[TEST] First transfer accepted");
 
-        // --- Second transfer (should fail — insufficient balance) ---
+        // --- Second transfer (should fail - insufficient balance) ---
         System.out.println("[TEST] Submitting second transfer (value=" + secondTransfer + ")");
         try {
             clientLibrary.submitNativeTransfer(CLIENT2_ADDR, secondTransfer, GAS_PRICE, GAS_LIMIT);
@@ -160,10 +160,10 @@ class InsufficientBalanceAfterTransferTest {
 
             assertEquals(expectedSenderBalance, ws.getBalance(sender),
                     "sender balance mismatch on " + replicaId +
-                            " — second transfer should NOT have gone through");
+                            " - second transfer should NOT have gone through");
             assertEquals(expectedReceiverBalance, ws.getBalance(receiver),
                     "receiver balance mismatch on " + replicaId +
-                            " — should only reflect first transfer");
+                            " - should only reflect first transfer");
         }
 
         System.out.println("[TEST] Verified: only first transfer committed." +
