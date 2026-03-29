@@ -226,6 +226,76 @@ class TransactionExecutorErc20Test {
         assertEquals(BigInteger.ZERO, tokenBalanceOf(bob));
     }
 
+    @Test
+    void decreaseAllowanceBelowZeroRevertsAndKeepsAllowanceUnchanged() throws Exception {
+        byte[] transferToAlice = Bytes.fromHexString(
+                "0x" + Erc20Abi.smartContractMethodIdentifier("transfer(address,uint256)")
+                        + Erc20Abi.encodeAddress(alice)
+                        + Erc20Abi.encodeUint256(BigInteger.valueOf(1000))
+        ).toArrayUnsafe();
+
+        Transaction t1 = signTx(new Transaction(
+                treasury,
+                CONTRACT_ADDRESS,
+                BigInteger.ZERO,
+                transferToAlice,
+                GAS_PRICE,
+                GAS_LIMIT,
+                worldState.getNonce(treasury),
+                null
+        ), treasuryKeys);
+
+        TransactionReceipt r1 = executor.execute(worldState, t1, proposer, false);
+        assertTrue(r1.isSuccess(), r1.getError());
+
+        byte[] incAllowance = Bytes.fromHexString(
+                "0x" + Erc20Abi.smartContractMethodIdentifier("increaseAllowance(address,uint256)")
+                        + Erc20Abi.encodeAddress(bob)
+                        + Erc20Abi.encodeUint256(BigInteger.valueOf(100))
+        ).toArrayUnsafe();
+
+        Transaction t2 = signTx(new Transaction(
+                alice,
+                CONTRACT_ADDRESS,
+                BigInteger.ZERO,
+                incAllowance,
+                GAS_PRICE,
+                GAS_LIMIT,
+                worldState.getNonce(alice),
+                null
+        ), aliceKeys);
+
+        TransactionReceipt r2 = executor.execute(worldState, t2, proposer, false);
+        assertTrue(r2.isSuccess(), r2.getError());
+        assertEquals(BigInteger.valueOf(100), tokenAllowanceOf(alice, bob));
+
+        byte[] decAllowance = Bytes.fromHexString(
+                "0x" + Erc20Abi.smartContractMethodIdentifier("decreaseAllowance(address,uint256)")
+                        + Erc20Abi.encodeAddress(bob)
+                        + Erc20Abi.encodeUint256(BigInteger.valueOf(101))
+        ).toArrayUnsafe();
+
+        Transaction t3 = signTx(new Transaction(
+                alice,
+                CONTRACT_ADDRESS,
+                BigInteger.ZERO,
+                decAllowance,
+                GAS_PRICE,
+                GAS_LIMIT,
+                worldState.getNonce(alice),
+                null
+        ), aliceKeys);
+
+        TransactionReceipt r3 = executor.execute(worldState, t3, proposer, false);
+
+        assertFalse(r3.isSuccess());
+        assertNotNull(r3.getError());
+                assertFalse(r3.getError().isBlank());
+        assertEquals(BigInteger.valueOf(100), tokenAllowanceOf(alice, bob));
+        assertEquals(BigInteger.valueOf(1000), tokenBalanceOf(alice));
+        assertEquals(BigInteger.ZERO, tokenBalanceOf(bob));
+    }
+
     // -------------------------
     // Helpers
     // -------------------------

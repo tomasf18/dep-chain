@@ -30,6 +30,16 @@ Quick reference for every test currently implemented under `tests/src/test/java/
 - clientResponsePreservesExtendedReceiptFields - Verifies client responses preserve all extended receipt fields during serialization.
 - clientResponseAllowsEmptyOptionalReceiptFields - Verifies optional receipt fields can be omitted and remain empty after parsing.
 
+## ClientResponseCodecTest
+- nativeBalanceSnapshotRoundTrips - Verifies native-balance query payloads encode and decode a balance plus state-hash snapshot.
+- committedResponseFormattingDecodesNativeAndTokenBalances - Verifies committed responses are formatted into readable native and token balance output.
+- canonicalResponseIdDependsOnReturnData - Verifies response identity changes when returnData changes, which is important for Byzantine quorum comparison.
+- malformedNativeBalanceSnapshotIsRejected - Verifies malformed native balance payloads are rejected by the codec.
+
+## Erc20HotStuffTest
+- erc20BalanceQueryAndTransferCommitThroughConsensus - Verifies the ERC20 balance query path and token transfer path both commit through the full replica stack.
+- erc20AllowanceLifecycleCommitThroughConsensus - Verifies increaseAllowance, transferFrom, and decreaseAllowance commit and converge across replicas.
+
 ## ConsensusIntegrationTest
 - drainBatchReturnsUpToMaxSize - Verifies mempool batching respects the requested maximum size.
 - drainBatchReturnsAllWhenLessThanMax - Verifies batching returns all available requests when fewer than the limit exist.
@@ -83,6 +93,7 @@ Quick reference for every test currently implemented under `tests/src/test/java/
 - erc20TransferUpdatesTokenBalancesAndChargesNativeFee - Verifies ERC-20 transfers update token balances and still charge native gas.
 - increaseAllowanceThenTransferFromWorks - Verifies allowance flow works across transfer, increaseAllowance, and transferFrom.
 - contractCallRevertProducesFailedReceipt - Verifies failed ERC-20 contract calls produce a failed receipt but still charge gas.
+- decreaseAllowanceBelowZeroRevertsAndKeepsAllowanceUnchanged - Verifies ERC20 decreaseAllowance rejects underflow and preserves the previous allowance.
 
 ## TransactionValidationTest
 - acceptsValidTransaction - Verifies a well-formed signed transaction passes validation.

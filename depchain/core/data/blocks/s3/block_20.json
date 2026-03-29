@@ -1,7 +1,29 @@
 {
-  "block_hash": "62b22a716f1bf2b44d89b7bdfb950d48f6d5eadea2183261f5f1fef8b1d37b7c",
-  "previous_block_hash": "758bd46ead515808acb5d359e5bc06388bfe94b540941ecf07cdef5160ef26fb",
+  "block_hash": "d39307bacdc5fdbbf1f34802d2efa2826904e3afa2c2d22e5fc88b2192a9316e",
+  "previous_block_hash": "f2d11bd8b1141e37d3df92cd25d1008dc3819a9bbcecba46bef89e522a8452ed",
   "block_number": 20,
-  "transactions": [],
-  "state_hash": "af54687aaf2bc49cfb71fb3cca19b95248e9439d8e7dc1c24e51e03498375de0"
+  "proposer": "0x76c6c1931f73ef9d9e9499c79d6bc34fd201ab15",
+  "transactions": [
+    {
+      "from": "0x172bf398d2a931323199521625f471fb1c28879a",
+      "to": "0x9999999999999999999999999999999999999999",
+      "value": "0",
+      "input": "0x70a08231000000000000000000000000172bf398d2a931323199521625f471fb1c28879a",
+      "gas_price": "1",
+      "gas_limit": "100000",
+      "nonce": 12,
+      "signature": "0x3044022044bfb3308baf2bb644239b848fedcd47da190d93a2f8815d18914b9a52aadfb40220385eab50f6c02e7c76c26d31ceb4c359a88703f4ce38cbff63805db91134344e",
+      "tx_hash": "a44d48c1a00bc9275518be3691983998e2d926894c3c5079a3387f1f3d82a027"
+    }
+  ],
+  "receipts": [
+    {
+      "tx_hash": "a44d48c1a00bc9275518be3691983998e2d926894c3c5079a3387f1f3d82a027",
+      "success": true,
+      "gas_used": "100000",
+      "fee": "100000",
+      "return_data": "0x0000000000000000000000000000000000000000000000000000000000004e20"
+    }
+  ],
+  "state_hash": "705de162c055464ce66498630f2771c0889f1a3e356bf162ed4eff5e543331e7"
 }

@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.web3j.utils.Numeric;
 
 import ist.depchain.common.ClientResponse;
+import ist.depchain.common.utils.ClientResponseCodec;
 
 public class MessageHandler {
     private final ClientContext clientContext;
@@ -64,8 +65,8 @@ public class MessageHandler {
                 return;
             }
 
-            // Handle COMMITTED status
-            if ("COMMITTED".equals(status)) {
+            // Handle committed statuses
+            if (status != null && status.startsWith("COMMITTED")) {
                 Map<String, Set<String>> differentResponseSenders = pendingRequests.get(reqId);
                 if (differentResponseSenders == null) {
                     System.out.println("[ ] (" + reqId + ", " + sourceId + "): COMMITTED but request already processed");
@@ -85,7 +86,7 @@ public class MessageHandler {
                 if (count >= responsesThreshold) {
                     System.out.println("[*] (" + reqId + ", " + sourceId + "): [" + responseId + "] (" + count + "/" + responsesThreshold + ") COMMITTED");
 
-                    printReceiptInfo(clientResponse);
+                    printReceiptInfo(clientResponse, clientContext.getRequestDataMap().get(reqId));
 
                     String originalData = clientContext.getRequestDataMap().get(reqId);
                     if (originalData != null && !clientContext.getCommitedLog().contains(originalData)) {
@@ -109,16 +110,10 @@ public class MessageHandler {
     }
 
     private String makeResponseId(ClientResponse response) {
-        // canonical reply identity based on essential fields only:
-        // requestId, committed, blockId - nice for stage 2
-        String blockIdStr = response.getBlockId().toStringUtf8();
-        String txHashStr = Numeric.toHexStringNoPrefix(response.getTxHash().toByteArray());
-        String status = response.getStatus();
-        String error = response.getError();
-        return response.getRequestId() + ":" + blockIdStr + ":" + response.getCommitted() + ":" + txHashStr + ":" + status + ":" + error;
+        return ClientResponseCodec.canonicalResponseId(response);
     }
 
-    private void printReceiptInfo(ClientResponse response) {
+    private void printReceiptInfo(ClientResponse response, String requestDescription) {
         String txHash = response.getTxHash().isEmpty() ? "<empty>" : "0x" + Numeric.toHexStringNoPrefix(response.getTxHash().toByteArray());
 
         System.out.println("    txHash      = " + txHash);
@@ -142,6 +137,11 @@ public class MessageHandler {
 
         if (!response.getReturnData().isEmpty()) {
             System.out.println("    returnData  = 0x" + Numeric.toHexStringNoPrefix(response.getReturnData().toByteArray()));
+        }
+
+        String formattedResult = ClientResponseCodec.formatCommittedResponse(requestDescription, response);
+        if (!formattedResult.isBlank()) {
+            System.out.println(formattedResult);
         }
     }
 

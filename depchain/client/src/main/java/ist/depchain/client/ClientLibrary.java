@@ -14,6 +14,7 @@ import org.hyperledger.besu.datatypes.Address;
 import org.web3j.utils.Numeric;
 
 import ist.depchain.common.ApplicationMessage;
+import ist.depchain.common.Command;
 import ist.depchain.common.ClientRequest;
 import ist.depchain.common.Transaction;
 import ist.depchain.common.utils.Crypto;
@@ -26,16 +27,23 @@ public class ClientLibrary {
 
     // Timeout for ACCEPTED status (much shorter than commit timeout)
     private static final long SUBMIT_TIMEOUT_SECONDS = 10;
+    private static final BigInteger QUERY_GAS_PRICE = BigInteger.ONE;
+    private static final BigInteger QUERY_GAS_LIMIT = BigInteger.valueOf(100_000);
 
     public ClientLibrary(ClientContext clientContext, MessageHandler messageHandler) {
         this.clientContext = clientContext;
         this.messageHandler = messageHandler;
     }
 
-    public void submitBalanceCheck() {
+    public void submitNativeBalanceCheck() {
+        Address selfAddress = clientContext.getSelfAddress();
+        submitCommandRequest("GET_NATIVE_BALANCE", selfAddress.toHexString(), "native.balanceOf(" + selfAddress.toHexString() + ")");
+    }
+
+    public void submitTokenBalanceCheck() {
         Address selfAddress = clientContext.getSelfAddress();
         byte[] calldata = Erc20Abi.balanceOf(selfAddress);
-        submitContractCall(calldata, BigInteger.ZERO, BigInteger.ZERO, "balanceOf(" + selfAddress.toHexString() + ")");
+        submitContractCall(calldata, QUERY_GAS_PRICE, QUERY_GAS_LIMIT, "erc20.balanceOf(" + selfAddress.toHexString() + ")");
     }
         
 
@@ -131,6 +139,51 @@ public class ClientLibrary {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted waiting for transaction acceptance (reqId=" + reqId + ")", e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e.getCause().getMessage(), e.getCause());
+        }
+    }
+
+    private void submitCommandRequest(String commandType, String commandData, String requestDescription) {
+        int reqId = clientContext.getRequestId().incrementAndGet();
+
+        Command command = Command.newBuilder()
+                .setType(commandType)
+                .setData(commandData == null ? "" : commandData)
+                .setClientId(clientContext.getConfig().getSelfId())
+                .setRequestId(reqId)
+                .build();
+
+        ClientRequest unsignedReq = ClientRequest.newBuilder()
+                .setClientId(clientContext.getConfig().getSelfId())
+                .setRequestId(reqId)
+                .setCommand(command)
+                .build();
+
+        ClientRequest signedReq = signRequest(unsignedReq);
+
+        ApplicationMessage appMsg = ApplicationMessage.newBuilder()
+                .setClientRequest(signedReq)
+                .build();
+
+        messageHandler.getPendingRequests().put(reqId, new ConcurrentHashMap<>());
+        clientContext.registerRequestInMap(reqId, requestDescription);
+
+        CompletableFuture<Void> committed = messageHandler.registerFuture(reqId);
+
+        Set<String> destinations = clientContext.getConfig().getBlockChainServers().keySet();
+        clientContext.getAuthenticatedPerfectLink().broadcast(destinations, appMsg.toByteArray());
+
+        System.out.println("[SENT] reqId=" + reqId + " command=" + commandType + " data=" + commandData);
+
+        try {
+            committed.get(SUBMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            System.out.println("[ACCEPTED] reqId=" + reqId + " - query is now being processed");
+        } catch (TimeoutException e) {
+            throw new RuntimeException("Native balance query failed to receive acceptance from network (reqId=" + reqId + ")", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted waiting for query acceptance (reqId=" + reqId + ")", e);
         } catch (ExecutionException e) {
             throw new RuntimeException(e.getCause().getMessage(), e.getCause());
         }

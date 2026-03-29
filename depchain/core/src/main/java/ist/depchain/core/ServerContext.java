@@ -18,11 +18,12 @@ import ist.depchain.network.crypto.Authenticator;
 import ist.depchain.network.crypto.KeyLoader;
 
 import java.security.PublicKey;
-import java.util.List;
-import java.util.Set;
 
 import org.hyperledger.besu.datatypes.Address;
+import org.apache.tuweni.bytes.Bytes;
+import org.apache.tuweni.units.bigints.UInt256;
 import org.hyperledger.besu.evm.account.MutableAccount;
+import org.web3j.crypto.Hash;
 
 import java.math.BigInteger;
 
@@ -101,10 +102,74 @@ public class ServerContext {
             System.out.println("balanceOf(initialTokenHolder): " + initialTokenHolderBalance);
             System.out.println();
 
+            trackErc20StorageSlots();
+
         } catch (Exception e) {
             System.err.println("[SERVER_CONTEXT | WARN] Could not load genesis: "
                     + e.getMessage() + " - starting with empty state");
         }
+    }
+
+    private void trackErc20StorageSlots() {
+        Address contractAddress = config.getIstContractAddress();
+
+        // Track every token holder balance slot and every client-to-client allowance slot we need to preserve.
+        for (ProcessInfo processInfo : config.getProcesses().values()) {
+            Address address = processInfo.getAddress();
+            worldState.trackStorageSlot(contractAddress, balanceSlot(address));
+            if (!processInfo.isClient()) {
+                continue;
+            }
+
+            for (ProcessInfo spenderInfo : config.getProcesses().values()) {
+                if (!spenderInfo.isClient()) {
+                    continue;
+                }
+                worldState.trackStorageSlot(contractAddress, allowanceSlot(address, spenderInfo.getAddress()));
+            }
+        }
+
+        worldState.refreshTrackedStorage(contractAddress);
+    }
+
+    private static UInt256 balanceSlot(Address owner) {
+        // Solidity mapping layout: keccak256(padded owner || padded slotIndex).
+        return UInt256.fromBytes(Bytes.wrap(Hash.sha3(concat(padAddress(owner), padWord(BigInteger.ZERO)))));
+    }
+
+    private static UInt256 allowanceSlot(Address owner, Address spender) {
+        // Allowances live in a nested mapping, so we hash the spender on top of the owner's mapping slot.
+        byte[] outer = Hash.sha3(concat(padAddress(owner), padWord(BigInteger.ONE)));
+        return UInt256.fromBytes(Bytes.wrap(Hash.sha3(concat(padAddress(spender), outer))));
+    }
+
+    private static byte[] padAddress(Address address) {
+        // Left-pad the 20-byte address to the 32-byte ABI word Solidity expects.
+        byte[] out = new byte[32];
+        byte[] raw = address.toArrayUnsafe();
+        System.arraycopy(raw, 0, out, 12, raw.length);
+        return out;
+    }
+
+    private static byte[] padWord(BigInteger value) {
+        // Encode a small integer as a 32-byte big-endian ABI word.
+        byte[] raw = value == null ? new byte[0] : value.toByteArray();
+        if (raw.length > 0 && raw[0] == 0) {
+            byte[] trimmed = new byte[raw.length - 1];
+            System.arraycopy(raw, 1, trimmed, 0, trimmed.length);
+            raw = trimmed;
+        }
+
+        byte[] out = new byte[32];
+        System.arraycopy(raw, 0, out, 32 - raw.length, raw.length);
+        return out;
+    }
+
+    private static byte[] concat(byte[] left, byte[] right) {
+        byte[] out = new byte[left.length + right.length];
+        System.arraycopy(left, 0, out, 0, left.length);
+        System.arraycopy(right, 0, out, left.length, right.length);
+        return out;
     }
 
     public void start() throws Exception {

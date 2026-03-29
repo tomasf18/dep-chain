@@ -79,6 +79,13 @@ class StressTest {
             }
         }
 
+        long requestBase = ServerApp.getCoordinator("s0").getServerContext().getBlockChain().getHeight() * 1000L;
+        ctx1.setRequestId((int) requestBase);
+        ctx2.setRequestId((int) requestBase);
+        DepChainWorldState snap = ServerApp.getCoordinator("s0").getServerContext().getWorldState();
+        ctx1.setNonce(snap.getNonce(addr1));
+        ctx2.setNonce(snap.getNonce(addr2));
+
         ctx1.start();
         ctx2.start();
     }
@@ -91,6 +98,7 @@ class StressTest {
         if (ctx2 != null) {
             ctx2.stop();
         }
+        stopReplicas();
         System.out.println("[STRESS] Ending StressTest");
     }
 
@@ -177,6 +185,22 @@ class StressTest {
         });
         t.setDaemon(true);
         t.start();
+    }
+
+    private static void stopReplicas() {
+        for (String replicaId : REPLICAS) {
+            BasicHotStuffCoordinator coord = ServerApp.getCoordinator(replicaId);
+            if (coord == null) {
+                continue;
+            }
+
+            try {
+                coord.getServerContext().stop();
+            } catch (Exception e) {
+                System.err.println("[STRESS] Error stopping replica context " + replicaId + ": " + e.getMessage());
+            }
+            coord.stop();
+        }
     }
 
     private static void waitForBalanceRange(Address addr1, Address addr2, BigInteger minExpectedTotal,

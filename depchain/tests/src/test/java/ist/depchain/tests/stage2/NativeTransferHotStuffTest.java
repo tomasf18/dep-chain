@@ -81,11 +81,19 @@ class NativeTransferHotStuffTest {
             }
         }
 
+        long requestBase = ServerApp.getCoordinator("s0").getServerContext().getBlockChain().getHeight() * 1000L;
+        clientContext.setRequestId((int) requestBase);
+        clientContext.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(clientAddress));
+
         clientContext.start();
     }
 
     @AfterEach
     void teardown() {
+        if (clientContext != null) {
+            clientContext.stop();
+        }
+        stopReplicas();
         System.out.println("[TEST] Ending NativeTransferHotStuffTest");
     }
 
@@ -141,6 +149,22 @@ class NativeTransferHotStuffTest {
         });
         t.setDaemon(true);
         t.start();
+    }
+
+    private static void stopReplicas() {
+        for (String replicaId : REPLICAS) {
+            BasicHotStuffCoordinator coord = ServerApp.getCoordinator(replicaId);
+            if (coord == null) {
+                continue;
+            }
+
+            try {
+                coord.getServerContext().stop();
+            } catch (Exception e) {
+                System.err.println("[TEST] Error stopping replica context " + replicaId + ": " + e.getMessage());
+            }
+            coord.stop();
+        }
     }
 
     private static BigInteger waitForReplicaConvergence(Address sender, Address receiver,

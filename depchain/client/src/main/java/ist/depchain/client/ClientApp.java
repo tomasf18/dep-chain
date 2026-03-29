@@ -30,23 +30,24 @@ public class ClientApp {
             try {
                 while (true) {
                     System.out.println("\n=== DepChain Client ===");
-                    System.out.println("0 - Check balance");
-                    System.out.println("1 - Submit native transfer");
-                    System.out.println("2 - ERC20 transfer");
-                    System.out.println("3 - ERC20 increaseAllowance");
-                    System.out.println("4 - ERC20 decreaseAllowance");
-                    System.out.println("5 - ERC20 transferFrom");
+                    System.out.println("1 - Check native balance");
+                    System.out.println("2 - Submit native transfer");
+                    System.out.println("3 - ERC20 transfer");
+                    System.out.println("4 - ERC20 increaseAllowance");
+                    System.out.println("5 - ERC20 decreaseAllowance");
+                    System.out.println("6 - ERC20 transferFrom");
+                    System.out.println("7 - Check ERC20 balance");
                     System.out.println("exit - Quit");
                     System.out.print("> ");
                     String line = in.nextLine();
 
                     try {
                         switch (line) {
-                            case "0": {
-                                clientLib.submitBalanceCheck();
+                            case "1": {
+                                clientLib.submitNativeBalanceCheck();
                                 break;
                             }
-                            case "1": {
+                            case "2": {
                                 System.out.print("Destination address (0x...): ");
                                 String to = in.nextLine();
 
@@ -63,7 +64,7 @@ public class ClientApp {
                                 break;
                             }
 
-                            case "2": {
+                            case "3": {
 
                                 System.out.print("Token recipient address (0x...): ");
                                 String to = in.nextLine();
@@ -81,7 +82,7 @@ public class ClientApp {
                                 break;
                             }
 
-                            case "3": {
+                            case "4": {
 
                                 System.out.print("Spender address (0x...): ");
                                 String spender = in.nextLine();
@@ -99,7 +100,7 @@ public class ClientApp {
                                 break;
                             }
 
-                            case "4": {
+                            case "5": {
 
                                 System.out.print("Spender address (0x...): ");
                                 String spender = in.nextLine();
@@ -117,7 +118,7 @@ public class ClientApp {
                                 break;
                             }
 
-                            case "5": {
+                            case "6": {
 
                                 System.out.print("From address (token owner): ");
                                 String from = in.nextLine();
@@ -135,6 +136,11 @@ public class ClientApp {
                                 BigInteger gasLimit = new BigInteger(in.nextLine());
 
                                 clientLib.submitTransferFrom(from, to, amount, gasPrice, gasLimit);
+                                break;
+                            }
+
+                            case "7": {
+                                clientLib.submitTokenBalanceCheck();
                                 break;
                             }
 

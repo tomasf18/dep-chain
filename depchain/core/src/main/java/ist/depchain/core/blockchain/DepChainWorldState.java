@@ -75,9 +75,38 @@ public class DepChainWorldState {
         if (account != null && code != null) {
             account.setCode(code);
         }
+        trackAccount(address);
+    }
+
+    public void trackAccount(Address address) {
+        // Record the account so snapshot/copy operations know it must survive.
         trackedAccounts.add(address);
         trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet());
         trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>());
+    }
+
+    public void trackStorageSlot(Address address, UInt256 slot) {
+        // Track a contract slot that is expected to change during EVM execution.
+        trackAccount(address);
+        trackedStorageSlots.computeIfAbsent(address, k -> ConcurrentHashMap.newKeySet()).add(slot);
+    }
+
+    public void refreshTrackedStorage(Address address) {
+        // Pull the latest live values from the EVM account into the tracked snapshot map.
+        AccountState account = world.get(address);
+        if (account == null) {
+            return;
+        }
+
+        Set<UInt256> slots = trackedStorageSlots.get(address);
+        if (slots == null || slots.isEmpty()) {
+            return;
+        }
+
+        Map<UInt256, UInt256> values = trackedStorageValues.computeIfAbsent(address, k -> new ConcurrentHashMap<>());
+        for (UInt256 slot : slots) {
+            values.put(slot, account.getStorageValue(slot));
+        }
     }
 
     // --- Balance operations ---

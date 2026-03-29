@@ -1,18 +1,14 @@
 package ist.depchain.core.blockchain;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.PrintStream;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.datatypes.Address;
-import org.hyperledger.besu.datatypes.Wei;
 import org.hyperledger.besu.evm.EvmSpecVersion;
 import org.hyperledger.besu.evm.account.MutableAccount;
 import org.hyperledger.besu.evm.fluent.EVMExecutor;
@@ -90,7 +86,10 @@ public final class EvmService {
         executor.tracer(tracer);
 
         if (worldState.getSimpleWorld().get(contractAddress) == null) {
-            worldState.getSimpleWorld().createAccount(contractAddress, 0, Wei.ZERO);
+            worldState.createContractAccount(contractAddress, 0, java.math.BigInteger.ZERO, Bytes.EMPTY);
+        } else {
+            // Genesis may replay into an already-created account, so keep it tracked either way.
+            worldState.trackAccount(contractAddress);
         }
 
         executor.sender(sender);
@@ -120,6 +119,8 @@ public final class EvmService {
         }
 
         contractAccount.setCode(returnBytes);
+        // The EVM updated storage during deployment, so refresh the tracked snapshot immediately.
+        worldState.refreshTrackedStorage(contractAddress);
 
         return new EvmResult(true, Bytes.EMPTY, returnBytes, null);
     }
@@ -155,6 +156,9 @@ public final class EvmService {
         if (!"RETURN".equalsIgnoreCase(opName)) {
             return new EvmResult(false, returnBytes, Bytes.EMPTY, "unexpected final EVM op: " + opName);
         }
+
+        // Contract calls may mutate ERC20 balances or allowances, so resync tracked storage here too.
+        worldState.refreshTrackedStorage(contractAddress);
 
         return new EvmResult(true, returnBytes, Bytes.EMPTY, null);
     }
