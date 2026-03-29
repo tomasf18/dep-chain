@@ -390,9 +390,7 @@ public class BasicHotStuffCoordinator {
         // Re-validate the entire proposed block before voting.
         // This defends against a Byzantine leader injecting invalid or forged txs.
         // Replicas must not vote for a block just because it has a valid QC chain. They must also verify the payload
-        Address proposerAddress = serverContext.deriveAddressForProcess(sourceId);
-
-        ValidationResult validation = BlockValidator.validateProposedBlock(node, serverContext.getWorldState(), serverContext.getConfig(), proposerAddress);
+        ValidationResult validation = BlockValidator.validateProposedBlock(node, serverContext.getWorldState(), serverContext.getConfig());
 
         if (!validation.isValid()) {
             System.err.println("[COORDINATOR | REPLICA] Rejecting proposed block " + node.getId().toStringUtf8()
@@ -522,7 +520,7 @@ public class BasicHotStuffCoordinator {
 
         int decideView = m.getViewNumber();
         System.out.println("[COORDINATOR | DECIDE] executing block=" + blockId.toStringUtf8() + " source=" + sourceId + " decideView=" + decideView + " currentViewBefore=" + currentView.get());
-        executeStage2Block(commitedBlock, blockId, sourceId);
+        executeStage2Block(commitedBlock, sourceId);
 
         if (currentView.get() < decideView) {
             // this means we are behind the decided view, likely due to a missed DECIDE message or a slow timer
@@ -548,7 +546,7 @@ public class BasicHotStuffCoordinator {
      * - compute the resulting deterministic state hash,
      * - then publish the snapshot into the committed world state.
      */
-    private void executeStage2Block(Block protoBlock, ByteString blockId, String leaderId) {
+    private void executeStage2Block(Block protoBlock, String leaderId) {
         // 1. Decode txs
         List<Transaction> txList = BlockValidator.decodeTransactionsFromProto(protoBlock);
 

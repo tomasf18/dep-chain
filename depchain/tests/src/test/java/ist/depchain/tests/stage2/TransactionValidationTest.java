@@ -64,7 +64,7 @@ class TransactionValidationTest {
     }
 
     @Test
-    void rejectsInsufficientBalance() throws Exception {
+    void acceptsInsufficientBalanceAtValidationTime() throws Exception {
         KeyPair kp = genKeyPair();
         PublicKey pub = kp.getPublic();
         Address from = AddressUtils.deriveAddress(pub);
@@ -82,8 +82,7 @@ class TransactionValidationTest {
         Transaction signed = unsignedTx.withSignature(sig);
 
         var result = TransactionValidator.validate(signed, pub, "SHA256withECDSA", ws, null);
-        assertFalse(result.isValid());
-        assertTrue(result.getErrorMessage().contains("balance"));
+        assertTrue(result.isValid(), result.getErrorMessage());
     }
 
     @Test

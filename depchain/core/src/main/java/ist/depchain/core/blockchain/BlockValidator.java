@@ -4,8 +4,6 @@ import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hyperledger.besu.datatypes.Address;
-
 import ist.depchain.common.Block;
 import ist.depchain.common.ClientRequestMeta;
 import ist.depchain.common.Transaction;
@@ -18,8 +16,8 @@ import ist.depchain.network.crypto.KeyLoader;
  *
  * Rules:
  * - tx count must match metadata count
- * - every tx is re-validated (signature, signer/address, nonce, balance, gas)
- * - validation is performed sequentially on a state snapshot
+ * - every tx is re-validated structurally (signature, signer/address, nonce, gas)
+ * - semantic success is deferred to deterministic execution after consensus
  * - tx failures caused by execution (e.g. out-of-gas) are allowed, as long as the tx
  *   is otherwise valid and deterministic; they still mutate nonce/balance on the snapshot
  */
@@ -27,7 +25,7 @@ public final class BlockValidator {
 
     private BlockValidator() {}
 
-    public static ValidationResult validateProposedBlock(Block protoBlock, DepChainWorldState committedState, Config config, Address proposerAddress) {
+    public static ValidationResult validateProposedBlock(Block protoBlock, DepChainWorldState committedState, Config config) {
 
         List<TransactionPayload> txPayloads = protoBlock.getTransactionsList();
         List<ClientRequestMeta> metaList = protoBlock.getRequestMetaList();

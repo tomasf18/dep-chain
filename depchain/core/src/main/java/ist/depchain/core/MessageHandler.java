@@ -107,7 +107,7 @@ public class MessageHandler {
 
         Set<Long> pendingNoncesForSender = pendingNonces.computeIfAbsent(tx.getFrom(), k -> ConcurrentHashMap.newKeySet());
         
-        // Validate transaction (signature, account, balance, gas, nonce, etc.)
+        // Validate transaction structure before admitting it to consensus.
         ValidationResult result = TransactionValidator.validate(tx, clientPublicKey, serverContext.getConfig().getSignatureAlgorithm(), serverContext.getWorldState(), pendingNoncesForSender);
 
         if (!result.isValid()) {

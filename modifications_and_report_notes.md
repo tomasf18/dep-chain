@@ -153,3 +153,40 @@ Just for ref for the report: implementation changes made to stabilize the HotStu
 - ERC20 unit and HotStuff coverage were added and stabilized.
 - The deployment/config bootstrap was aligned around `client1` as the initial token holder.
 - The world-state snapshot path now preserves the ERC20 contract state across replica execution.
+
+
+## Request Tracking 
+Before, the server rejected any client request whose requestId was not strictly greater than the highest seen one. This was too brittle over UDP and incompatible with the richer transaction flow needed in Stage 2. A valid delayed request could be discarded just because a later one arrived first.
+
+The solution: Changed how client requests are tracked on the server
+- In the message handler, requests with lower sequence numbers are no longer ignored
+- The message handler now has a callback to the coordinator that is called when a request is committed
+- The message handler marks the request as executed and responds to the client
+- This is necessary to prevent replay attacks and to guarantee that the client receives a response even if the request is re-proposed multiple times (for example, if the leader fails after proposing but before commit)
+
+---
+
+## Report notes
+- Student question: If we are a replica should we validate if a transaction of depchain is possible due to account balances after or before the consensus for the block is reached? Could we accept a block with that transaction and when we are executing it if it fails we simple don't change the state and still make the sender pay the gas fee? 
+- PROFESSOR ANSWER: You should reason about the implications of the various design options and explain your choices in the report and in the discussion.
+
+The best design choice is: validate transaction execution against the committed replica state AFTER consensus, not as a hard safety gate before consensus
+
+- Consensus decides ordering, not semantic success.
+- A transaction that is valid when proposed can become invalid by the time it is executed because earlier committed transactions may have changed balances, nonces, or allowances.
+- If replicas tried to fully validate “can this tx succeed?” before consensus, they could reject something that would later be valid in the final block order, or accept something that becomes invalid later. That makes the system brittle and order-dependent.
+
+- After consensus:
+  - execute the block deterministically on every replica in the same order
+  - if a transaction fails during execution, revert its state changes
+  - still charge gas if protocol says execution consumed resources
+
+About the fee rule:
+
+- Yes, for EVM-style execution failures, the design must be:
+  - no state change from the failed call
+  - sender still pays gas for the work already spent
+- But we should be careful with one distinction:
+  - if the transaction is structurally invalid or cannot even start execution, then we should not silently mutate balances
+  - if execution starts and then reverts, fee charging is appropriate
+
