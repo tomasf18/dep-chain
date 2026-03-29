@@ -19,9 +19,18 @@ public class Transaction {
     private final BigInteger gasLimit;
     private final long nonce;
     private final byte[] signature; // ECDSA signature over unsigned tx bytes
+    private final TransactionKind kind;
+    private final Address nativeBalanceQueryTarget;
 
     public Transaction(Address from, Address to, BigInteger value, byte[] data,
                        BigInteger gasPrice, BigInteger gasLimit, long nonce, byte[] signature) {
+        this(from, to, value, data, gasPrice, gasLimit, nonce, signature,
+                TransactionKind.TRANSACTION_KIND_STANDARD, null);
+    }
+
+    private Transaction(Address from, Address to, BigInteger value, byte[] data,
+                        BigInteger gasPrice, BigInteger gasLimit, long nonce, byte[] signature,
+                        TransactionKind kind, Address nativeBalanceQueryTarget) {
         this.from = from;
         this.to = to;
         this.value = value != null ? value : BigInteger.ZERO;
@@ -30,10 +39,21 @@ public class Transaction {
         this.gasLimit = gasLimit != null ? gasLimit : BigInteger.ZERO;
         this.nonce = nonce;
         this.signature = signature != null ? Arrays.copyOf(signature, signature.length) : null;
+        this.kind = kind != null ? kind : TransactionKind.TRANSACTION_KIND_STANDARD;
+        this.nativeBalanceQueryTarget = nativeBalanceQueryTarget;
+    }
+
+    public static Transaction nativeBalanceQuery(Address from, Address target, BigInteger gasPrice,
+                                                 BigInteger gasLimit, long nonce, byte[] signature) {
+        if (target == null) {
+            throw new IllegalArgumentException("target cannot be null");
+        }
+        return new Transaction(from, null, BigInteger.ZERO, new byte[0], gasPrice, gasLimit, nonce, signature,
+                TransactionKind.TRANSACTION_KIND_NATIVE_BALANCE_QUERY, target);
     }
 
     public boolean isContractDeployment() {
-        return to == null;
+        return to == null && !isNativeBalanceQuery();
     }
 
     public boolean isContractCall() {
@@ -42,6 +62,14 @@ public class Transaction {
 
     public boolean isNativeTransfer() {
         return to != null && data.length == 0 && value.compareTo(BigInteger.ZERO) > 0;
+    }
+
+    public boolean isNativeBalanceQuery() {
+        return kind == TransactionKind.TRANSACTION_KIND_NATIVE_BALANCE_QUERY;
+    }
+
+    public Address getNativeBalanceQueryTarget() {
+        return nativeBalanceQueryTarget;
     }
 
     /**
@@ -61,7 +89,7 @@ public class Transaction {
     }
 
     public Transaction withSignature(byte[] newSignature) {
-        return new Transaction(from, to, value, data, gasPrice, gasLimit, nonce, newSignature);
+        return new Transaction(from, to, value, data, gasPrice, gasLimit, nonce, newSignature, kind, nativeBalanceQueryTarget);
     }
 
     /**
@@ -74,6 +102,8 @@ public class Transaction {
         byte[] valueBytes = normalizeBigInt(value);
         byte[] gasPriceBytes = normalizeBigInt(gasPrice);
         byte[] gasLimitBytes = normalizeBigInt(gasLimit);
+        byte[] kindBytes = normalizeBigInt(BigInteger.valueOf(kind.getNumber()));
+        byte[] queryTargetBytes = nativeBalanceQueryTarget == null ? new byte[0] : nativeBalanceQueryTarget.toArrayUnsafe();
         byte[] nonceBytes = ByteBuffer.allocate(Long.BYTES).putLong(nonce).array();
 
         int total =
@@ -83,6 +113,8 @@ public class Transaction {
                 4 + data.length +
                 4 + gasPriceBytes.length +
                 4 + gasLimitBytes.length +
+                4 + kindBytes.length +
+                4 + queryTargetBytes.length +
                 4 + nonceBytes.length;
 
         ByteBuffer buf = ByteBuffer.allocate(total);
@@ -92,6 +124,8 @@ public class Transaction {
         putWithLength(buf, data);
         putWithLength(buf, gasPriceBytes);
         putWithLength(buf, gasLimitBytes);
+        putWithLength(buf, kindBytes);
+        putWithLength(buf, queryTargetBytes);
         putWithLength(buf, nonceBytes);
 
         return buf.array();
@@ -103,7 +137,7 @@ public class Transaction {
     }
 
     public TransactionPayload toProto() {
-        return TransactionPayload.newBuilder()
+        TransactionPayload.Builder builder = TransactionPayload.newBuilder()
                 .setFrom(ByteString.copyFrom(from.toArrayUnsafe()))
                 .setTo(ByteString.copyFrom(to == null ? new byte[0] : to.toArrayUnsafe()))
                 .setValue(ByteString.copyFrom(normalizeBigInt(value)))
@@ -111,8 +145,16 @@ public class Transaction {
                 .setGasPrice(ByteString.copyFrom(normalizeBigInt(gasPrice)))
                 .setGasLimit(ByteString.copyFrom(normalizeBigInt(gasLimit)))
                 .setNonce(nonce)
-                .setSignature(ByteString.copyFrom(signature == null ? new byte[0] : signature))
-                .build();
+            .setSignature(ByteString.copyFrom(signature == null ? new byte[0] : signature))
+            .setKind(kind);
+
+        if (nativeBalanceQueryTarget != null) {
+            builder.setNativeBalanceQuery(NativeBalanceQuery.newBuilder()
+                .setTarget(ByteString.copyFrom(nativeBalanceQueryTarget.toArrayUnsafe()))
+                .build());
+        }
+
+        return builder.build();
     }
 
     public static Transaction fromProto(TransactionPayload proto) {
@@ -120,6 +162,16 @@ public class Transaction {
         Address to = proto.getTo().isEmpty()
                 ? null
                 : Address.wrap(Bytes.wrap(proto.getTo().toByteArray()));
+
+        TransactionKind kind = proto.getKind();
+        Address nativeBalanceQueryTarget = null;
+        if (proto.hasNativeBalanceQuery()) {
+            ByteString targetBytes = proto.getNativeBalanceQuery().getTarget();
+            if (!targetBytes.isEmpty()) {
+            nativeBalanceQueryTarget = Address.wrap(Bytes.wrap(targetBytes.toByteArray()));
+            }
+            kind = TransactionKind.TRANSACTION_KIND_NATIVE_BALANCE_QUERY;
+        }
 
         return new Transaction(
                 from,
@@ -129,7 +181,9 @@ public class Transaction {
                 fromUnsigned(proto.getGasPrice().toByteArray()),
                 fromUnsigned(proto.getGasLimit().toByteArray()),
                 proto.getNonce(),
-                proto.getSignature().toByteArray()
+            proto.getSignature().toByteArray(),
+            kind,
+            nativeBalanceQueryTarget
         );
     }
 

@@ -44,7 +44,7 @@ class StressTest {
     private static final BigInteger INITIAL_BALANCE = BigInteger.valueOf(10_000_000);
     private static final BigInteger TX_VALUE        = BigInteger.valueOf(100);
     private static final BigInteger GAS_PRICE       = BigInteger.ONE;
-    private static final BigInteger GAS_LIMIT       = BigInteger.valueOf(21_000);
+    private static final BigInteger GAS_LIMIT       = Stage2GasConstants.NATIVE_TRANSFER_GAS_COST;
     private static final int       NUM_TXS_EACH     = 20; // 40 txs total
 
     private ClientContext  ctx1, ctx2;

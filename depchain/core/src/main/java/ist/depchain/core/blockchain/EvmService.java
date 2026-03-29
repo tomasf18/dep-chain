@@ -22,6 +22,8 @@ import com.google.gson.JsonParser;
 
 public final class EvmService {
 
+    private static final BigInteger DEFAULT_EXECUTION_GAS_LIMIT = BigInteger.valueOf(10_000_000);
+
     private EvmService() {}
 
     public static final class EvmResult {
@@ -29,12 +31,18 @@ public final class EvmService {
         private final Bytes returnData;
         private final Bytes runtimeCode;   // only meaningful for deployment
         private final String errorMessage;
+        private final BigInteger gasUsed;
 
         public EvmResult(boolean success, Bytes returnData, Bytes runtimeCode, String errorMessage) {
+            this(success, returnData, runtimeCode, errorMessage, BigInteger.ZERO);
+        }
+
+        public EvmResult(boolean success, Bytes returnData, Bytes runtimeCode, String errorMessage, BigInteger gasUsed) {
             this.success = success;
             this.returnData = returnData != null ? returnData : Bytes.EMPTY;
             this.runtimeCode = runtimeCode != null ? runtimeCode : Bytes.EMPTY;
             this.errorMessage = errorMessage;
+            this.gasUsed = gasUsed != null ? gasUsed : BigInteger.ZERO;
         }
 
         public boolean isSuccess() {
@@ -51,6 +59,10 @@ public final class EvmService {
 
         public String getErrorMessage() {
             return errorMessage;
+        }
+
+        public BigInteger getGasUsed() {
+            return gasUsed;
         }
     }
 
@@ -78,11 +90,17 @@ public final class EvmService {
      * Used for bootstrap/genesis or any deterministic deployment flow.
      */
     public static EvmResult deployContract(DepChainWorldState worldState, Address sender, Address contractAddress, byte[] deploymentData) {
+        return deployContract(worldState, sender, contractAddress, deploymentData, DEFAULT_EXECUTION_GAS_LIMIT);
+    }
+
+    public static EvmResult deployContract(DepChainWorldState worldState, Address sender, Address contractAddress, byte[] deploymentData, BigInteger gasLimit) {
         ByteArrayOutputStream traceOutput = new ByteArrayOutputStream();
         PrintStream tracePrint = new PrintStream(traceOutput);
         StandardJsonTracer tracer = new StandardJsonTracer(tracePrint, true, true, true, true);
 
-        EVMExecutor executor = EVMExecutor.evm(EvmSpecVersion.CANCUN);
+        BigInteger effectiveGasLimit = normalizeGasLimit(gasLimit);
+
+        EVMExecutor executor = EVMExecutor.evm(EvmSpecVersion.CANCUN).gas(toExecutorGasLimit(effectiveGasLimit));
         executor.tracer(tracer);
 
         if (worldState.getSimpleWorld().get(contractAddress) == null) {
@@ -103,14 +121,15 @@ public final class EvmService {
 
         JsonObject lastTrace = getLastTraceObject(traceOutput);
         String opName = lastTrace.get("opName").getAsString();
+        BigInteger gasUsed = calculateGasUsed(effectiveGasLimit, extractRemainingGas(lastTrace));
         Bytes returnBytes = extractReturnBytes(traceOutput);
 
         if ("REVERT".equalsIgnoreCase(opName)) {
-            return new EvmResult(false, returnBytes, Bytes.EMPTY, decodeRevertReason(returnBytes));
+            return new EvmResult(false, returnBytes, Bytes.EMPTY, decodeRevertReason(returnBytes), gasUsed);
         }
 
         if (!"RETURN".equalsIgnoreCase(opName)) {
-            return new EvmResult(false, returnBytes, Bytes.EMPTY, "unexpected final EVM op: " + opName);
+            return new EvmResult(false, returnBytes, Bytes.EMPTY, "unexpected final EVM op: " + opName, gasUsed);
         }
 
         MutableAccount contractAccount = (MutableAccount) worldState.getSimpleWorld().get(contractAddress);
@@ -122,19 +141,25 @@ public final class EvmService {
         // The EVM updated storage during deployment, so refresh the tracked snapshot immediately.
         worldState.refreshTrackedStorage(contractAddress);
 
-        return new EvmResult(true, Bytes.EMPTY, returnBytes, null);
+        return new EvmResult(true, Bytes.EMPTY, returnBytes, null, gasUsed);
     }
 
     /**
      * Executes a contract call (may mutate storage if calldata targets a state-changing function).
      */
     public static EvmResult callContract(DepChainWorldState worldState, Address sender, Address contractAddress, Bytes runtimeCode, byte[] calldata) {
+        return callContract(worldState, sender, contractAddress, runtimeCode, calldata, DEFAULT_EXECUTION_GAS_LIMIT);
+    }
+
+    public static EvmResult callContract(DepChainWorldState worldState, Address sender, Address contractAddress, Bytes runtimeCode, byte[] calldata, BigInteger gasLimit) {
 
         ByteArrayOutputStream traceOutput = new ByteArrayOutputStream();
         PrintStream tracePrint = new PrintStream(traceOutput);
         StandardJsonTracer tracer = new StandardJsonTracer(tracePrint, true, true, true, true);
 
-        EVMExecutor executor = EVMExecutor.evm(EvmSpecVersion.CANCUN);
+        BigInteger effectiveGasLimit = normalizeGasLimit(gasLimit);
+
+        EVMExecutor executor = EVMExecutor.evm(EvmSpecVersion.CANCUN).gas(toExecutorGasLimit(effectiveGasLimit));
         executor.tracer(tracer);
         executor.sender(sender);
         executor.receiver(contractAddress);
@@ -147,20 +172,21 @@ public final class EvmService {
 
         JsonObject lastTrace = getLastTraceObject(traceOutput);
         String opName = lastTrace.get("opName").getAsString();
+        BigInteger gasUsed = calculateGasUsed(effectiveGasLimit, extractRemainingGas(lastTrace));
         Bytes returnBytes = extractReturnBytes(traceOutput);
 
         if ("REVERT".equalsIgnoreCase(opName)) {
-            return new EvmResult(false, returnBytes, Bytes.EMPTY, decodeRevertReason(returnBytes));
+            return new EvmResult(false, returnBytes, Bytes.EMPTY, decodeRevertReason(returnBytes), gasUsed);
         }
 
         if (!"RETURN".equalsIgnoreCase(opName)) {
-            return new EvmResult(false, returnBytes, Bytes.EMPTY, "unexpected final EVM op: " + opName);
+            return new EvmResult(false, returnBytes, Bytes.EMPTY, "unexpected final EVM op: " + opName, gasUsed);
         }
 
         // Contract calls may mutate ERC20 balances or allowances, so resync tracked storage here too.
         worldState.refreshTrackedStorage(contractAddress);
 
-        return new EvmResult(true, returnBytes, Bytes.EMPTY, null);
+        return new EvmResult(true, returnBytes, Bytes.EMPTY, null, gasUsed);
     }
 
     // ---------- Convenience read helpers ----------
@@ -192,24 +218,28 @@ public final class EvmService {
     // ---------- Decoding ----------
 
     public static Bytes extractReturnBytes(ByteArrayOutputStream output) {
-        JsonObject json = getLastTraceObject(output);
+        try {
+            JsonObject json = getLastTraceObject(output);
 
-        String memory = json.get("memory").getAsString();
-        JsonArray stack = json.get("stack").getAsJsonArray();
+            String memory = json.get("memory").getAsString();
+            JsonArray stack = json.get("stack").getAsJsonArray();
 
-        int offset = decodeHexInt(stack.get(stack.size() - 1).getAsString());
-        int size = decodeHexInt(stack.get(stack.size() - 2).getAsString());
+            int offset = decodeHexInt(stack.get(stack.size() - 1).getAsString());
+            int size = decodeHexInt(stack.get(stack.size() - 2).getAsString());
 
-        if (size == 0) {
+            if (size == 0) {
+                return Bytes.EMPTY;
+            }
+
+            String returnData = memory.substring(
+                    2 + offset * 2,
+                    2 + offset * 2 + size * 2
+            );
+
+            return Bytes.fromHexString("0x" + returnData);
+        } catch (Exception ex) {
             return Bytes.EMPTY;
         }
-
-        String returnData = memory.substring(
-                2 + offset * 2,
-                2 + offset * 2 + size * 2
-        );
-
-        return Bytes.fromHexString("0x" + returnData);
     }
 
     /**
@@ -297,8 +327,53 @@ public final class EvmService {
         throw new IllegalStateException("No JSON trace line found in Besu tracer output");
     }
 
+    private static BigInteger extractRemainingGas(JsonObject traceObject) {
+        if (traceObject == null || !traceObject.has("gas") || traceObject.get("gas").isJsonNull()) {
+            throw new IllegalStateException("No gas field found in Besu tracer output");
+        }
+        return decodeQuantity(traceObject.get("gas").getAsString());
+    }
+
+    private static BigInteger calculateGasUsed(BigInteger initialGas, BigInteger remainingGas) {
+        if (initialGas == null) {
+            throw new IllegalArgumentException("initialGas cannot be null");
+        }
+        if (remainingGas == null) {
+            throw new IllegalArgumentException("remainingGas cannot be null");
+        }
+        BigInteger gasUsed = initialGas.subtract(remainingGas);
+        if (gasUsed.signum() < 0) {
+            throw new IllegalStateException("EVM remaining gas exceeded initial gas");
+        }
+        return gasUsed;
+    }
+
+    private static BigInteger normalizeGasLimit(BigInteger gasLimit) {
+        return gasLimit == null ? DEFAULT_EXECUTION_GAS_LIMIT : gasLimit;
+    }
+
+    private static long toExecutorGasLimit(BigInteger gasLimit) {
+        return normalizeGasLimit(gasLimit).longValueExact();
+    }
+
+    private static BigInteger decodeQuantity(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("quantity cannot be blank");
+        }
+
+        String normalized = value.trim();
+        if (normalized.startsWith("0x") || normalized.startsWith("0X")) {
+            return new BigInteger(normalized.substring(2), 16);
+        }
+        return new BigInteger(normalized);
+    }
+
     public static int decodeHexInt(String value) {
-        return Integer.decode(value);
+        try {
+            return Integer.decode(value);
+        } catch (NumberFormatException ex) {
+            return Integer.parseUnsignedInt(value.trim(), 16);
+        }
     }
 
     public static byte[] hexStringToByteArray(String hexString) {

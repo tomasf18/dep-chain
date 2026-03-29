@@ -21,6 +21,9 @@ import ist.depchain.common.Transaction;
  */
 public class BlockSerializer {
 
+    private BlockSerializer() {
+    }
+
     // --- Serialize ---
 
     public static String toJson(BlockChainBlock block) {
@@ -85,6 +88,11 @@ public class BlockSerializer {
         obj.addProperty("gas_price", tx.getGasPrice().toString());
         obj.addProperty("gas_limit", tx.getGasLimit().toString());
         obj.addProperty("nonce", tx.getNonce());
+        obj.addProperty("kind", tx.isNativeBalanceQuery() ? "NATIVE_BALANCE_QUERY" : "STANDARD");
+
+        if (tx.isNativeBalanceQuery() && tx.getNativeBalanceQueryTarget() != null) {
+            obj.addProperty("native_balance_query_target", tx.getNativeBalanceQueryTarget().toHexString());
+        }
 
         if (tx.getSignature() != null) {
             obj.addProperty("signature", "0x" + Numeric.toHexStringNoPrefix(tx.getSignature()));
@@ -199,6 +207,18 @@ public class BlockSerializer {
         byte[] signature = null;
         if (obj.has("signature") && !obj.get("signature").isJsonNull()) {
             signature = Numeric.hexStringToByteArray(obj.get("signature").getAsString());
+        }
+
+        String kind = obj.has("kind") && !obj.get("kind").isJsonNull()
+                ? obj.get("kind").getAsString()
+                : "STANDARD";
+
+        if ("NATIVE_BALANCE_QUERY".equalsIgnoreCase(kind)) {
+            Address target = null;
+            if (obj.has("native_balance_query_target") && !obj.get("native_balance_query_target").isJsonNull()) {
+                target = Address.fromHexString(obj.get("native_balance_query_target").getAsString());
+            }
+            return Transaction.nativeBalanceQuery(from, target, gasPrice, gasLimit, nonce, signature);
         }
 
         return new Transaction(from, to, value, data, gasPrice, gasLimit, nonce, signature);

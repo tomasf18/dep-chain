@@ -33,7 +33,6 @@ public class Signature {
     return ptr;
   }
 
-  @SuppressWarnings({"deprecation", "removal"})
   protected void finalize() {
     delete();
   }

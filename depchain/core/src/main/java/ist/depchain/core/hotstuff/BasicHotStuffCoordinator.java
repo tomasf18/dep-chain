@@ -547,53 +547,57 @@ public class BasicHotStuffCoordinator {
      * - then publish the snapshot into the committed world state.
      */
     private void executeStage2Block(Block protoBlock, String leaderId) {
-        // 1. Decode txs
-        List<Transaction> txList = BlockValidator.decodeTransactionsFromProto(protoBlock);
-
-        // 2. Determine proposer address
-        Address proposerAddress = serverContext.deriveAddressForProcess(leaderId);
-        System.out.println("[COORDINATOR] Executing block " + protoBlock.getId() + " proposed by " + leaderId
-                + " with " + txList.size() + " transactions");
-
-        // 3. Build deterministic app-level block
-        BlockChainBlock previousAppBlock = serverContext.getBlockChain().getLatestBlock();
-        BlockChainBlock appBlock = BlockBuilder.build(txList, previousAppBlock, proposerAddress);
-
-        // 4. Execute on an isolated snapshot, not on the committed world state directly
-        DepChainWorldState workingState = serverContext.getWorldState().copy();
-        List<TransactionReceipt> receipts = new ArrayList<>();
-
-        for (Transaction tx : appBlock.getTransactions()) {
-            TransactionReceipt receipt = serverContext.getTransactionExecutor().execute(workingState, tx, proposerAddress, true);
-            receipts.add(receipt);
-        }
-
-        // 5. Compute resulting state hash and finalize block
-        String stateHash = workingState.computeStateHash();
-        BlockChainBlock finalBlock = BlockBuilder.finalize(appBlock, receipts, stateHash);
-
-        // 6. Atomically publish the new committed state + persist block
-        serverContext.getWorldState().replaceWith(workingState);
-        serverContext.getBlockChain().addBlock(finalBlock);
-
-        System.out.println("[COORDINATOR] Committed block #" + finalBlock.getBlockNumber() + " with " + txList.size() + " txs, hash=" + finalBlock.getBlockHash() + ", stateHash=" + stateHash);
-
-        // 7. Discard committed requests from mempool and notify MessageHandler
         List<ClientRequestMeta> metaList = protoBlock.getRequestMetaList();
-        synchronized (this) {
-            lastProposedBatch = null;
-            for (ClientRequestMeta meta : metaList) {
-                mempool.discardIfPresent(meta.getClientId(), meta.getRequestId());
+        List<TransactionReceipt> receipts = new ArrayList<>();
+        BlockChainBlock finalBlock;
+
+        synchronized (serverContext) {
+            // 1. Decode txs
+            List<Transaction> txList = BlockValidator.decodeTransactionsFromProto(protoBlock);
+
+            // 2. Determine proposer address
+            Address proposerAddress = serverContext.deriveAddressForProcess(leaderId);
+            System.out.println("[COORDINATOR] Executing block " + protoBlock.getId() + " proposed by " + leaderId
+                    + " with " + txList.size() + " transactions");
+
+            // 3. Build deterministic app-level block
+            BlockChainBlock previousAppBlock = serverContext.getBlockChain().getLatestBlock();
+            BlockChainBlock appBlock = BlockBuilder.build(txList, previousAppBlock, proposerAddress);
+
+            // 4. Execute on an isolated snapshot, not on the committed world state directly
+            DepChainWorldState workingState = serverContext.getWorldState().copy();
+
+            for (Transaction tx : appBlock.getTransactions()) {
+                TransactionReceipt receipt = serverContext.getTransactionExecutor().execute(workingState, tx, proposerAddress);
+                receipts.add(receipt);
+            }
+
+            // 5. Compute resulting state hash and finalize block
+            String stateHash = workingState.computeStateHash();
+            finalBlock = BlockBuilder.finalize(appBlock, receipts, stateHash);
+
+            // 6. Atomically publish the new committed state + persist block
+            serverContext.getWorldState().replaceWith(workingState);
+            serverContext.getBlockChain().addBlock(finalBlock);
+
+            System.out.println("[COORDINATOR] Committed block #" + finalBlock.getBlockNumber() + " with " + txList.size() + " txs, hash=" + finalBlock.getBlockHash() + ", stateHash=" + stateHash);
+
+            // 7. Discard committed requests from mempool and notify MessageHandler
+            synchronized (this) {
+                lastProposedBatch = null;
+                for (ClientRequestMeta meta : metaList) {
+                    mempool.discardIfPresent(meta.getClientId(), meta.getRequestId());
+                }
+            }
+
+            if (requestCommitListener != null) {
+                for (ClientRequestMeta meta : metaList) {
+                    requestCommitListener.onRequestCommitted(meta.getClientId(), meta.getRequestId());
+                }
             }
         }
 
-        if (requestCommitListener != null) {
-            for (ClientRequestMeta meta : metaList) {
-                requestCommitListener.onRequestCommitted(meta.getClientId(), meta.getRequestId());
-            }
-        }
-
-        // 8. Send per-request client responses
+        // 8. Send per-request client responses outside the state lock.
         for (int i = 0; i < metaList.size(); i++) {
             ClientRequestMeta meta = metaList.get(i);
             TransactionReceipt receipt = receipts.get(i);

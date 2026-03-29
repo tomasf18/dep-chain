@@ -8,8 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.google.protobuf.ByteString;
-
 import org.hyperledger.besu.datatypes.Address;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,6 +108,19 @@ class ConsensusIntegrationTest {
         assertFalse(mempool.isEmpty());
     }
 
+    @Test
+    void drainBatchDeduplicatesDuplicateReplayRequests() {
+        CommandMempool mempool = new CommandMempool();
+        mempool.enqueue(makeClientRequest("c1", 7));
+        mempool.enqueue(makeClientRequest("c1", 7));
+        mempool.enqueue(makeClientRequest("c1", 7));
+
+        List<ClientRequest> batch = mempool.drainBatch(10);
+
+        assertEquals(1, batch.size());
+        assertTrue(mempool.isEmpty());
+    }
+
     // ========== Protobuf round-trip: Transaction <-> TransactionPayload ==========
 
     @Test
@@ -159,7 +170,7 @@ class ConsensusIntegrationTest {
         // Execute
         List<TransactionReceipt> receipts = new ArrayList<>();
         for (Transaction t : block.getTransactions()) {
-            receipts.add(executor.execute(ws, t, PROPOSER, false));
+            receipts.add(executor.execute(ws, t, PROPOSER));
         }
 
         assertEquals(1, receipts.size());
@@ -189,7 +200,7 @@ class ConsensusIntegrationTest {
         // Execute in order
         List<TransactionReceipt> receipts = new ArrayList<>();
         for (Transaction t : block.getTransactions()) {
-            receipts.add(executor.execute(ws, t, PROPOSER, false));
+            receipts.add(executor.execute(ws, t, PROPOSER));
         }
 
         assertTrue(receipts.get(0).isSuccess());
@@ -209,7 +220,7 @@ class ConsensusIntegrationTest {
 
         List<TransactionReceipt> receipts = new ArrayList<>();
         for (Transaction t : block.getTransactions()) {
-            receipts.add(executor.execute(ws, t, PROPOSER, false));
+            receipts.add(executor.execute(ws, t, PROPOSER));
         }
 
         BlockChainBlock finalized = BlockBuilder.finalize(block, receipts, "");
@@ -228,7 +239,7 @@ class ConsensusIntegrationTest {
         chain.addBlock(genesis);
 
         BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
-        List<TransactionReceipt> receipts = List.of(executor.execute(ws, tx, PROPOSER, false));
+        List<TransactionReceipt> receipts = List.of(executor.execute(ws, tx, PROPOSER));
         BlockChainBlock finalized = BlockBuilder.finalize(block, receipts, "");
         chain.addBlock(finalized);
 
@@ -261,7 +272,7 @@ class ConsensusIntegrationTest {
         List<TransactionReceipt> receipts = new ArrayList<>();
         List<Transaction> orderedTxs = block.getTransactions();
         for (Transaction t : orderedTxs) {
-            receipts.add(executor.execute(ws, t, PROPOSER, false));
+            receipts.add(executor.execute(ws, t, PROPOSER));
         }
 
         // Build receipt map by tx hash (same logic as executeStage2Block)
@@ -303,7 +314,7 @@ class ConsensusIntegrationTest {
         BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
         BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
 
-        TransactionReceipt receipt = executor.execute(ws, block.getTransactions().get(0), PROPOSER, false);
+        TransactionReceipt receipt = executor.execute(ws, block.getTransactions().get(0), PROPOSER);
         assertFalse(receipt.isSuccess());
 
         // Block still has the tx
@@ -317,16 +328,16 @@ class ConsensusIntegrationTest {
     void proposerReceivesGasFees() {
         ws.createEOA(ALICE, 0, BigInteger.valueOf(1_000_000));
 
-        Transaction tx = tx(ALICE, BOB, 100, 2, 21_000, 0); // fee = min(2*21000, 2*21000) = 42000
+        Transaction tx = tx(ALICE, BOB, 100, 2, 21_000, 0); // fee = min(2*20000, 2*21000) = 40000
         BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
         BlockChainBlock block = BlockBuilder.build(List.of(tx), genesis, PROPOSER);
 
-        TransactionReceipt receipt = executor.execute(ws, block.getTransactions().get(0), PROPOSER, false);
+        TransactionReceipt receipt = executor.execute(ws, block.getTransactions().get(0), PROPOSER);
         assertTrue(receipt.isSuccess());
 
         // Proposer should have received the gas fee
         assertTrue(ws.getBalance(PROPOSER).compareTo(BigInteger.ZERO) > 0);
-        assertEquals(BigInteger.valueOf(42_000), ws.getBalance(PROPOSER));
+        assertEquals(BigInteger.valueOf(40_000), ws.getBalance(PROPOSER));
     }
 
     @Test
@@ -340,14 +351,14 @@ class ConsensusIntegrationTest {
         // Block 1
         Transaction tx1 = tx(ALICE, BOB, 100, 1, 21_000, 0);
         BlockChainBlock block1 = BlockBuilder.build(List.of(tx1), genesis, PROPOSER);
-        TransactionReceipt r1 = executor.execute(ws, block1.getTransactions().get(0), PROPOSER, false);
+        TransactionReceipt r1 = executor.execute(ws, block1.getTransactions().get(0), PROPOSER);
         BlockChainBlock finalized1 = BlockBuilder.finalize(block1, List.of(r1), "");
         chain.addBlock(finalized1);
 
         // Block 2
         Transaction tx2 = tx(ALICE, CAROL, 200, 1, 21_000, 1);
         BlockChainBlock block2 = BlockBuilder.build(List.of(tx2), finalized1, PROPOSER);
-        TransactionReceipt r2 = executor.execute(ws, block2.getTransactions().get(0), PROPOSER, false);
+        TransactionReceipt r2 = executor.execute(ws, block2.getTransactions().get(0), PROPOSER);
         BlockChainBlock finalized2 = BlockBuilder.finalize(block2, List.of(r2), "");
         chain.addBlock(finalized2);
 
@@ -361,30 +372,30 @@ class ConsensusIntegrationTest {
         ws.createEOA(ALICE, 0, BigInteger.valueOf(10_000_000));
         ws.createEOA(BOB, 0, BigInteger.valueOf(10_000_000));
 
-        Transaction tx1 = tx(ALICE, CAROL, 100, 1, 21_000, 0); // fee = 21_000
-        Transaction tx2 = tx(BOB, CAROL, 200, 3, 21_000, 0);   // fee = 63_000
+        Transaction tx1 = tx(ALICE, CAROL, 100, 1, 21_000, 0); // fee = 20_000
+        Transaction tx2 = tx(BOB, CAROL, 200, 3, 21_000, 0);   // fee = 60_000
 
         BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
         BlockChainBlock block = BlockBuilder.build(List.of(tx1, tx2), genesis, PROPOSER);
 
         for (Transaction t : block.getTransactions()) {
-            TransactionReceipt r = executor.execute(ws, t, PROPOSER, false);
+            TransactionReceipt r = executor.execute(ws, t, PROPOSER);
             assertTrue(r.isSuccess());
         }
 
-        // Proposer should get total fees: 21_000 + 63_000 = 84_000
-        assertEquals(BigInteger.valueOf(84_000), ws.getBalance(PROPOSER));
+        // Proposer should get total fees: 20_000 + 60_000 = 80_000
+        assertEquals(BigInteger.valueOf(80_000), ws.getBalance(PROPOSER));
     }
 
     @Test
     void transactionsFailWhenBalanceExhaustedMidBlock() {
         // Alice has enough for the first two txs but not the third.
-        // Fee ordering guarantees: tx0 (fee=63_000) → tx1 (fee=42_000) → tx2 (fee=21_000)
+        // Fee ordering guarantees: tx0 (fee=60_000) → tx1 (fee=40_000) → tx2 (fee=20_000)
         ws.createEOA(ALICE, 0, BigInteger.valueOf(150_000));
 
         Transaction tx0 = tx(ALICE, BOB, 10_000, 3, 21_000, 0); // upfront = 10_000 + 63_000 = 73_000
         Transaction tx1 = tx(ALICE, BOB, 10_000, 2, 21_000, 1); // upfront = 10_000 + 42_000 = 52_000
-        Transaction tx2 = tx(ALICE, BOB, 10_000, 1, 21_000, 2); // upfront = 10_000 + 21_000 = 31_000
+        Transaction tx2 = tx(ALICE, BOB, 10_000, 1, 21_000, 2); // upfront = 10_000 + 31_000 = 31_000
 
         BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
         BlockChainBlock block = BlockBuilder.build(List.of(tx0, tx1, tx2), genesis, PROPOSER);
@@ -397,21 +408,21 @@ class ConsensusIntegrationTest {
 
         List<TransactionReceipt> receipts = new ArrayList<>();
         for (Transaction t : ordered) {
-            receipts.add(executor.execute(ws, t, PROPOSER, false));
+            receipts.add(executor.execute(ws, t, PROPOSER));
         }
 
-        // After tx0: 150_000 - 73_000 = 77_000 remaining
-        // After tx1: 77_000  - 52_000 = 25_000 remaining
-        // tx2 needs 31_000 > 25_000 → fails
+        // After tx0: 150_000 - 73_000 + 3_000 refund = 80_000 remaining
+        // After tx1: 80_000  - 52_000 + 2_000 refund = 30_000 remaining
+        // tx2 needs 31_000 > 30_000 → fails
         assertTrue(receipts.get(0).isSuccess());
         assertTrue(receipts.get(1).isSuccess());
         assertFalse(receipts.get(2).isSuccess());
         assertEquals("insufficient balance for upfront cost", receipts.get(2).getError());
 
         // BOB received only the first two transfers
-        assertEquals(BigInteger.valueOf(20_000), ws.getBalance(BOB));
+        assertEquals(Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, ws.getBalance(BOB));
         // Alice's balance unchanged by the failed tx
-        assertEquals(BigInteger.valueOf(25_000), ws.getBalance(ALICE));
+        assertEquals(BigInteger.valueOf(30_000), ws.getBalance(ALICE));
     }
 
     // ========== Helpers ==========

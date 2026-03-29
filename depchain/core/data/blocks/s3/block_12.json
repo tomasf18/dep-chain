@@ -1,6 +1,6 @@
 {
-  "block_hash": "550b7b5dc042bed3fdd8c07839a65045c9e7aa1b0da193bf976de1e767ab2aef",
-  "previous_block_hash": "01b3ad79b9ba2ba2bd1de265d4b5da74ef6d34b2e1304a5fe5ad33d5828d495e",
+  "block_hash": "78a09ffb5837d769d3befb8f474a203a2f0a2c84176a80e9c5519b490f7d166a",
+  "previous_block_hash": "0934f904a377abca5b8d37e5e07690e587d3d6b0f1ccf0626baeaf5095e98ea5",
   "block_number": 12,
   "proposer": "0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd",
   "transactions": [
@@ -8,22 +8,23 @@
       "from": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
       "to": "0x9999999999999999999999999999999999999999",
       "value": "0",
-      "input": "0x39509351000000000000000000000000172bf398d2a931323199521625f471fb1c28879a0000000000000000000000000000000000000000000000000000000000001b58",
-      "gas_price": "3",
-      "gas_limit": "21000",
-      "nonce": 8,
-      "signature": "0x304502206110538605d3280d989ae4f0bcfc888cf72bcd072a875978a839bed95b0510e5022100932d40fc11630be3027724d011b7369d1d53ced9561f67490788082a4595b771",
-      "tx_hash": "5b98f0c72f1261168b9d98be8592f33ab908c19d2d5dcefa11dfb716afccb84d"
+      "input": "0xa9059cbb000000000000000000000000172bf398d2a931323199521625f471fb1c28879a0000000000000000000000000000000000000000000000000000000000002710",
+      "gas_price": "4",
+      "gas_limit": "20000",
+      "nonce": 6,
+      "kind": "STANDARD",
+      "signature": "0x3046022100874cffb4c9014087d4e19858692552e8c5339cbad8bf1c5758d7f0dac6f831970221008a76a04fe56b632acdd7f8ba270dffeb8a22cee691a8a956e981ef522eaa44b7",
+      "tx_hash": "c77b7752ebebef8d1db1201f7d9b0a3c8187634ce75b1b65f202727955f11217"
     }
   ],
   "receipts": [
     {
-      "tx_hash": "5b98f0c72f1261168b9d98be8592f33ab908c19d2d5dcefa11dfb716afccb84d",
-      "success": true,
-      "gas_used": "21000",
-      "fee": "63000",
-      "return_data": "0x0000000000000000000000000000000000000000000000000000000000000001"
+      "tx_hash": "c77b7752ebebef8d1db1201f7d9b0a3c8187634ce75b1b65f202727955f11217",
+      "success": false,
+      "gas_used": "8021",
+      "fee": "32084",
+      "error": "unexpected final EVM op: SSTORE"
     }
   ],
-  "state_hash": "3594077aea9620e21dbfc96fe1e92b7f27c23cfff46809b245713cf78713a35f"
+  "state_hash": "de4d04180f59c83308ad53e5a3bbfdd1587e18e7ad3de9c2279f31f5e1f0bce3"
 }

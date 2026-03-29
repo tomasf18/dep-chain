@@ -9,7 +9,8 @@
       "gas_price": "1",
       "gas_limit": "10000000",
       "nonce": 0,
-      "tx_hash": "c4686d19483a4635690f291a255c17c1fba3aa4ecc6226dab60c11b867f56909"
+      "kind": "STANDARD",
+      "tx_hash": "c8a924e8a4341b58386b22d4c202d54e8f6eb50f6d2f897e6ff473e6495d3e5c"
     }
   ]
 }

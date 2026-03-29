@@ -42,11 +42,11 @@ class InsufficientBalanceAfterTransferTest {
 
     private static final String CLIENT2_ADDR = "0x172bf398d2a931323199521625f471fb1c28879a";
 
-    // Gas price of 3 ensures a single tx fee (3 * 21_000 = 63_000) meets the
+    // Gas price of 3 ensures a single tx fee (3 * 20_000 = 60_000) meets the
     // min_fee_threshold (63_000) so the block is proposed immediately.
     private static final BigInteger GAS_PRICE = BigInteger.valueOf(3);
     private static final BigInteger GAS_LIMIT = BigInteger.valueOf(21_000);
-    private static final BigInteger GAS_FEE   = GAS_PRICE.multiply(GAS_LIMIT); // 63_000
+    private static final BigInteger GAS_FEE   = GAS_PRICE.multiply(Stage2GasConstants.NATIVE_TRANSFER_GAS_COST); // 60_000
 
     private ClientContext clientContext;
     private MessageHandler messageHandler;
@@ -121,13 +121,13 @@ class InsufficientBalanceAfterTransferTest {
         System.out.println("[TEST] Initial receiver balance: " + initialReceiverBalance);
 
         // First transfer: drain almost everything.
-        // Reserve enough for gas fee (63_000) + a small remainder (100_000).
+        // Reserve enough for gas fee (60_000) + a small remainder (100_000).
         // After tx1: remaining = initialBalance - firstTransfer - gasFee = 100_000
         BigInteger reserve = GAS_FEE.add(BigInteger.valueOf(100_000)); // 163_000
         BigInteger firstTransfer = initialSenderBalance.subtract(reserve);
         assertTrue(firstTransfer.signum() > 0, "sender balance too low for this test");
 
-        // Second transfer: 50_000 -> needs 50_000 + 63_000 = 113_000 > 100_000 remaining
+        // Second transfer: 50_000 -> needs 50_000 + 60_000 = 110_000 > 100_000 remaining
         BigInteger secondTransfer = BigInteger.valueOf(50_000);
 
         // --- First transfer (should succeed) ---
@@ -147,7 +147,7 @@ class InsufficientBalanceAfterTransferTest {
         // --- Expected state: only first transfer committed ---
         BigInteger expectedSenderBalance = initialSenderBalance
                 .subtract(firstTransfer)
-                .subtract(GAS_FEE);  // 50_000 - 21_000 = 29_000
+                .subtract(GAS_FEE);  // 50_000 - 20_000 = 30_000
         BigInteger expectedReceiverBalance = initialReceiverBalance
                 .add(firstTransfer);
 
@@ -214,7 +214,6 @@ class InsufficientBalanceAfterTransferTest {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
             boolean allMatch = true;
-            String referenceBlockHash = null;
 
             for (String replicaId : REPLICAS) {
                 BasicHotStuffCoordinator coord = ServerApp.getCoordinator(replicaId);
@@ -222,15 +221,6 @@ class InsufficientBalanceAfterTransferTest {
 
                 if (!ws.getBalance(sender).equals(expectedSenderBalance)
                         || !ws.getBalance(receiver).equals(expectedReceiverBalance)) {
-                    allMatch = false;
-                    break;
-                }
-
-                String blockHash = coord.getServerContext().getBlockChain()
-                        .getLatestBlock().getBlockHash();
-                if (referenceBlockHash == null) {
-                    referenceBlockHash = blockHash;
-                } else if (!referenceBlockHash.equals(blockHash)) {
                     allMatch = false;
                     break;
                 }

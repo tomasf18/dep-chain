@@ -42,9 +42,9 @@ class BlockBuildingAndPersistenceTest {
 
     @Test
     void blockBuilderOrdersByFeeDescending() {
-        Transaction lowFee = tx(ALICE, BOB, 100, 1, 21_000, 0);   // fee = 21000
-        Transaction highFee = tx(ALICE, BOB, 100, 10, 21_000, 1);  // fee = 210000
-        Transaction midFee = tx(ALICE, BOB, 100, 5, 21_000, 2);    // fee = 105000
+        Transaction lowFee = tx(ALICE, BOB, 100, 1, 21_000, 0);    // fee = 21000
+        Transaction highFee = tx(BOB, CAROL, 100, 10, 21_000, 0);  // fee = 210000
+        Transaction midFee = tx(CAROL, ALICE, 100, 5, 21_000, 0);  // fee = 105000
 
         BlockChainBlock block = BlockBuilder.build(List.of(lowFee, highFee, midFee), genesis, PROPOSER);
 

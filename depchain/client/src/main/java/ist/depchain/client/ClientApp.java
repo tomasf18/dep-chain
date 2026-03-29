@@ -30,13 +30,13 @@ public class ClientApp {
             try {
                 while (true) {
                     System.out.println("\n=== DepChain Client ===");
-                    System.out.println("1 - Check native balance");
-                    System.out.println("2 - Submit native transfer");
-                    System.out.println("3 - ERC20 transfer");
-                    System.out.println("4 - ERC20 increaseAllowance");
-                    System.out.println("5 - ERC20 decreaseAllowance");
-                    System.out.println("6 - ERC20 transferFrom");
-                    System.out.println("7 - Check ERC20 balance");
+                    System.out.println("1 - Check native (DepCoin) balance");
+                    System.out.println("2 - Native (DepCoin) transfer");
+                    System.out.println("3 - ERC20 (IST Coin) transfer");
+                    System.out.println("4 - ERC20 (IST Coin) increaseAllowance");
+                    System.out.println("5 - ERC20 (IST Coin) decreaseAllowance");
+                    System.out.println("6 - ERC20 (IST Coin) transferFrom");
+                    System.out.println("7 - Check ERC20 (IST Coin) balance");
                     System.out.println("exit - Quit");
                     System.out.print("> ");
                     String line = in.nextLine();

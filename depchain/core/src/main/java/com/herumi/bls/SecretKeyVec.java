@@ -33,7 +33,6 @@ public class SecretKeyVec extends java.util.AbstractList<SecretKey> implements j
     return ptr;
   }
 
-  @SuppressWarnings({"deprecation", "removal"})
   protected void finalize() {
     delete();
   }

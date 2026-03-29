@@ -92,11 +92,11 @@ class TransactionExecutorErc20Test {
                 null
         ), treasuryKeys);
 
-        TransactionReceipt receipt = executor.execute(worldState, tx, proposer, false);
+        TransactionReceipt receipt = executor.execute(worldState, tx, proposer);
 
         assertTrue(receipt.isSuccess(), receipt.getError());
-        assertEquals(GAS_LIMIT, receipt.getGasUsed());
-        assertEquals(GAS_LIMIT.multiply(GAS_PRICE), receipt.getFee());
+        assertTrue(receipt.getGasUsed().compareTo(GAS_LIMIT) <= 0);
+        assertEquals(receipt.getGasUsed().multiply(GAS_PRICE), receipt.getFee());
 
         BigInteger treasuryToken = tokenBalanceOf(treasury);
         BigInteger aliceToken = tokenBalanceOf(alice);
@@ -106,13 +106,89 @@ class TransactionExecutorErc20Test {
 
         // Native gas fee moved from treasury to proposer
         assertEquals(
-                treasuryNativeBefore.subtract(GAS_LIMIT.multiply(GAS_PRICE)),
+                treasuryNativeBefore.subtract(receipt.getFee()),
                 worldState.getBalance(treasury)
         );
         assertEquals(
-                proposerNativeBefore.add(GAS_LIMIT.multiply(GAS_PRICE)),
+                proposerNativeBefore.add(receipt.getFee()),
                 worldState.getBalance(proposer)
         );
+    }
+
+    @Test
+    void erc20TransferRefundsUnusedGasWhenGasLimitExceedsActualUsage() throws Exception {
+        BigInteger treasuryNativeBefore = worldState.getBalance(treasury);
+        BigInteger proposerNativeBefore = worldState.getBalance(proposer);
+
+        byte[] calldata = Bytes.fromHexString(
+                "0x" + Erc20Abi.smartContractMethodIdentifier("transfer(address,uint256)")
+                        + Erc20Abi.encodeAddress(alice)
+                        + Erc20Abi.encodeUint256(BigInteger.valueOf(5000))
+        ).toArrayUnsafe();
+
+        Transaction tx = signTx(new Transaction(
+                treasury,
+                CONTRACT_ADDRESS,
+                BigInteger.ZERO,
+                calldata,
+                GAS_PRICE,
+                GAS_LIMIT,
+                worldState.getNonce(treasury),
+                null
+        ), treasuryKeys);
+
+        TransactionReceipt receipt = executor.execute(worldState, tx, proposer);
+
+        assertTrue(receipt.isSuccess(), receipt.getError());
+        assertTrue(receipt.getGasUsed().compareTo(GAS_LIMIT) < 0, "Expected EVM execution to consume less gas than the user limit");
+
+        BigInteger expectedFee = receipt.getGasUsed().multiply(GAS_PRICE);
+        BigInteger expectedRefund = GAS_LIMIT.subtract(receipt.getGasUsed()).multiply(GAS_PRICE);
+
+        assertEquals(expectedFee, receipt.getFee());
+        assertEquals(treasuryNativeBefore.subtract(expectedFee), worldState.getBalance(treasury));
+        assertEquals(proposerNativeBefore.add(expectedFee), worldState.getBalance(proposer));
+        assertEquals(expectedRefund, GAS_PRICE.multiply(GAS_LIMIT.subtract(receipt.getGasUsed())));
+
+        assertEquals(new BigInteger("9999995000"), tokenBalanceOf(treasury));
+        assertEquals(BigInteger.valueOf(5000), tokenBalanceOf(alice));
+    }
+
+    @Test
+    void erc20TransferOutOfGasChargesFullLimitAndRevertsState() throws Exception {
+                BigInteger lowGasLimit = BigInteger.ONE;
+        BigInteger treasuryNativeBefore = worldState.getBalance(treasury);
+        BigInteger proposerNativeBefore = worldState.getBalance(proposer);
+        BigInteger treasuryTokensBefore = tokenBalanceOf(treasury);
+        BigInteger aliceTokensBefore = tokenBalanceOf(alice);
+
+        byte[] calldata = Bytes.fromHexString(
+                "0x" + Erc20Abi.smartContractMethodIdentifier("transfer(address,uint256)")
+                        + Erc20Abi.encodeAddress(alice)
+                        + Erc20Abi.encodeUint256(BigInteger.valueOf(5000))
+        ).toArrayUnsafe();
+
+        Transaction tx = signTx(new Transaction(
+                treasury,
+                CONTRACT_ADDRESS,
+                BigInteger.ZERO,
+                calldata,
+                GAS_PRICE,
+                lowGasLimit,
+                worldState.getNonce(treasury),
+                null
+        ), treasuryKeys);
+
+        TransactionReceipt receipt = executor.execute(worldState, tx, proposer);
+
+        assertFalse(receipt.isSuccess());
+        assertNotNull(receipt.getError());
+        assertEquals(lowGasLimit.multiply(GAS_PRICE), receipt.getFee());
+
+        assertEquals(treasuryNativeBefore.subtract(receipt.getFee()), worldState.getBalance(treasury));
+        assertEquals(proposerNativeBefore.add(receipt.getFee()), worldState.getBalance(proposer));
+        assertEquals(treasuryTokensBefore, tokenBalanceOf(treasury));
+        assertEquals(aliceTokensBefore, tokenBalanceOf(alice));
     }
 
     @Test
@@ -135,7 +211,7 @@ class TransactionExecutorErc20Test {
                 null
         ), treasuryKeys);
 
-        TransactionReceipt r1 = executor.execute(worldState, t1, proposer, false);
+        TransactionReceipt r1 = executor.execute(worldState, t1, proposer);
         assertTrue(r1.isSuccess(), r1.getError());
 
         assertEquals(BigInteger.valueOf(1000), tokenBalanceOf(alice));
@@ -158,7 +234,7 @@ class TransactionExecutorErc20Test {
                 null
         ), aliceKeys);
 
-        TransactionReceipt r2 = executor.execute(worldState, t2, proposer, false);
+        TransactionReceipt r2 = executor.execute(worldState, t2, proposer);
         assertTrue(r2.isSuccess(), r2.getError());
 
         assertEquals(BigInteger.valueOf(400), tokenAllowanceOf(alice, bob));
@@ -182,7 +258,7 @@ class TransactionExecutorErc20Test {
                 null
         ), bobKeys);
 
-        TransactionReceipt r3 = executor.execute(worldState, t3, proposer, false);
+        TransactionReceipt r3 = executor.execute(worldState, t3, proposer);
         assertTrue(r3.isSuccess(), r3.getError());
 
         assertEquals(BigInteger.valueOf(750), tokenBalanceOf(alice));
@@ -210,15 +286,16 @@ class TransactionExecutorErc20Test {
                 null
         ), aliceKeys);
 
-        TransactionReceipt receipt = executor.execute(worldState, tx, proposer, false);
+        TransactionReceipt receipt = executor.execute(worldState, tx, proposer);
 
         assertFalse(receipt.isSuccess());
         assertNotNull(receipt.getError());
         assertFalse(receipt.getError().isBlank());
+        assertTrue(receipt.getGasUsed().compareTo(GAS_LIMIT) <= 0);
 
         // Native gas is still charged
         assertEquals(
-                INITIAL_NATIVE_BALANCE.subtract(GAS_LIMIT.multiply(GAS_PRICE)),
+                INITIAL_NATIVE_BALANCE.subtract(receipt.getFee()),
                 worldState.getBalance(alice)
         );
 
@@ -245,7 +322,7 @@ class TransactionExecutorErc20Test {
                 null
         ), treasuryKeys);
 
-        TransactionReceipt r1 = executor.execute(worldState, t1, proposer, false);
+        TransactionReceipt r1 = executor.execute(worldState, t1, proposer);
         assertTrue(r1.isSuccess(), r1.getError());
 
         byte[] incAllowance = Bytes.fromHexString(
@@ -265,7 +342,7 @@ class TransactionExecutorErc20Test {
                 null
         ), aliceKeys);
 
-        TransactionReceipt r2 = executor.execute(worldState, t2, proposer, false);
+        TransactionReceipt r2 = executor.execute(worldState, t2, proposer);
         assertTrue(r2.isSuccess(), r2.getError());
         assertEquals(BigInteger.valueOf(100), tokenAllowanceOf(alice, bob));
 
@@ -286,11 +363,81 @@ class TransactionExecutorErc20Test {
                 null
         ), aliceKeys);
 
-        TransactionReceipt r3 = executor.execute(worldState, t3, proposer, false);
+        TransactionReceipt r3 = executor.execute(worldState, t3, proposer);
 
         assertFalse(r3.isSuccess());
         assertNotNull(r3.getError());
                 assertFalse(r3.getError().isBlank());
+        assertEquals(BigInteger.valueOf(100), tokenAllowanceOf(alice, bob));
+        assertEquals(BigInteger.valueOf(1000), tokenBalanceOf(alice));
+        assertEquals(BigInteger.ZERO, tokenBalanceOf(bob));
+    }
+
+    @Test
+    void approveNonZeroToNonZeroReplacementRevertsAndKeepsAllowanceUnchanged() throws Exception {
+        byte[] transferToAlice = Bytes.fromHexString(
+                "0x" + Erc20Abi.smartContractMethodIdentifier("transfer(address,uint256)")
+                        + Erc20Abi.encodeAddress(alice)
+                        + Erc20Abi.encodeUint256(BigInteger.valueOf(1000))
+        ).toArrayUnsafe();
+
+        Transaction t1 = signTx(new Transaction(
+                treasury,
+                CONTRACT_ADDRESS,
+                BigInteger.ZERO,
+                transferToAlice,
+                GAS_PRICE,
+                GAS_LIMIT,
+                worldState.getNonce(treasury),
+                null
+        ), treasuryKeys);
+
+        TransactionReceipt r1 = executor.execute(worldState, t1, proposer);
+        assertTrue(r1.isSuccess(), r1.getError());
+
+        byte[] incAllowance = Bytes.fromHexString(
+                "0x" + Erc20Abi.smartContractMethodIdentifier("increaseAllowance(address,uint256)")
+                        + Erc20Abi.encodeAddress(bob)
+                        + Erc20Abi.encodeUint256(BigInteger.valueOf(100))
+        ).toArrayUnsafe();
+
+        Transaction t2 = signTx(new Transaction(
+                alice,
+                CONTRACT_ADDRESS,
+                BigInteger.ZERO,
+                incAllowance,
+                GAS_PRICE,
+                GAS_LIMIT,
+                worldState.getNonce(alice),
+                null
+        ), aliceKeys);
+
+        TransactionReceipt r2 = executor.execute(worldState, t2, proposer);
+        assertTrue(r2.isSuccess(), r2.getError());
+        assertEquals(BigInteger.valueOf(100), tokenAllowanceOf(alice, bob));
+
+        byte[] approveReplacement = Bytes.fromHexString(
+                "0x" + Erc20Abi.smartContractMethodIdentifier("approve(address,uint256)")
+                        + Erc20Abi.encodeAddress(bob)
+                        + Erc20Abi.encodeUint256(BigInteger.valueOf(200))
+        ).toArrayUnsafe();
+
+        Transaction t3 = signTx(new Transaction(
+                alice,
+                CONTRACT_ADDRESS,
+                BigInteger.ZERO,
+                approveReplacement,
+                GAS_PRICE,
+                GAS_LIMIT,
+                worldState.getNonce(alice),
+                null
+        ), aliceKeys);
+
+        TransactionReceipt r3 = executor.execute(worldState, t3, proposer);
+
+        assertFalse(r3.isSuccess());
+        assertNotNull(r3.getError());
+        assertFalse(r3.getError().isBlank());
         assertEquals(BigInteger.valueOf(100), tokenAllowanceOf(alice, bob));
         assertEquals(BigInteger.valueOf(1000), tokenBalanceOf(alice));
         assertEquals(BigInteger.ZERO, tokenBalanceOf(bob));

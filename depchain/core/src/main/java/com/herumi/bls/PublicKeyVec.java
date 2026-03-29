@@ -33,7 +33,6 @@ public class PublicKeyVec extends java.util.AbstractList<PublicKey> implements j
     return ptr;
   }
 
-  @SuppressWarnings({"deprecation", "removal"})
   protected void finalize() {
     delete();
   }

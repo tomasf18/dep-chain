@@ -36,7 +36,7 @@ class NativeTransferHotStuffTest {
 
     private static final String RECEIVER_HEX = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     private static final BigInteger GAS_PRICE = BigInteger.ONE;
-    private static final BigInteger GAS_LIMIT = BigInteger.valueOf(21_000);
+    private static final BigInteger GAS_LIMIT = Stage2GasConstants.NATIVE_TRANSFER_GAS_COST;
 
     private ClientContext clientContext;
     private MessageHandler messageHandler;
@@ -102,7 +102,7 @@ class NativeTransferHotStuffTest {
     void testMultipleSequentialTransfers() {
         LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(5));
 
-        int numTransfers = 3;
+        int numTransfers = 4;
         long totalValue = 0;
         Address sender = clientContext.getSelfAddress();
         Address receiver = Address.fromHexString(RECEIVER_HEX);
@@ -120,7 +120,7 @@ class NativeTransferHotStuffTest {
         }
 
         BigInteger expectedSenderBalance = waitForReplicaConvergence(sender, receiver,
-                initialSenderBalance, initialReceiverBalance, totalValue, numTransfers,
+            initialSenderBalance, initialReceiverBalance, totalValue, numTransfers,
                 TimeUnit.SECONDS.toMillis(120));
 
             BigInteger expectedReceiverBalance = BigInteger.valueOf(totalValue);
@@ -173,8 +173,7 @@ class NativeTransferHotStuffTest {
                                                         long totalValue, int numTransfers, long timeoutMs) {
         BigInteger expectedReceiverBalance = initialReceiverBalance.add(BigInteger.valueOf(totalValue));
         BigInteger gasFee = GAS_PRICE.multiply(GAS_LIMIT);
-        BigInteger expectedFeeTotal = gasFee.multiply(BigInteger.valueOf(numTransfers));
-        BigInteger expectedSenderBalance = initialSenderBalance.subtract(BigInteger.valueOf(totalValue)).subtract(expectedFeeTotal);
+        BigInteger expectedSenderBalance = initialSenderBalance.subtract(BigInteger.valueOf(totalValue)).subtract(gasFee.multiply(BigInteger.valueOf(numTransfers)));
 
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
@@ -210,6 +209,6 @@ class NativeTransferHotStuffTest {
         DepChainWorldState ws = ServerApp.getCoordinator("s0").getServerContext().getWorldState();
         fail("Native transfer state did not converge within " + timeoutMs + "ms; sender="
                 + ws.getBalance(sender) + ", receiver=" + ws.getBalance(receiver));
-        return expectedSenderBalance;
+        return initialSenderBalance;
     }
 }

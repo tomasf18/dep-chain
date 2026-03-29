@@ -6,19 +6,26 @@ import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.util.List;
+import java.util.UUID;
 
 import org.hyperledger.besu.datatypes.Address;
 import org.junit.jupiter.api.Test;
+import com.google.protobuf.ByteString;
 
 import ist.depchain.common.Transaction;
+import ist.depchain.common.Block;
 import ist.depchain.common.utils.AddressUtils;
 import ist.depchain.common.utils.Crypto;
 
 import ist.depchain.core.BlockChain;
 import ist.depchain.core.blockchain.BlockChainBlock;
 import ist.depchain.core.blockchain.DepChainWorldState;
+import ist.depchain.core.blockchain.BlockValidator;
 import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.blockchain.TransactionExecutor;
+import ist.depchain.common.utils.Config;
+import ist.depchain.common.ClientRequestMeta;
+import ist.depchain.core.blockchain.ValidationResult;
 
 class BlockValidationAndExecutionTest {
 
@@ -40,7 +47,7 @@ class BlockValidationAndExecutionTest {
 
         DepChainWorldState working = committed.copy();
         TransactionExecutor executor = new TransactionExecutor();
-        TransactionReceipt receipt = executor.execute(working, tx, null, false);
+        TransactionReceipt receipt = executor.execute(working, tx, null);
 
         assertTrue(receipt.isSuccess());
         assertEquals(BigInteger.valueOf(1_000_000), committed.getBalance(from));
@@ -71,6 +78,67 @@ class BlockValidationAndExecutionTest {
         String h2 = ws.computeStateHash();
 
         assertNotEquals(h1, h2);
+    }
+
+    @Test
+    void blockValidatorRejectsForgedTransactionSignature() throws Exception {
+        Config config = Config.loadConfiguration("../config/config-dev.json", "s0");
+
+        KeyPair ownerKeys = genKeyPair();
+        KeyPair forgedKeys = genKeyPair();
+        Address owner = AddressUtils.deriveAddress(ownerKeys.getPublic());
+        Address receiver = Address.fromHexString("0x1111111111111111111111111111111111111111");
+
+        DepChainWorldState ws = new DepChainWorldState(config);
+        ws.createEOA(owner, 0, BigInteger.valueOf(1_000_000));
+
+        Transaction unsignedTx = new Transaction(
+                owner, receiver, BigInteger.valueOf(100), new byte[0],
+                BigInteger.ONE, BigInteger.valueOf(21_000), 0, null
+        );
+
+        byte[] forgedSig = Crypto.sign(unsignedTx.toUnsignedBytes(), forgedKeys.getPrivate(), "SHA256withECDSA");
+        Transaction forgedTx = unsignedTx.withSignature(forgedSig);
+
+        Block block = Block.newBuilder()
+                .setId(ByteString.copyFromUtf8(UUID.randomUUID().toString()))
+                .setParentId(ByteString.EMPTY)
+            .addTransactions(forgedTx.toProto())
+                .addRequestMeta(ClientRequestMeta.newBuilder().setClientId("client1").setRequestId(1).build())
+                .build();
+
+        ValidationResult result = BlockValidator.validateProposedBlock(block, ws, config);
+
+        assertFalse(result.isValid());
+        assertTrue(result.getErrorMessage().contains("invalid tx"));
+    }
+
+    @Test
+    void blockValidatorRejectsTransactionMetadataMismatch() {
+        Config config = Config.loadConfiguration("../config/config-dev.json", "s0");
+        DepChainWorldState ws = new DepChainWorldState(config);
+
+        Transaction tx = new Transaction(
+            Address.fromHexString("0x2222222222222222222222222222222222222222"),
+            Address.fromHexString("0x1111111111111111111111111111111111111111"),
+            BigInteger.ONE,
+            new byte[0],
+            BigInteger.ONE,
+            BigInteger.valueOf(21_000),
+            0,
+            null
+        );
+
+        Block block = Block.newBuilder()
+            .setId(ByteString.copyFromUtf8(UUID.randomUUID().toString()))
+            .setParentId(ByteString.EMPTY)
+            .addTransactions(tx.toProto())
+            .build();
+
+        ValidationResult result = BlockValidator.validateProposedBlock(block, ws, config);
+
+        assertFalse(result.isValid());
+        assertTrue(result.getErrorMessage().contains("mismatch"));
     }
 
     private static KeyPair genKeyPair() throws Exception {

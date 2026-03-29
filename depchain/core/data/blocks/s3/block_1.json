@@ -1,62 +1,30 @@
 {
-  "block_hash": "a1a9b812b25643c2c47125af38d3ad76929172d69a6035d17360510ad6ba8fd1",
+  "block_hash": "5ad55e9e73eda1cc6793c55677d251d8a1b12351ab4a797775dbc69e08538a8a",
   "previous_block_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
   "block_number": 1,
-  "proposer": "0xdb710290c98c770c5ee6b312ea42b89cdbd23cc2",
+  "proposer": "0x163b745a57f26b27f3876c82b21a6d90bbe54bc9",
   "transactions": [
     {
       "from": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
-      "to": "0x172bf398d2a931323199521625f471fb1c28879a",
-      "value": "37000",
+      "value": "0",
       "input": "0x",
       "gas_price": "1",
-      "gas_limit": "21000",
+      "gas_limit": "100000",
       "nonce": 0,
-      "signature": "0x304502205abf4537d83fb863b68a2875d346ad730e74142523f811f3eec128c670afec4e022100a054d929f16569469c499242a1886d5c8c6d286edbbff667c0d0e28710f9ecf8",
-      "tx_hash": "2ef637194275f55efcaa1c93fdf0074026aff5b41e0585971d1698683bc58188"
-    },
-    {
-      "from": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
-      "to": "0x172bf398d2a931323199521625f471fb1c28879a",
-      "value": "1",
-      "input": "0x",
-      "gas_price": "1",
-      "gas_limit": "21000",
-      "nonce": 1,
-      "signature": "0x304502203a74ecb6814643c614049c1a06e410b2234a1c1641049184689589548d98185c022100d73b2c60bb479bdbd6824ca827b7f02627fe84246bee945da90d0f24b7ed8fda",
-      "tx_hash": "6a3ef847eab82ffee0ab56b7cfeb528ce143d6368b4eafb81d0f02ae6b65167a"
-    },
-    {
-      "from": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
-      "to": "0x172bf398d2a931323199521625f471fb1c28879a",
-      "value": "1",
-      "input": "0x",
-      "gas_price": "1",
-      "gas_limit": "21000",
-      "nonce": 2,
-      "signature": "0x304602210093969c3ba1dfc1b4cb9b7c81876e6e09ea4d922ae3e6ce7f29a0d8f661c8656d0221009ee3d843c4d8a446d663a5c16ed3e38199cf0fd3dfe3291c024c49db283f4aeb",
-      "tx_hash": "320eba06ac77bd7f8790c89a325cf8f6d6dc1a25ea852663f97c59fb49e6f350"
+      "kind": "NATIVE_BALANCE_QUERY",
+      "native_balance_query_target": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
+      "signature": "0x3044022056e676cd88b62669da464b33aed82f9e3d62686a25465826b39a9d3e6ccd7d750220172c69f717df8d8013a04a2cbdb210ea9a15e4ad0f5831cf8539c842b55e7405",
+      "tx_hash": "33b6454e1c7b05132c8b8b729e6a657dcc730b748e6214fd653a3bdb2b1953c3"
     }
   ],
   "receipts": [
     {
-      "tx_hash": "2ef637194275f55efcaa1c93fdf0074026aff5b41e0585971d1698683bc58188",
+      "tx_hash": "33b6454e1c7b05132c8b8b729e6a657dcc730b748e6214fd653a3bdb2b1953c3",
       "success": true,
-      "gas_used": "21000",
-      "fee": "21000"
-    },
-    {
-      "tx_hash": "6a3ef847eab82ffee0ab56b7cfeb528ce143d6368b4eafb81d0f02ae6b65167a",
-      "success": true,
-      "gas_used": "21000",
-      "fee": "21000"
-    },
-    {
-      "tx_hash": "320eba06ac77bd7f8790c89a325cf8f6d6dc1a25ea852663f97c59fb49e6f350",
-      "success": true,
-      "gas_used": "21000",
-      "fee": "21000"
+      "gas_used": "20000",
+      "fee": "20000",
+      "return_data": "0x00000000000000000000000000000000000000000000003635c9adc5de9fb1e047e6429f7c2300340ed8daf311b9863807307ae22750df053f1906e183fc3aaf"
     }
   ],
-  "state_hash": "3e539b83b145c2f361d0e95e808b9f7a6a52bcc55b64056d361ff22e0af253e3"
+  "state_hash": "47e6429f7c2300340ed8daf311b9863807307ae22750df053f1906e183fc3aaf"
 }

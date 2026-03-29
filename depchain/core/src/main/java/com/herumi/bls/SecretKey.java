@@ -33,7 +33,6 @@ public class SecretKey {
     return ptr;
   }
 
-  @SuppressWarnings({"deprecation", "removal"})
   protected void finalize() {
     delete();
   }

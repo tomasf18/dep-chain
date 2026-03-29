@@ -52,6 +52,11 @@ public final class BlockValidator {
             if (!txResult.isValid()) {
                 return ValidationResult.fail("invalid tx at index " + i + ": " + txResult.getErrorMessage());
             }
+
+            // Treat each accepted transaction as consuming the sender's current nonce
+            // so a malicious leader cannot pack two transactions with the same nonce
+            // into the same proposed block.
+            snapshot.incrementNonce(tx.getFrom());
         }
 
         return ValidationResult.ok();

@@ -114,6 +114,16 @@ public class TransactionValidator {
     }
 
     private static ValidationResult validateContractShape(Transaction tx) {
+        if (tx.isNativeBalanceQuery()) {
+            if (tx.getValue().signum() != 0) {
+                return ValidationResult.fail("native balance query must not transfer native value");
+            }
+            if (tx.getNativeBalanceQueryTarget() == null) {
+                return ValidationResult.fail("native balance query missing target address");
+            }
+            return ValidationResult.ok();
+        }
+
         if (tx.isContractDeployment() && tx.getData().length == 0) {
             return ValidationResult.fail("contract deployment requires non-empty bytecode");
         }

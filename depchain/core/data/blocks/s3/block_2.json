@@ -1,29 +1,30 @@
 {
-  "block_hash": "ff7b43fa82ae536e9a8534c84a2c31bfb6acad38289488cc2f6bac605759170a",
-  "previous_block_hash": "a1a9b812b25643c2c47125af38d3ad76929172d69a6035d17360510ad6ba8fd1",
+  "block_hash": "c7926501e9e8ce1efcb96dee696896a44f21d31df2ef1c5cd884aa07dedfa130",
+  "previous_block_hash": "5ad55e9e73eda1cc6793c55677d251d8a1b12351ab4a797775dbc69e08538a8a",
   "block_number": 2,
   "proposer": "0xdb710290c98c770c5ee6b312ea42b89cdbd23cc2",
   "transactions": [
     {
       "from": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
-      "to": "0x9999999999999999999999999999999999999999",
       "value": "0",
-      "input": "0x70a08231000000000000000000000000fe37d77266b312ca364bd3f9386e1df4d193e9d9",
+      "input": "0x",
       "gas_price": "1",
       "gas_limit": "100000",
-      "nonce": 3,
-      "signature": "0x3046022100aa5441573e5fd178f45889ff222bf48f166c1405b8a7cc672f988dea5fb6a777022100c879ce15c9f6d2f3b25144c0393d9f2689898748286732108b932258fc1eab59",
-      "tx_hash": "39c7bf73a6e12f61025ba1b38a66d8857b297f19372fd6d8518e077f76ab83dc"
+      "nonce": 1,
+      "kind": "NATIVE_BALANCE_QUERY",
+      "native_balance_query_target": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
+      "signature": "0x3045022100c4925113a061f7b1780a35a56b848b2c7b61007297a3beaf57dcf400047c6bea02204e1480edafa2f4c16c15da30a20db457944aac410c25c64aa42cb5a1615bd095",
+      "tx_hash": "79d939971cb9b305fb70bd9fc40ca0dc38a08eb7b2601080f68b84d8817864d2"
     }
   ],
   "receipts": [
     {
-      "tx_hash": "39c7bf73a6e12f61025ba1b38a66d8857b297f19372fd6d8518e077f76ab83dc",
+      "tx_hash": "79d939971cb9b305fb70bd9fc40ca0dc38a08eb7b2601080f68b84d8817864d2",
       "success": true,
-      "gas_used": "100000",
-      "fee": "100000",
-      "return_data": "0x00000000000000000000000000000000000000000000000000000002540be400"
+      "gas_used": "20000",
+      "fee": "20000",
+      "return_data": "0x00000000000000000000000000000000000000000000003635c9adc5de9f63c01d2cc29a1135d6f182137091adace5d60bd665e6c98d012e5b3e33959ba9f5f1"
     }
   ],
-  "state_hash": "abc563adaa23733fb3ae1463674e4e90c004c48fdd8d145ca6961b4d1c937707"
+  "state_hash": "1d2cc29a1135d6f182137091adace5d60bd665e6c98d012e5b3e33959ba9f5f1"
 }

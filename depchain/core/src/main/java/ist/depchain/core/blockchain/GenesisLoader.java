@@ -100,7 +100,7 @@ public class GenesisLoader {
                 }
 
                 // Execute deployment into the fixed, known IST contract address
-                EvmService.deployContract(worldState, tx.getFrom(), expectedContractAddress, tx.getData());
+                EvmService.deployContract(worldState, tx.getFrom(), expectedContractAddress, tx.getData(), tx.getGasLimit());
             }
         }
 

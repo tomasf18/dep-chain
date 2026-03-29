@@ -1,29 +1,30 @@
 {
-  "block_hash": "30170e4511db5d677a3bc8adf59299e751f5885ecd1a24a94365c72602c3f785",
-  "previous_block_hash": "bd7070b0bfc4e98c2b90c7949677d79d25fdd530905c10202fd4a59634ac53fe",
+  "block_hash": "29e461e85e40e922b052e05aa436ff9f49fe5981fe07ffba0fced5638c70bf04",
+  "previous_block_hash": "107f2059f22ce2af71446e80f08841cb9a141572ee37651e77b038345eb93a78",
   "block_number": 8,
-  "proposer": "0x76c6c1931f73ef9d9e9499c79d6bc34fd201ab15",
+  "proposer": "0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd",
   "transactions": [
     {
-      "from": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
-      "to": "0x9999999999999999999999999999999999999999",
+      "from": "0x172bf398d2a931323199521625f471fb1c28879a",
       "value": "0",
-      "input": "0xa457c2d7000000000000000000000000172bf398d2a931323199521625f471fb1c28879a0000000000000000000000000000000000000000000000000000000000001388",
-      "gas_price": "3",
-      "gas_limit": "21000",
-      "nonce": 6,
-      "signature": "0x304502204dce3dc5e419045b3c106b60946af1d5e1a567b0b995d5fe700f2407543c3bc10221008ee66afdcb633ca6b91857fd20c92fce958e9a206b235f380857ae75faef4469",
-      "tx_hash": "1ac7c83dac84440be0e055635b9db7a49705696236fc233793a475fedd347951"
+      "input": "0x",
+      "gas_price": "1",
+      "gas_limit": "100000",
+      "nonce": 2,
+      "kind": "NATIVE_BALANCE_QUERY",
+      "native_balance_query_target": "0x172bf398d2a931323199521625f471fb1c28879a",
+      "signature": "0x304402205358fc5ce73a72ee79633e6919f46581bc782949307104da49bc845344b9d67f022032995eb3f267b4f61777537f5761507aef809d3cb5e7a1995600a4c97d390475",
+      "tx_hash": "d2f8d7dc96a90a45514d747f4c1ed3fcac74728f178d7e11d355d7b702f130ca"
     }
   ],
   "receipts": [
     {
-      "tx_hash": "1ac7c83dac84440be0e055635b9db7a49705696236fc233793a475fedd347951",
-      "success": false,
-      "gas_used": "21000",
-      "fee": "63000",
-      "error": "EVM revert: 0xc4eeb578"
+      "tx_hash": "d2f8d7dc96a90a45514d747f4c1ed3fcac74728f178d7e11d355d7b702f130ca",
+      "success": true,
+      "gas_used": "20000",
+      "fee": "20000",
+      "return_data": "0x000000000000000000000000000000000000000000000000000000001dccc8c0eb1ce503d1acb8446fc909d4938188410f86fb1ec16274c2ba2dae5f2fd8f4a2"
     }
   ],
-  "state_hash": "53a262d2d9f64c342601dc1c51533bf61a5975334c2a63d5c98f7745c96e797f"
+  "state_hash": "eb1ce503d1acb8446fc909d4938188410f86fb1ec16274c2ba2dae5f2fd8f4a2"
 }

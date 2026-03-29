@@ -60,6 +60,13 @@ public final class Erc20Abi {
                     ).toArrayUnsafe();
     }
 
+    public static byte[] approve(Address spender, BigInteger amount) {
+        return Bytes.fromHexString("0x" + smartContractMethodIdentifier("approve(address,uint256)")
+                        + encodeAddress(spender) // argument 1: spender address
+                        + encodeUint256(amount) // argument 2: amount
+                    ).toArrayUnsafe();
+    }
+
     public static byte[] decreaseAllowance(Address spender, BigInteger amount) {
         return Bytes.fromHexString("0x" + smartContractMethodIdentifier("decreaseAllowance(address,uint256)")
                         + encodeAddress(spender) // argument 1: spender address

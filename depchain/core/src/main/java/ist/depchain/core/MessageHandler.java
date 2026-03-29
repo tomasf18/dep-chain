@@ -10,17 +10,13 @@ import ist.depchain.common.ApplicationMessage;
 import ist.depchain.network.crypto.KeyLoader;
 import ist.depchain.core.blockchain.TransactionValidator;
 import ist.depchain.core.blockchain.ValidationResult;
-import ist.depchain.common.utils.ClientResponseCodec;
 
 import java.security.PublicKey;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
-import java.math.BigInteger;
 
 import org.hyperledger.besu.datatypes.Address;
-import org.web3j.crypto.Hash;
-import com.google.protobuf.ByteString;
 
 public class MessageHandler {
     private final ServerContext serverContext;
@@ -42,7 +38,7 @@ public class MessageHandler {
             ApplicationMessage wrapper = ApplicationMessage.parseFrom(data);
             switch (wrapper.getContentCase()) {
                 case CLIENT_REQUEST:
-                    handleClientRequest(sourceId, wrapper.getClientRequest());
+                    handleClientRequest(wrapper.getClientRequest());
                     break;
                 case HOTSTUFF_MESSAGE:
                     handleHotStuffMessage(sourceId, wrapper.getHotstuffMessage());
@@ -56,7 +52,7 @@ public class MessageHandler {
         }
     }
 
-    private void handleClientRequest(String sourceId, ClientRequest clientRequest) {
+    private void handleClientRequest(ClientRequest clientRequest) {
         String clientId = clientRequest.getClientId();
         int requestId = clientRequest.getRequestId();
         RequestKey requestKey = new RequestKey(clientId, requestId);
@@ -80,9 +76,6 @@ public class MessageHandler {
             case TRANSACTION:
                  handleTransactionRequest(clientRequest, requestKey);
                  break;
-            case COMMAND:
-                handleCommandRequest(clientRequest, requestKey);
-                break;
             case PAYLOAD_NOT_SET:
                 pendingRequests.remove(requestKey);
                 System.err.println("[MESSAGE_HANDLER | ERROR] Empty client payload");
@@ -130,68 +123,6 @@ public class MessageHandler {
         sendAcceptedResponse(clientId, clientRequest.getRequestId());
     }
 
-    private void handleCommandRequest(ClientRequest clientRequest, RequestKey requestKey) {
-        String clientId = clientRequest.getClientId();
-        String commandType = clientRequest.getCommand().getType();
-
-        if (commandType == null || commandType.isBlank()) {
-            pendingRequests.remove(requestKey);
-            sendRejectionResponse(clientId, clientRequest.getRequestId(), "empty command type");
-            return;
-        }
-
-        if (!ClientResponseCodec.NATIVE_BALANCE_COMMAND.equalsIgnoreCase(commandType)) {
-            pendingRequests.remove(requestKey);
-            sendRejectionResponse(clientId, clientRequest.getRequestId(), "unsupported command type: " + commandType);
-            return;
-        }
-
-        String targetHex = clientRequest.getCommand().getData();
-        if (targetHex == null || targetHex.isBlank()) {
-            pendingRequests.remove(requestKey);
-            sendRejectionResponse(clientId, clientRequest.getRequestId(), "native balance query requires a target address");
-            return;
-        }
-
-        Address target;
-        try {
-            target = Address.fromHexString(targetHex);
-        } catch (Exception e) {
-            pendingRequests.remove(requestKey);
-            sendRejectionResponse(clientId, clientRequest.getRequestId(), "invalid target address: " + targetHex);
-            return;
-        }
-
-        sendAcceptedResponse(clientId, clientRequest.getRequestId());
-
-        try {
-            BigInteger balance = serverContext.getWorldState().getBalance(target);
-            String stateHash = serverContext.getWorldState().computeStateHash();
-            String blockHash = serverContext.getBlockChain().getLatestBlock().getBlockHash();
-            byte[] returnData = ClientResponseCodec.encodeNativeBalanceSnapshot(balance, stateHash);
-            byte[] requestHash = Hash.sha3(clientRequest.toByteArray());
-
-            ClientResponse response = ClientResponse.newBuilder()
-                    .setClientId(clientId)
-                    .setRequestId(clientRequest.getRequestId())
-                    .setCommitted(true)
-                    .setBlockId(ByteString.copyFromUtf8(blockHash))
-                    .setTxHash(ByteString.copyFrom(requestHash))
-                    .setStatus("COMMITTED_SUCCESS")
-                    .setError("")
-                    .setReturnData(ByteString.copyFrom(returnData))
-                    .build();
-
-            serverContext.getPerfectLink().send(clientId, response.toByteArray());
-            executedRequests.add(requestKey);
-            pendingRequests.remove(requestKey);
-        } catch (Exception e) {
-            pendingRequests.remove(requestKey);
-            sendRejectionResponse(clientId, clientRequest.getRequestId(), "failed to process native balance query: " + e.getMessage());
-        }
-    }
-        
-    
     private void handleHotStuffMessage(String sourceId, HotStuffMessage hotstuffMsg) {
         coordinator.processMessage(sourceId, hotstuffMsg);
     }
