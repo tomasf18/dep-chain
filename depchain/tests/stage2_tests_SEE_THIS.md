@@ -152,6 +152,90 @@ It is meant as a quick orientation guide.
 - `transferFromCalldataHasCorrectShape` - Verifies transferFrom calldata is formed correctly.
 - `balanceOfCalldataHasCorrectShape` - Verifies balanceOf calldata is formed correctly.
 
+## Approval Frontrunning Resistance (§A)
+
+### ApprovalFrontrunningResistanceTest
+- `spenderCannotExceedOriginalAllowanceByRacingDecrease` - Verifies that a spender who races an owner's decreaseAllowance cannot extract more tokens than the original allowance.
+- `ownerCanSafelyReduceRemainingAllowanceAfterPartialSpend` - Verifies an owner can zero out allowance after a partial spend, blocking further transferFrom.
+- `approveNonZeroToNonZeroRevertsPreventsClassicFrontrunning` - Verifies the ERC-20 contract rejects direct nonzero-to-nonzero approve, forcing use of increaseAllowance/decreaseAllowance.
+
+## Invalid Signature / Signer Mismatch (§B)
+
+### InvalidOuterSignatureStage2Test
+- `forgedOuterSignatureIsDroppedByServers` - Verifies a client request signed with a random key is silently dropped by all replicas.
+- `missingOuterSignatureIsDroppedByServers` - Verifies a client request with an empty signature field is rejected by all replicas.
+- `tamperedRequestBodyIsDroppedByServers` - Verifies a validly signed request whose body is modified after signing is rejected.
+- `spoofedClientIdIsDroppedByServers` - Verifies a request claiming a different client identity is rejected when the signature does not match.
+
+## Replay / Nonce / Pipelining (§C)
+
+### FutureNonceAndPipeliningTest
+- `futureNonceIsAcceptedWhenNotPending` - Verifies a future nonce is accepted at validation time when it is not already pending.
+- `duplicateFutureNonceRejectedWhenAlreadyPending` - Verifies a duplicate future nonce is rejected if the same nonce is already pending.
+- `staleNonceBelowCommittedIsRejected` - Verifies a nonce below the committed nonce is rejected.
+- `multipleDistinctFutureNoncesAllAccepted` - Verifies multiple distinct future nonces from the same sender are all accepted.
+- `pipelinedTransactionsExecuteInNonceOrder` - Integration test verifying three pipelined transfers commit in nonce order through full consensus.
+
+## Double-Spend Prevention (§D)
+
+### DoubleSpendConsensusTest
+- `sameNonceConflictingTransfersOnlyOneCommits` - Verifies two transactions with the same nonce to different receivers result in at most one commit.
+- `sequentialTransfersExceedingBalanceOnlyFirstCommits` - Verifies a second transfer fails when the first drains the sender's balance.
+- `rapidFireSameNonceOnlyOneCommits` - Verifies the same signed transaction submitted under three request IDs produces at most one committed transfer.
+
+## Contract Execution Consistency (§F)
+
+### Erc20RevertReceiptConsistencyTest
+- `revertingErc20TransferProducesIdenticalFailedReceiptsAcrossReplicas` - Verifies a reverting ERC-20 transfer produces identical failed receipts, state hashes, and block hashes on all replicas.
+- `mixedSuccessAndRevertProduceIdenticalReceiptsAcrossReplicas` - Verifies a block with a successful transfer followed by a reverting one produces identical receipts on all replicas.
+- `revertingDecreaseAllowanceProducesConsistentStateAndReceipts` - Verifies a reverting decreaseAllowance leaves allowance unchanged and produces consistent state across replicas.
+
+## Gas Parameter Edge Cases (§G)
+
+### GasParameterEdgeCasesTest
+- `absurdGasLimitRefundsExcessGas` - Verifies an absurdly large gas limit is accepted and excess gas is refunded.
+- `exactGasLimitNoRefund` - Verifies a gas limit exactly matching the required gas results in no refund.
+- `gasLimitOneLessThanRequiredCausesOutOfGas` - Verifies a gas limit one less than required causes an out-of-gas failure.
+- `veryHighGasPriceChargesProportionally` - Verifies a high gas price charges proportionally higher fees.
+- `upfrontCostExceedingBalanceFailsDeterministically` - Verifies upfront cost exceeding sender balance is rejected deterministically.
+- `validationRejectsZeroGasPrice` - Verifies the validation layer rejects zero gas price.
+- `validationRejectsZeroGasLimit` - Verifies the validation layer rejects zero gas limit.
+- `gasLimitOfOneFailsWithOutOfGas` - Verifies a gas limit of 1 fails with out-of-gas and charges 1 unit of fee.
+- `differentGasPricesProduceDifferentFeesButSameReceiverBalance` - Verifies different gas prices produce different fees but identical receiver balances.
+
+## Equal-Fee Ordering Determinism (§H)
+
+### EqualFeeOrderingConsensusTest
+- `equalFeeTransactionsFromDifferentClientsProduceIdenticalBlockOrderAcrossReplicas` - Verifies equal-fee transactions from different clients produce identical block ordering on all replicas.
+- `multipleEqualFeeTransactionsProduceConsistentStateAcrossReplicas` - Verifies multiple equal-fee transactions from both clients produce consistent state across replicas.
+
+## Byzantine Client + Leader Collusion (§J)
+
+### ByzantineClientLeaderCollusionTest
+- `honestReplicaRejectsTransactionFromUnknownAccount` - Verifies honest replicas reject a block containing a transaction from an unknown account not in world state.
+- `honestReplicaRejectsLeaderTamperedTransactionContent` - Verifies honest replicas reject a block where the leader tampered with transaction content after signing.
+- `honestReplicaRejectsBlockWithExtraMetadataEntries` - Verifies honest replicas reject a block whose transaction count does not match metadata count.
+
+## Query Consistency (§K)
+
+### QueryConsistencyTest
+- `nativeBalanceConsistentAcrossReplicasAfterTransfer` - Verifies native balance is consistent across all replicas after a transfer.
+- `tokenBalanceConsistentAcrossReplicasAfterTransfer` - Verifies ERC-20 token balance is consistent across all replicas after a transfer.
+- `multipleTransfersProduceConsistentCumulativeBalances` - Verifies sequential transfers produce consistent cumulative balances across replicas.
+- `bidirectionalTransfersProduceConsistentState` - Verifies bidirectional transfers between two clients produce consistent state across replicas.
+
+## Edge-Case Robustness (§L)
+
+### EdgeCaseRobustnessTest
+- `nativeSelfTransferPreservesBalanceMinusGas` - Verifies a native self-transfer (from == to) preserves balance minus gas fee.
+- `nativeTransferToZeroAddressCreatesAccountAndCreditsValue` - Verifies a transfer to 0x0 creates the zero-address account and credits the value.
+- `erc20ApproveToZeroSucceedsWhenAllowanceIsNonZero` - Verifies approve(spender, 0) succeeds when allowance is nonzero (only non-zero → non-zero is blocked).
+- `erc20TransferFromOwnerToOwnerDeductsAllowanceButPreservesBalance` - Verifies transferFrom(owner, owner, amount) deducts allowance but leaves token balance unchanged.
+- `contractCallToEoaFailsWithNoRuntimeCode` - Verifies a contract call targeting an EOA fails with "no runtime code" and charges full gas.
+- `worldStateCopyIsIndependent` - Verifies copy() produces a fully independent snapshot where mutations do not cross over.
+- `stateHashIsStableWithoutModifications` - Verifies computeStateHash() is idempotent when called without intervening changes.
+- `stateHashChangesAfterBalanceModification` - Verifies computeStateHash() changes after a balance modification.
+- `proposerIsSenderFeesCreditedBack` - Verifies that when proposer == sender, fees credit back and net loss is only the transfer value.
 
 ---
 

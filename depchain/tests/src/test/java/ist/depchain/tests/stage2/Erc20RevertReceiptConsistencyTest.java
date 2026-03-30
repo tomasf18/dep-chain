@@ -118,11 +118,13 @@ class Erc20RevertReceiptConsistencyTest {
         Address client1Address = client1Context.getSelfAddress();
 
         // Client2 has zero tokens (only client1/treasury has the initial supply).
+        int heightBefore = ServerApp.getCoordinator("s0").getServerContext().getBlockChain().getHeight();
+
         // Submit a transfer of 1 token from client2 → client1: this must revert.
         client2Library.submitTokenTransfer(client1Address.toHexString(), BigInteger.ONE, GAS_PRICE, GAS_LIMIT);
 
         // Wait for the reverting tx to be committed across all replicas
-        waitForMinBlockHeight(1, 120_000);
+        waitForMinBlockHeight(heightBefore + 1, 120_000);
 
         // Verify identical state hashes
         assertReplicaStateHashesMatch();

@@ -52,7 +52,7 @@ class ByzantineClientLeaderCollusionTest {
     private static ClientContext clientContext;
 
     @BeforeAll
-    static void setupSharedContext() {
+    static void setupSharedContext() throws Exception {
         serverConfig = Config.loadConfiguration("../config/config-dev.json", "s0");
         serverContext = new ServerContext(serverConfig);
         coordinator = new BasicHotStuffCoordinator(serverContext, false);
@@ -62,7 +62,7 @@ class ByzantineClientLeaderCollusionTest {
     }
 
     @AfterAll
-    static void teardownSharedContext() {
+    static void teardownSharedContext() throws Exception {
         if (coordinator != null) coordinator.stop();
         if (serverContext != null) serverContext.stop();
         if (clientContext != null) clientContext.stop();

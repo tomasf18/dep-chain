@@ -150,11 +150,14 @@ class DoubleSpendConsensusTest {
         Address sender = clientContext.getSelfAddress();
         BigInteger senderBalance = ServerApp.getCoordinator("s0").getServerContext().getWorldState().getBalance(sender);
 
-        // First transfer: drain almost everything (leave just enough for one gas fee)
-        BigInteger firstTransfer = senderBalance.subtract(GAS_FEE).subtract(BigInteger.valueOf(1_000));
+        // Upfront gas reservation = gasPrice * gasLimit (not actual fee)
+        BigInteger upfrontGas = GAS_PRICE.multiply(GAS_LIMIT); // 3 * 21_000 = 63_000
+        // First transfer: drain almost everything, leaving only 1_000 after upfront cost
+        BigInteger firstTransfer = senderBalance.subtract(upfrontGas).subtract(BigInteger.valueOf(1_000));
         assertTrue(firstTransfer.signum() > 0, "sender balance too low for test");
 
-        // Second transfer: 500 — needs 500 + 60_000 gas = 60_500, but only ~1_000 remains
+        // Second transfer: 500 — needs 500 + 63_000 upfront = 63_500, but only ~4_000 remains
+        // (1_000 leftover + 3_000 gas refund from first tx)
         BigInteger secondTransfer = BigInteger.valueOf(500);
 
         clientLibrary.submitNativeTransfer(RECEIVER_A.toHexString(), firstTransfer, GAS_PRICE, GAS_LIMIT);
