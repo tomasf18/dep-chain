@@ -1,30 +1,30 @@
 {
-  "block_hash": "c7926501e9e8ce1efcb96dee696896a44f21d31df2ef1c5cd884aa07dedfa130",
-  "previous_block_hash": "5ad55e9e73eda1cc6793c55677d251d8a1b12351ab4a797775dbc69e08538a8a",
+  "block_hash": "e7566d704e06fa6e28bef1140d13cfd5ea8b435eae3e6019d837fe7df3c3a68e",
+  "previous_block_hash": "8737de1025d73fd060970ebc8e84d8657e8093c749514f11ebb1f7a49fae49b0",
   "block_number": 2,
-  "proposer": "0xdb710290c98c770c5ee6b312ea42b89cdbd23cc2",
+  "proposer": "0x163b745a57f26b27f3876c82b21a6d90bbe54bc9",
   "transactions": [
     {
       "from": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
+      "to": "0x9999999999999999999999999999999999999999",
       "value": "0",
-      "input": "0x",
-      "gas_price": "1",
-      "gas_limit": "100000",
+      "input": "0xa9059cbb000000000000000000000000172bf398d2a931323199521625f471fb1c28879a0000000000000000000000000000000000000000000000000000000000002710",
+      "gas_price": "3",
+      "gas_limit": "21000",
       "nonce": 1,
-      "kind": "NATIVE_BALANCE_QUERY",
-      "native_balance_query_target": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
-      "signature": "0x3045022100c4925113a061f7b1780a35a56b848b2c7b61007297a3beaf57dcf400047c6bea02204e1480edafa2f4c16c15da30a20db457944aac410c25c64aa42cb5a1615bd095",
-      "tx_hash": "79d939971cb9b305fb70bd9fc40ca0dc38a08eb7b2601080f68b84d8817864d2"
+      "kind": "STANDARD",
+      "signature": "0x304402200290ba588ac8c44cca61d2cab52c8210fc76172dbe9e143135ebc2330515006d022011fd6cc956f2339b49a726d8218ed3cec403aba5ffec102ff62ac86f22bc4a34",
+      "tx_hash": "8c638277059b30baf2767fd3afbf6802375ed95a51cae3bd23687dcfec524f2f"
     }
   ],
   "receipts": [
     {
-      "tx_hash": "79d939971cb9b305fb70bd9fc40ca0dc38a08eb7b2601080f68b84d8817864d2",
-      "success": true,
-      "gas_used": "20000",
-      "fee": "20000",
-      "return_data": "0x00000000000000000000000000000000000000000000003635c9adc5de9f63c01d2cc29a1135d6f182137091adace5d60bd665e6c98d012e5b3e33959ba9f5f1"
+      "tx_hash": "8c638277059b30baf2767fd3afbf6802375ed95a51cae3bd23687dcfec524f2f",
+      "success": false,
+      "gas_used": "8021",
+      "fee": "24063",
+      "error": "unexpected final EVM op: SSTORE"
     }
   ],
-  "state_hash": "1d2cc29a1135d6f182137091adace5d60bd665e6c98d012e5b3e33959ba9f5f1"
+  "state_hash": "5e390c9727974998dde056da02fb8276230641573789d9cabea8eb0e740594f0"
 }
