@@ -217,3 +217,43 @@ This is really just a stronger version of malformed-block testing.
 ### K. Query consistency tests
 
 Because our reads are quorum-based snapshots, not consensus-ordered operations, a test here could be useful.
+
+### L. Edge-case robustness tests
+
+**Guarantee:** degenerate but technically valid inputs are handled deterministically and do not break invariants.
+
+**Tests (implemented in `EdgeCaseRobustnessTest.java`):**
+
+* native self-transfer (from == to) — balance unchanged minus gas,
+* native transfer to zero address (0x0) — account created, value credited,
+* ERC-20 approve(spender, 0) when allowance is nonzero — succeeds (only non-zero → non-zero is blocked),
+* ERC-20 transferFrom(owner, owner, amount) — allowance consumed but token balance unchanged,
+* contract call to EOA (no code) — fails with "no runtime code", full gas charged,
+* world-state snapshot independence — copy() produces fully independent clone,
+* state hash stability — computeStateHash() idempotent without changes,
+* state hash sensitivity — computeStateHash() changes after balance modification,
+* proposer == sender — fees credit back to sender, net loss is only value.
+
+## Remaining untested edge cases
+
+The following edge cases have been identified but are **not yet implemented**. They are listed here for future coverage.
+
+### Medium priority
+
+* **Nonce at long boundaries** — very large nonce values near `Long.MAX_VALUE`; nonce increments must not overflow.
+* **Multiple failed txs in same block** — each must still increment nonce correctly even if execution fails.
+* **ERC-20 increaseAllowance overflow** — allowance near `uint256.max`, then increaseAllowance by 1; should revert, not wrap.
+* **ERC-20 decreaseAllowance to exact zero** — decrease by exactly the current allowance (boundary between success and revert).
+* **Empty block proposal** — leader proposes a block with zero transactions; verify replicas accept or reject consistently.
+* **Native balance query for non-existent account** — querying balance of an address not in world state.
+* **Concurrent view change + proposal** — replica receives PREPARE from old view while processing a NEW-VIEW.
+
+### Lower priority
+
+* **Block with large transaction list** — stress test ordering and validation with many txs.
+* **Duplicate account creation** — `createEOA()` called twice for the same address; verify behavior (overwrite vs error).
+* **QC with null or mismatched fields** — malformed quorum certificates with null blockId or wrong view numbers.
+* **View-change timeout backoff saturation** — consecutive timeouts reaching MAX_TIMEOUT_MS.
+* **Response status string edge cases** — case sensitivity, whitespace, substrings in client MessageHandler.
+* **Re-deploying contract to existing address** — deploying to an address that already has code.
+* **Nonce gap in same batch** — sender has nonces [1,3,5] in a single proposed block (missing 2,4).
