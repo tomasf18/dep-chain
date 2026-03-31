@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -27,10 +27,9 @@ import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionValidator;
 import ist.depchain.core.blockchain.ValidationResult;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
+import ist.depchain.tests.stage2.Stage2GasConstants;
 
 /**
- * Future nonce handling and pipelined transaction tests (TODO-TESTS §C).
- *
  * Guarantee: future nonces (txNonce > committedNonce) are accepted at
  * validation time to support pipelined transactions, but only one
  * transaction per nonce can be pending at a time. This prevents abuse
@@ -120,7 +119,7 @@ class FutureNonceAndPipeliningTest {
 
         Set<Long> pending = new HashSet<>();
 
-        // Submit nonces 0, 1, 2 (pipelined) — each should be accepted
+        // Submit nonces 0, 1, 2 (pipelined) - each should be accepted
         for (int nonce = 0; nonce < 3; nonce++) {
             Transaction unsignedTx = new Transaction(from, to, BigInteger.valueOf(100), new byte[0],
                     BigInteger.ONE, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, nonce, null);
@@ -217,7 +216,7 @@ class FutureNonceAndPipeliningTest {
         for (String replicaId : REPLICAS) {
             DepChainWorldState ws = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState();
             assertEquals(expectedReceiverBalance, ws.getBalance(receiver),
-                    "receiver balance mismatch on " + replicaId + " — pipelined txs may not have executed in order");
+                    "receiver balance mismatch on " + replicaId + " - pipelined txs may not have executed in order");
             // Nonce should be advanced by 3
             long expectedNonce = clientContext.getNonce();
             assertEquals(expectedNonce, ws.getNonce(sender),

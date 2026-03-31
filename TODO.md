@@ -5,6 +5,8 @@ Important:
 
 ## Started, but not completed
 
+- adapt stage 1 tests (adversary tests only) to stage 2 - **IMPORTANT: YOU SHOULD ALSO ADAPT THE PRUNING** 
+- inlude "guaranteee that the f+1 received responses are actually identical (usar hash)" test
 - READ OPERATIONS bothe Native and ERC20 balanceOf (client should be able to ask for their token balance and the replica should reply with it, provided the replica response includes the information needed to verify the balance is correct)
  Clients should see their balance by requesting nodes for it. But replicas sending an entire chain of blocks is very inefficient since it can be huge. We must consider a better alternative to ensure the client receives the state and can verify it is correct (merkle proofs, or maybe a snapshot of the state at a certain block number, etc) **EVERY REPLICA KEEPS A MERKLE ROOT OF THE WORLD STATE, WHEN CLIENT WANTS TO VERIFY ITS BALANCE, THE MERKLE ROOT CAN BE PROVIDED AND IF IT IS EQUAL FOR f+1 REPLICAS, THE CLIENT CAN TRUST THE BALANCE** -> this might not work because the client might want to verify a balance that is not in the latest block, but in a previous one. In that case, we can provide the client with the block hash and the state hash of that block, and the client can verify that the state hash matches the one in the block, and then verify that the balance is correct according to that state hash. This way, we can ensure that the client can verify their balance without having to receive the entire chain of blocks.
 
@@ -21,10 +23,10 @@ Legend:
 
 Only the owner of an account can authorize spending from it, and every accepted operation is attributable to a real signer.
 
-- [ ] invalid outer client-request signature
+- [x] invalid outer client-request signature - covered by `InvalidOuterSignatureStage2Test`
 - [x] invalid transaction signature - covered by transaction validation and forged-tx block rejection tests
 - [x] signer/address mismatch - covered by transaction validation tests
-- [ ] forged request by Byzantine server
+- [x] forged request by Byzantine server - covered by `ByzantineClientLeaderCollusionTest`
 - [x] forged transaction wrapped in valid request envelope - covered by Byzantine leader malformed block tests
 
 #### 2. Replay resistance and uniqueness
@@ -34,7 +36,7 @@ A Byzantine client must not be able to execute the same intent multiple times by
 - [x] duplicate request replay - covered by `RequestReplayThroughConsensusTest`
 - [x] duplicate signed transaction under different request IDs - covered by `RequestReplayThroughConsensusTest`
 - [x] duplicate nonce submission - covered by pending-nonce validation, stale-nonce replay, and same-block duplicate nonce rejection
-- [ ] future nonce abuse
+- [ ] future nonce abuse - partially covered by `FutureNonceAndPipeliningTest`, but no explicit flooding/DoS case is represented yet
 - [x] repeated DECIDE delivery - covered by `RepeatedDecideIdempotenceTest`
 
 #### 3. Financial safety / state-machine safety
@@ -72,9 +74,9 @@ The modified token contract must resist approval frontrunning.
 
 The following items are useful for discussion or future hardening, but they are not yet represented as explicit Stage 2 test cases:
 
-- [ ] invalid outer client-request signature
-- [ ] forged request by Byzantine server
-- [ ] future nonce abuse
+- [x] invalid outer client-request signature
+- [x] forged request by Byzantine server
+- [ ] future nonce abuse - partially covered by `FutureNonceAndPipeliningTest`, but no explicit flooding/DoS case is represented yet
 
 #### Useful coverage already in the suite
 

@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -24,22 +24,22 @@ import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 
 /**
  * Guarantee: a spender cannot exploit an allowance reduction to spend
- * old + new allowance cumulatively.  Our ERC-20 uses increaseAllowance /
+ * old + new allowance cumulatively. Our ERC-20 uses increaseAllowance /
  * decreaseAllowance instead of raw approve(), and approve(non-zero -> non-zero)
  * reverts, which eliminates the classic frontrunning attack vector.
  *
  * Test scenarios:
- *   1. Owner grants allowance 100, spender spends 100, owner decreases by 50
- *      -> total extracted is exactly 100, not 150.
- *   2. Spender races owner's decrease: spender spends full allowance before
- *      the decrease lands -> decrease is a no-op (allowance already 0), total
- *      extracted is bounded by original allowance.
- *   3. Owner tries approve() to replace non-zero allowance -> reverts,
- *      preventing the classic ERC-20 race.
+ * 1. Owner grants allowance 100, spender spends 100, owner decreases by 50
+ * -> total extracted is exactly 100, not 150.
+ * 2. Spender races owner's decrease: spender spends full allowance before
+ * the decrease lands -> decrease is a no-op (allowance already 0), total
+ * extracted is bounded by original allowance.
+ * 3. Owner tries approve() to replace non-zero allowance -> reverts,
+ * preventing the classic ERC-20 race.
  */
 class ApprovalFrontrunningResistanceTest {
     private static final String CONFIG_FILE = "../config/config-dev.json";
-    private static final String[] REPLICAS = {"s0", "s1", "s2", "s3"};
+    private static final String[] REPLICAS = { "s0", "s1", "s2", "s3" };
 
     private static final BigInteger GAS_PRICE = BigInteger.ONE;
     private static final BigInteger GAS_LIMIT = BigInteger.valueOf(100_000);
@@ -94,7 +94,8 @@ class ApprovalFrontrunningResistanceTest {
         spenderContext.setRequestId((int) (requestBase + 500));
 
         ownerContext.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(ownerAddress));
-        spenderContext.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(spenderAddress));
+        spenderContext
+                .setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(spenderAddress));
 
         ownerContext.start();
         spenderContext.start();
@@ -102,8 +103,10 @@ class ApprovalFrontrunningResistanceTest {
 
     @AfterEach
     void teardown() {
-        if (ownerContext != null) ownerContext.stop();
-        if (spenderContext != null) spenderContext.stop();
+        if (ownerContext != null)
+            ownerContext.stop();
+        if (spenderContext != null)
+            spenderContext.stop();
         stopReplicas();
     }
 
@@ -112,7 +115,7 @@ class ApprovalFrontrunningResistanceTest {
      * 2. Spender races to transferFrom(100) before the owner's decrease lands.
      * 3. Owner submits decreaseAllowance(50).
      * 4. Assert: spender extracted at most 100 tokens total (not 100 + 50 = 150).
-     *    The decrease is a no-op because allowance is already 0 after the spend.
+     * The decrease is a no-op because allowance is already 0 after the spend.
      */
     @Test
     void spenderCannotExceedOriginalAllowanceByRacingDecrease() {
@@ -134,20 +137,24 @@ class ApprovalFrontrunningResistanceTest {
                 BigInteger.ZERO,
                 120_000);
 
-        // Step 3: Owner tries to decrease by 50 — allowance is already 0, so this reverts
+        // Step 3: Owner tries to decrease by 50 - allowance is already 0, so this
+        // reverts
         ownerLibrary.submitDecreaseAllowance(spender.toHexString(), BigInteger.valueOf(50), GAS_PRICE, GAS_LIMIT);
 
-        // Wait for the decrease tx to be processed (allowance stays at 0 because decrease below 0 reverts)
+        // Wait for the decrease tx to be processed (allowance stays at 0 because
+        // decrease below 0 reverts)
         waitForReplicaState(owner, spender,
                 TOKEN_INITIAL_SUPPLY.subtract(allowance),
                 allowance,
                 BigInteger.ZERO,
                 120_000);
 
-        // Step 4: Verify total extracted is exactly 100 (the original allowance), never more
+        // Step 4: Verify total extracted is exactly 100 (the original allowance), never
+        // more
         for (String replicaId : REPLICAS) {
             DepChainWorldState ws = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState();
-            Address contractAddress = ServerApp.getCoordinator(replicaId).getServerContext().getConfig().getIstContractAddress();
+            Address contractAddress = ServerApp.getCoordinator(replicaId).getServerContext().getConfig()
+                    .getIstContractAddress();
 
             BigInteger spenderBalance = tokenBalanceOf(ws, contractAddress, spender);
             assertTrue(spenderBalance.compareTo(allowance) <= 0,
@@ -178,7 +185,8 @@ class ApprovalFrontrunningResistanceTest {
         waitForReplicaState(owner, spender, TOKEN_INITIAL_SUPPLY, BigInteger.ZERO, initialAllowance, 120_000);
 
         // Spend 60
-        spenderLibrary.submitTransferFrom(owner.toHexString(), spender.toHexString(), spendAmount, GAS_PRICE, GAS_LIMIT);
+        spenderLibrary.submitTransferFrom(owner.toHexString(), spender.toHexString(), spendAmount, GAS_PRICE,
+                GAS_LIMIT);
         waitForReplicaState(owner, spender,
                 TOKEN_INITIAL_SUPPLY.subtract(spendAmount),
                 spendAmount,
@@ -193,8 +201,9 @@ class ApprovalFrontrunningResistanceTest {
                 BigInteger.ZERO,
                 120_000);
 
-        // Spender tries to spend 1 more — should fail (allowance = 0)
-        spenderLibrary.submitTransferFrom(owner.toHexString(), spender.toHexString(), BigInteger.ONE, GAS_PRICE, GAS_LIMIT);
+        // Spender tries to spend 1 more - should fail (allowance = 0)
+        spenderLibrary.submitTransferFrom(owner.toHexString(), spender.toHexString(), BigInteger.ONE, GAS_PRICE,
+                GAS_LIMIT);
 
         // Allow time for the reverting tx to be processed
         LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(30));
@@ -202,7 +211,8 @@ class ApprovalFrontrunningResistanceTest {
         // Spender balance should still be exactly 60
         for (String replicaId : REPLICAS) {
             DepChainWorldState ws = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState();
-            Address contractAddress = ServerApp.getCoordinator(replicaId).getServerContext().getConfig().getIstContractAddress();
+            Address contractAddress = ServerApp.getCoordinator(replicaId).getServerContext().getConfig()
+                    .getIstContractAddress();
 
             assertEquals(spendAmount, tokenBalanceOf(ws, contractAddress, spender),
                     "spender token balance mismatch on " + replicaId);
@@ -229,7 +239,7 @@ class ApprovalFrontrunningResistanceTest {
         ownerLibrary.submitIncreaseAllowance(spender.toHexString(), initialAllowance, GAS_PRICE, GAS_LIMIT);
         waitForReplicaState(owner, spender, TOKEN_INITIAL_SUPPLY, BigInteger.ZERO, initialAllowance, 120_000);
 
-        // Try approve(200) — must revert because current allowance is non-zero
+        // Try approve(200) - must revert because current allowance is non-zero
         ownerLibrary.submitApprove(spender.toHexString(), replacementAllowance, GAS_PRICE, GAS_LIMIT);
 
         // Allowance remains 100
@@ -243,7 +253,7 @@ class ApprovalFrontrunningResistanceTest {
     private static void startReplica(String serverId) {
         Thread t = new Thread(() -> {
             try {
-                ServerApp.main(new String[]{CONFIG_FILE, serverId, "false"});
+                ServerApp.main(new String[] { CONFIG_FILE, serverId, "false" });
             } catch (Exception e) {
                 System.err.println("[TEST] Error starting replica " + serverId);
                 e.printStackTrace();
@@ -256,17 +266,21 @@ class ApprovalFrontrunningResistanceTest {
     private static void stopReplicas() {
         for (String replicaId : REPLICAS) {
             BasicHotStuffCoordinator coord = ServerApp.getCoordinator(replicaId);
-            if (coord == null) continue;
-            try { coord.getServerContext().stop(); } catch (Exception ignored) {}
+            if (coord == null)
+                continue;
+            try {
+                coord.getServerContext().stop();
+            } catch (Exception ignored) {
+            }
             coord.stop();
         }
     }
 
     private static void waitForReplicaState(Address owner, Address spender,
-                                            BigInteger expectedOwnerToken,
-                                            BigInteger expectedSpenderToken,
-                                            BigInteger expectedAllowance,
-                                            long timeoutMs) {
+            BigInteger expectedOwnerToken,
+            BigInteger expectedSpenderToken,
+            BigInteger expectedAllowance,
+            long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
             boolean allMatch = true;
@@ -282,7 +296,8 @@ class ApprovalFrontrunningResistanceTest {
                     break;
                 }
             }
-            if (allMatch) return;
+            if (allMatch)
+                return;
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(250));
         }
         fail("ERC20 state did not converge within " + timeoutMs + "ms");
@@ -292,14 +307,16 @@ class ApprovalFrontrunningResistanceTest {
         return ws.getStorageValue(contractAddress, balanceSlot(owner)).toBigInteger();
     }
 
-    private static BigInteger tokenAllowanceOf(DepChainWorldState ws, Address contractAddress, Address owner, Address spender) {
+    private static BigInteger tokenAllowanceOf(DepChainWorldState ws, Address contractAddress, Address owner,
+            Address spender) {
         return ws.getStorageValue(contractAddress, allowanceSlot(owner, spender)).toBigInteger();
     }
 
     private static void assertReplicaStateHashesMatch() {
         String referenceHash = null;
         for (String replicaId : REPLICAS) {
-            String stateHash = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState().computeStateHash();
+            String stateHash = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState()
+                    .computeStateHash();
             if (referenceHash == null) {
                 referenceHash = stateHash;
             } else {

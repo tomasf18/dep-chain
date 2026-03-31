@@ -7,14 +7,19 @@
 #   ./run_stage2_isolated.sh
 #   ./run_stage2_isolated.sh BlockValidationAndExecutionTest TransactionExecutionTest
 #   ./run_stage2_isolated.sh --fail-fast
+#   ./run_stage2_isolated.sh --integration
+#   ./run_stage2_isolated.sh --unit
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEST_DIR="$SCRIPT_DIR/src/test/java/ist/depchain/tests/stage2"
+INTEGRATION_DIR="$TEST_DIR/integration"
+UNIT_DIR="$TEST_DIR/unit"
 
 FAIL_FAST=false
+ONLY_SCOPE="all"
 SELECTED_CLASSES=()
 
 while [[ $# -gt 0 ]]; do
@@ -23,16 +28,25 @@ while [[ $# -gt 0 ]]; do
             FAIL_FAST=true
             shift
             ;;
+        --integration)
+            ONLY_SCOPE="integration"
+            shift
+            ;;
+        --unit)
+            ONLY_SCOPE="unit"
+            shift
+            ;;
         -h|--help)
             cat <<'USAGE'
 Runs Stage 2 test classes one at a time using Maven.
 
 Usage:
   ./run_stage2_isolated.sh
-  ./run_stage2_isolated.sh [--fail-fast] [TestClassName ...]
+  ./run_stage2_isolated.sh [--fail-fast] [--integration|--unit] [TestClassName ...]
 
 If no class names are provided, the script runs every file matching *Test.java
-under tests/src/test/java/ist/depchain/tests/stage2.
+under tests/src/test/java/ist/depchain/tests/stage2, recursively through the
+integration/ and unit/ folders.
 USAGE
             exit 0
             ;;
@@ -44,10 +58,22 @@ USAGE
 done
 
 if [[ ${#SELECTED_CLASSES[@]} -eq 0 ]]; then
+    case "$ONLY_SCOPE" in
+        integration)
+            DISCOVERY_ROOT="$INTEGRATION_DIR"
+            ;;
+        unit)
+            DISCOVERY_ROOT="$UNIT_DIR"
+            ;;
+        *)
+            DISCOVERY_ROOT="$TEST_DIR"
+            ;;
+    esac
+
     while IFS= read -r test_file; do
         test_class="$(basename "$test_file" .java)"
         SELECTED_CLASSES+=("$test_class")
-    done < <(find "$TEST_DIR" -maxdepth 1 -type f -name '*Test.java' | sort)
+    done < <(find "$DISCOVERY_ROOT" -type f -name '*Test.java' | sort)
 fi
 
 if [[ ${#SELECTED_CLASSES[@]} -eq 0 ]]; then

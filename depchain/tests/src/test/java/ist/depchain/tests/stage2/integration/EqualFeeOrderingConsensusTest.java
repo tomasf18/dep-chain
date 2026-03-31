@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import ist.depchain.client.ClientContext;
 import ist.depchain.client.ClientLibrary;
 import ist.depchain.client.MessageHandler;
-import ist.depchain.common.Transaction;
 import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.blockchain.BlockChainBlock;
@@ -23,9 +22,7 @@ import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 
-/**
- * Equal-fee ordering determinism through consensus (TODO-TESTS §H).
- *
+/*
  * Guarantee: tie cases (transactions with equal fees) are deterministic
  * across all honest replicas. The BlockBuilder uses a lexicographic tx-hash
  * tie-breaker, and all replicas produce the same block ordering.
@@ -38,9 +35,9 @@ import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
  */
 class EqualFeeOrderingConsensusTest {
     private static final String CONFIG_FILE = "../config/config-dev.json";
-    private static final String[] REPLICAS = {"s0", "s1", "s2", "s3"};
+    private static final String[] REPLICAS = { "s0", "s1", "s2", "s3" };
 
-    // Same gas price and gas limit for both clients → same fee
+    // Same gas price and gas limit for both clients -> same fee
     private static final BigInteger GAS_PRICE = BigInteger.valueOf(3);
     private static final BigInteger GAS_LIMIT = BigInteger.valueOf(21_000);
     private static final BigInteger TRANSFER_VALUE = BigInteger.valueOf(1_000);
@@ -93,8 +90,10 @@ class EqualFeeOrderingConsensusTest {
         client1Context.setRequestId((int) requestBase);
         client2Context.setRequestId((int) (requestBase + 500));
 
-        client1Context.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client1Address));
-        client2Context.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client2Address));
+        client1Context
+                .setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client1Address));
+        client2Context
+                .setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client2Address));
 
         client1Context.start();
         client2Context.start();
@@ -102,8 +101,10 @@ class EqualFeeOrderingConsensusTest {
 
     @AfterEach
     void teardown() {
-        if (client1Context != null) client1Context.stop();
-        if (client2Context != null) client2Context.stop();
+        if (client1Context != null)
+            client1Context.stop();
+        if (client2Context != null)
+            client2Context.stop();
         stopReplicas();
     }
 
@@ -111,7 +112,8 @@ class EqualFeeOrderingConsensusTest {
      * Both clients submit a native transfer with the same gas price and gas limit.
      * The fee is identical (3 * 20_000 = 60_000 for both).
      * The BlockBuilder's tie-breaker (lexicographic tx hash) decides the ordering.
-     * All replicas must produce the same ordering, same block hash, and same receipts.
+     * All replicas must produce the same ordering, same block hash, and same
+     * receipts.
      */
     @Test
     void equalFeeTransactionsFromDifferentClientsProduceIdenticalBlockOrderAcrossReplicas() {
@@ -119,7 +121,8 @@ class EqualFeeOrderingConsensusTest {
 
         for (String replicaId : REPLICAS) {
             DepChainWorldState ws = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState();
-            if (!ws.accountExists(receiver)) ws.createEOA(receiver, 0, BigInteger.ZERO);
+            if (!ws.accountExists(receiver))
+                ws.createEOA(receiver, 0, BigInteger.ZERO);
         }
 
         // Both clients submit with identical gas price and gas limit
@@ -135,7 +138,8 @@ class EqualFeeOrderingConsensusTest {
         assertReplicaStateHashesMatch();
 
         // Verify the block actually has two transactions
-        BlockChainBlock latestBlock = ServerApp.getCoordinator("s0").getServerContext().getBlockChain().getLatestBlock();
+        BlockChainBlock latestBlock = ServerApp.getCoordinator("s0").getServerContext().getBlockChain()
+                .getLatestBlock();
         assertTrue(latestBlock.getTransactions().size() >= 1,
                 "Expected at least 1 transaction in the latest block");
     }
@@ -150,7 +154,8 @@ class EqualFeeOrderingConsensusTest {
 
         for (String replicaId : REPLICAS) {
             DepChainWorldState ws = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState();
-            if (!ws.accountExists(receiver)) ws.createEOA(receiver, 0, BigInteger.ZERO);
+            if (!ws.accountExists(receiver))
+                ws.createEOA(receiver, 0, BigInteger.ZERO);
         }
 
         // Client1: 2 transfers
@@ -188,17 +193,20 @@ class EqualFeeOrderingConsensusTest {
                     break;
                 }
             }
-            if (allMatch) return;
+            if (allMatch)
+                return;
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(250));
         }
         BigInteger actual = ServerApp.getCoordinator("s0").getServerContext().getWorldState().getBalance(receiver);
-        fail("Receiver balance did not converge within " + timeoutMs + "ms; expected=" + expectedBalance + " actual=" + actual);
+        fail("Receiver balance did not converge within " + timeoutMs + "ms; expected=" + expectedBalance + " actual="
+                + actual);
     }
 
     private static void assertReplicaStateHashesMatch() {
         String referenceHash = null;
         for (String replicaId : REPLICAS) {
-            String stateHash = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState().computeStateHash();
+            String stateHash = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState()
+                    .computeStateHash();
             if (referenceHash == null) {
                 referenceHash = stateHash;
             } else {
@@ -213,7 +221,8 @@ class EqualFeeOrderingConsensusTest {
         List<TransactionReceipt> referenceReceipts = null;
 
         for (String replicaId : REPLICAS) {
-            BlockChainBlock latestBlock = ServerApp.getCoordinator(replicaId).getServerContext().getBlockChain().getLatestBlock();
+            BlockChainBlock latestBlock = ServerApp.getCoordinator(replicaId).getServerContext().getBlockChain()
+                    .getLatestBlock();
             if (referenceBlockHash == null) {
                 referenceBlockHash = latestBlock.getBlockHash();
                 referenceStateHash = latestBlock.getStateHash();
@@ -223,15 +232,20 @@ class EqualFeeOrderingConsensusTest {
 
             assertEquals(referenceBlockHash, latestBlock.getBlockHash(), "Block hash mismatch on " + replicaId);
             assertEquals(referenceStateHash, latestBlock.getStateHash(), "State hash mismatch on " + replicaId);
-            assertEquals(referenceReceipts.size(), latestBlock.getReceipts().size(), "Receipt count mismatch on " + replicaId);
+            assertEquals(referenceReceipts.size(), latestBlock.getReceipts().size(),
+                    "Receipt count mismatch on " + replicaId);
 
             for (int i = 0; i < referenceReceipts.size(); i++) {
                 TransactionReceipt expected = referenceReceipts.get(i);
                 TransactionReceipt actual = latestBlock.getReceipts().get(i);
-                assertEquals(expected.isSuccess(), actual.isSuccess(), "Receipt success mismatch at index " + i + " on " + replicaId);
-                assertEquals(expected.getGasUsed(), actual.getGasUsed(), "Receipt gasUsed mismatch at index " + i + " on " + replicaId);
-                assertEquals(expected.getFee(), actual.getFee(), "Receipt fee mismatch at index " + i + " on " + replicaId);
-                assertArrayEquals(expected.getTxHash(), actual.getTxHash(), "Receipt txHash mismatch at index " + i + " on " + replicaId);
+                assertEquals(expected.isSuccess(), actual.isSuccess(),
+                        "Receipt success mismatch at index " + i + " on " + replicaId);
+                assertEquals(expected.getGasUsed(), actual.getGasUsed(),
+                        "Receipt gasUsed mismatch at index " + i + " on " + replicaId);
+                assertEquals(expected.getFee(), actual.getFee(),
+                        "Receipt fee mismatch at index " + i + " on " + replicaId);
+                assertArrayEquals(expected.getTxHash(), actual.getTxHash(),
+                        "Receipt txHash mismatch at index " + i + " on " + replicaId);
             }
         }
     }
@@ -239,7 +253,7 @@ class EqualFeeOrderingConsensusTest {
     private static void startReplica(String serverId) {
         Thread t = new Thread(() -> {
             try {
-                ServerApp.main(new String[]{CONFIG_FILE, serverId, "false"});
+                ServerApp.main(new String[] { CONFIG_FILE, serverId, "false" });
             } catch (Exception e) {
                 System.err.println("[TEST] Error starting replica " + serverId);
                 e.printStackTrace();
@@ -252,8 +266,12 @@ class EqualFeeOrderingConsensusTest {
     private static void stopReplicas() {
         for (String replicaId : REPLICAS) {
             BasicHotStuffCoordinator coord = ServerApp.getCoordinator(replicaId);
-            if (coord == null) continue;
-            try { coord.getServerContext().stop(); } catch (Exception ignored) {}
+            if (coord == null)
+                continue;
+            try {
+                coord.getServerContext().stop();
+            } catch (Exception ignored) {
+            }
             coord.stop();
         }
     }

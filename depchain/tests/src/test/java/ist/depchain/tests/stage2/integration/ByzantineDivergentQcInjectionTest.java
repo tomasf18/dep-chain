@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.integration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -20,9 +20,23 @@ import ist.depchain.common.QC;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 
+/**
+ * Scenario: a Byzantine leader tries to inject divergent forged QCs to
+ * different replicas in the same view, attempting to cause them to lock on
+ * different blocks and break safety.
+ * Honest replicas must reject the forged QCs and remain locked on the genesis
+ * QC, preventing any divergence or safety violation.
+ *
+ * Tests:
+ * 1. Leader crafts two different forged QCs for the same view and sends them to
+ * different replicas - all honest replicas must ignore them and keep genesis
+ * locked QC.
+ * 2. No block should be executed on any replica as a result of the forged QC
+ * injection.
+ */
 class ByzantineDivergentQcInjectionTest {
     private static final String CONFIG_FILE = "../config/config-dev.json";
-    private static final String[] REPLICAS = {"s0", "s1", "s2", "s3"};
+    private static final String[] REPLICAS = { "s0", "s1", "s2", "s3" };
 
     @BeforeEach
     void setup() {
@@ -80,7 +94,8 @@ class ByzantineDivergentQcInjectionTest {
     }
 
     private static QC forgedCommitJustify(String label) {
-        byte[] forgedSig = UUID.nameUUIDFromBytes(label.getBytes(StandardCharsets.UTF_8)).toString().getBytes(StandardCharsets.UTF_8);
+        byte[] forgedSig = UUID.nameUUIDFromBytes(label.getBytes(StandardCharsets.UTF_8)).toString()
+                .getBytes(StandardCharsets.UTF_8);
         return QC.newBuilder()
                 .setType(HotStuffMessage.Type.PRE_COMMIT)
                 .setViewNumber(1)
@@ -97,7 +112,7 @@ class ByzantineDivergentQcInjectionTest {
     private static void startReplica(String serverId) {
         Thread t = new Thread(() -> {
             try {
-                ServerApp.main(new String[]{CONFIG_FILE, serverId, "false"});
+                ServerApp.main(new String[] { CONFIG_FILE, serverId, "false" });
             } catch (Exception e) {
                 System.err.println("[TEST] Error starting replica " + serverId);
                 e.printStackTrace();

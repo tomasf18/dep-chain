@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -25,9 +25,32 @@ import ist.depchain.core.blockchain.BlockChainBlock;
 import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 
+/**
+ * End-to-end integration tests for ERC-20 token operations through the full
+ * stack, including client submission, mempool handling, block proposal,
+ * consensus,
+ * execution and state convergence across replicas.
+ *
+ * Tests include:
+ * 1. Balance queries and transfers between two clients, ensuring correct token
+ * balances and state convergence.
+ * 2. Allowance lifecycle (increase, transferFrom, decrease) with correct state
+ * updates.
+ * 3. Reverting allowance decrease does not change allowance and state
+ * converges.
+ * 4. Balance queries do not mutate state and replicas converge.
+ * 5. Transfer produces identical receipts and state hashes across replicas.
+ * 6. Unsafe approve replacement is rejected and allowance stays at remaining
+ * amount.
+ *
+ * All tests involve starting multiple replicas in separate threads, submitting
+ * transactions from client libraries and waiting for state convergence with
+ * timeouts.
+ */
+
 class Erc20HotStuffTest {
     private static final String CONFIG_FILE = "../config/config-dev.json";
-    private static final String[] REPLICAS = {"s0", "s1", "s2", "s3"};
+    private static final String[] REPLICAS = { "s0", "s1", "s2", "s3" };
 
     private static final BigInteger QUERY_GAS_PRICE = BigInteger.ONE;
     private static final BigInteger QUERY_GAS_LIMIT = BigInteger.valueOf(100_000);
@@ -88,8 +111,10 @@ class Erc20HotStuffTest {
         client1Context.setRequestId((int) requestBase);
         client2Context.setRequestId((int) (requestBase + 500));
 
-        client1Context.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client1Address));
-        client2Context.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client2Address));
+        client1Context
+                .setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client1Address));
+        client2Context
+                .setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client2Address));
 
         client1Context.start();
         client2Context.start();
@@ -120,10 +145,10 @@ class Erc20HotStuffTest {
                 TOKEN_INITIAL_SUPPLY,
                 BigInteger.ZERO,
                 BigInteger.ZERO,
-                TimeUnit.SECONDS.toMillis(120)
-        );
+                TimeUnit.SECONDS.toMillis(120));
 
-        client1Library.submitTokenTransfer(client2Address.toHexString(), TOKEN_TRANSFER_AMOUNT, QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
+        client1Library.submitTokenTransfer(client2Address.toHexString(), TOKEN_TRANSFER_AMOUNT, QUERY_GAS_PRICE,
+                QUERY_GAS_LIMIT);
 
         waitForReplicaState(
                 client1Address,
@@ -131,8 +156,7 @@ class Erc20HotStuffTest {
                 TOKEN_INITIAL_SUPPLY.subtract(TOKEN_TRANSFER_AMOUNT),
                 TOKEN_TRANSFER_AMOUNT,
                 BigInteger.ZERO,
-                TimeUnit.SECONDS.toMillis(120)
-        );
+                TimeUnit.SECONDS.toMillis(120));
     }
 
     @Test
@@ -140,29 +164,30 @@ class Erc20HotStuffTest {
         Address owner = client1Context.getSelfAddress();
         Address spender = client2Context.getSelfAddress();
 
-        client1Library.submitIncreaseAllowance(spender.toHexString(), ALLOWANCE_AMOUNT, QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
+        client1Library.submitIncreaseAllowance(spender.toHexString(), ALLOWANCE_AMOUNT, QUERY_GAS_PRICE,
+                QUERY_GAS_LIMIT);
 
         waitForReplicaState(
                 owner,
                 spender,
-            TOKEN_INITIAL_SUPPLY,
-            BigInteger.ZERO,
-            ALLOWANCE_AMOUNT,
-                TimeUnit.SECONDS.toMillis(120)
-        );
+                TOKEN_INITIAL_SUPPLY,
+                BigInteger.ZERO,
+                ALLOWANCE_AMOUNT,
+                TimeUnit.SECONDS.toMillis(120));
 
-        client2Library.submitTransferFrom(owner.toHexString(), spender.toHexString(), TRANSFER_FROM_AMOUNT, QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
+        client2Library.submitTransferFrom(owner.toHexString(), spender.toHexString(), TRANSFER_FROM_AMOUNT,
+                QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
 
         waitForReplicaState(
                 owner,
                 spender,
-            TOKEN_INITIAL_SUPPLY.subtract(TRANSFER_FROM_AMOUNT),
-            TRANSFER_FROM_AMOUNT,
-            ALLOWANCE_AMOUNT.subtract(TRANSFER_FROM_AMOUNT),
-                TimeUnit.SECONDS.toMillis(120)
-        );
+                TOKEN_INITIAL_SUPPLY.subtract(TRANSFER_FROM_AMOUNT),
+                TRANSFER_FROM_AMOUNT,
+                ALLOWANCE_AMOUNT.subtract(TRANSFER_FROM_AMOUNT),
+                TimeUnit.SECONDS.toMillis(120));
 
-        client1Library.submitDecreaseAllowance(spender.toHexString(), DECREASE_AMOUNT, QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
+        client1Library.submitDecreaseAllowance(spender.toHexString(), DECREASE_AMOUNT, QUERY_GAS_PRICE,
+                QUERY_GAS_LIMIT);
 
         waitForReplicaState(
                 owner,
@@ -170,65 +195,64 @@ class Erc20HotStuffTest {
                 TOKEN_INITIAL_SUPPLY.subtract(TRANSFER_FROM_AMOUNT),
                 TRANSFER_FROM_AMOUNT,
                 ALLOWANCE_AMOUNT.subtract(TRANSFER_FROM_AMOUNT).subtract(DECREASE_AMOUNT),
-                TimeUnit.SECONDS.toMillis(120)
-        );
+                TimeUnit.SECONDS.toMillis(120));
     }
 
-            @Test
-            void erc20RevertingAllowanceDecreaseConvergesWithIdenticalStateHashes() {
-            Address owner = client1Context.getSelfAddress();
-            Address spender = client2Context.getSelfAddress();
+    @Test
+    void erc20RevertingAllowanceDecreaseConvergesWithIdenticalStateHashes() {
+        Address owner = client1Context.getSelfAddress();
+        Address spender = client2Context.getSelfAddress();
 
-            client1Library.submitIncreaseAllowance(spender.toHexString(), ALLOWANCE_AMOUNT, QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
+        client1Library.submitIncreaseAllowance(spender.toHexString(), ALLOWANCE_AMOUNT, QUERY_GAS_PRICE,
+                QUERY_GAS_LIMIT);
 
-            waitForReplicaState(
+        waitForReplicaState(
                 owner,
                 spender,
                 TOKEN_INITIAL_SUPPLY,
                 BigInteger.ZERO,
                 ALLOWANCE_AMOUNT,
-                TimeUnit.SECONDS.toMillis(120)
-            );
+                TimeUnit.SECONDS.toMillis(120));
 
-            client1Library.submitDecreaseAllowance(spender.toHexString(), ALLOWANCE_AMOUNT.add(BigInteger.ONE), QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
+        client1Library.submitDecreaseAllowance(spender.toHexString(), ALLOWANCE_AMOUNT.add(BigInteger.ONE),
+                QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
 
-            waitForReplicaState(
+        waitForReplicaState(
                 owner,
                 spender,
                 TOKEN_INITIAL_SUPPLY,
                 BigInteger.ZERO,
                 ALLOWANCE_AMOUNT,
-                TimeUnit.SECONDS.toMillis(120)
-            );
+                TimeUnit.SECONDS.toMillis(120));
 
-            assertReplicaStateHashesMatch();
-            }
+        assertReplicaStateHashesMatch();
+    }
 
-            @Test
-            void erc20BalanceQueryLeavesStateUnchangedAcrossReplicas() {
-            Address owner = client1Context.getSelfAddress();
-            Address spender = client2Context.getSelfAddress();
+    @Test
+    void erc20BalanceQueryLeavesStateUnchangedAcrossReplicas() {
+        Address owner = client1Context.getSelfAddress();
+        Address spender = client2Context.getSelfAddress();
 
-            client1Library.submitTokenBalanceCheck();
+        client1Library.submitTokenBalanceCheck();
 
-            waitForReplicaState(
+        waitForReplicaState(
                 owner,
                 spender,
                 TOKEN_INITIAL_SUPPLY,
                 BigInteger.ZERO,
                 BigInteger.ZERO,
-                TimeUnit.SECONDS.toMillis(120)
-            );
+                TimeUnit.SECONDS.toMillis(120));
 
-            assertReplicaStateHashesMatch();
-            }
+        assertReplicaStateHashesMatch();
+    }
 
     @Test
     void unsafeApproveReplacementIsRejectedAndAllowanceStaysAtRemainingAmount() {
         Address owner = client1Context.getSelfAddress();
         Address spender = client2Context.getSelfAddress();
 
-        client1Library.submitIncreaseAllowance(spender.toHexString(), ALLOWANCE_AMOUNT, QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
+        client1Library.submitIncreaseAllowance(spender.toHexString(), ALLOWANCE_AMOUNT, QUERY_GAS_PRICE,
+                QUERY_GAS_LIMIT);
 
         waitForReplicaState(
                 owner,
@@ -236,21 +260,10 @@ class Erc20HotStuffTest {
                 TOKEN_INITIAL_SUPPLY,
                 BigInteger.ZERO,
                 ALLOWANCE_AMOUNT,
-                TimeUnit.SECONDS.toMillis(120)
-        );
+                TimeUnit.SECONDS.toMillis(120));
 
-        client2Library.submitTransferFrom(owner.toHexString(), spender.toHexString(), TRANSFER_FROM_AMOUNT, QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
-
-        waitForReplicaState(
-                owner,
-                spender,
-                TOKEN_INITIAL_SUPPLY.subtract(TRANSFER_FROM_AMOUNT),
-                TRANSFER_FROM_AMOUNT,
-                ALLOWANCE_AMOUNT.subtract(TRANSFER_FROM_AMOUNT),
-                TimeUnit.SECONDS.toMillis(120)
-        );
-
-        client1Library.submitApprove(spender.toHexString(), REPLACEMENT_APPROVAL_AMOUNT, QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
+        client2Library.submitTransferFrom(owner.toHexString(), spender.toHexString(), TRANSFER_FROM_AMOUNT,
+                QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
 
         waitForReplicaState(
                 owner,
@@ -258,8 +271,18 @@ class Erc20HotStuffTest {
                 TOKEN_INITIAL_SUPPLY.subtract(TRANSFER_FROM_AMOUNT),
                 TRANSFER_FROM_AMOUNT,
                 ALLOWANCE_AMOUNT.subtract(TRANSFER_FROM_AMOUNT),
-                TimeUnit.SECONDS.toMillis(120)
-        );
+                TimeUnit.SECONDS.toMillis(120));
+
+        client1Library.submitApprove(spender.toHexString(), REPLACEMENT_APPROVAL_AMOUNT, QUERY_GAS_PRICE,
+                QUERY_GAS_LIMIT);
+
+        waitForReplicaState(
+                owner,
+                spender,
+                TOKEN_INITIAL_SUPPLY.subtract(TRANSFER_FROM_AMOUNT),
+                TRANSFER_FROM_AMOUNT,
+                ALLOWANCE_AMOUNT.subtract(TRANSFER_FROM_AMOUNT),
+                TimeUnit.SECONDS.toMillis(120));
     }
 
     @Test
@@ -267,7 +290,8 @@ class Erc20HotStuffTest {
         Address client1Address = client1Context.getSelfAddress();
         Address client2Address = client2Context.getSelfAddress();
 
-        client1Library.submitTokenTransfer(client2Address.toHexString(), TOKEN_TRANSFER_AMOUNT, QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
+        client1Library.submitTokenTransfer(client2Address.toHexString(), TOKEN_TRANSFER_AMOUNT, QUERY_GAS_PRICE,
+                QUERY_GAS_LIMIT);
 
         waitForReplicaState(
                 client1Address,
@@ -275,8 +299,7 @@ class Erc20HotStuffTest {
                 TOKEN_INITIAL_SUPPLY.subtract(TOKEN_TRANSFER_AMOUNT),
                 TOKEN_TRANSFER_AMOUNT,
                 BigInteger.ZERO,
-                TimeUnit.SECONDS.toMillis(120)
-        );
+                TimeUnit.SECONDS.toMillis(120));
 
         assertLatestBlocksEquivalentAcrossReplicas();
     }
@@ -286,7 +309,8 @@ class Erc20HotStuffTest {
         Address owner = client1Context.getSelfAddress();
         Address spender = client2Context.getSelfAddress();
 
-        client1Library.submitIncreaseAllowance(spender.toHexString(), ALLOWANCE_AMOUNT, QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
+        client1Library.submitIncreaseAllowance(spender.toHexString(), ALLOWANCE_AMOUNT, QUERY_GAS_PRICE,
+                QUERY_GAS_LIMIT);
 
         waitForReplicaState(
                 owner,
@@ -294,21 +318,10 @@ class Erc20HotStuffTest {
                 TOKEN_INITIAL_SUPPLY,
                 BigInteger.ZERO,
                 ALLOWANCE_AMOUNT,
-                TimeUnit.SECONDS.toMillis(120)
-        );
+                TimeUnit.SECONDS.toMillis(120));
 
-        client2Library.submitTransferFrom(owner.toHexString(), spender.toHexString(), ALLOWANCE_AMOUNT, QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
-
-        waitForReplicaState(
-                owner,
-                spender,
-                TOKEN_INITIAL_SUPPLY.subtract(ALLOWANCE_AMOUNT),
-                ALLOWANCE_AMOUNT,
-                BigInteger.ZERO,
-                TimeUnit.SECONDS.toMillis(120)
-        );
-
-        client1Library.submitDecreaseAllowance(spender.toHexString(), BigInteger.valueOf(50), QUERY_GAS_PRICE, QUERY_GAS_LIMIT);
+        client2Library.submitTransferFrom(owner.toHexString(), spender.toHexString(), ALLOWANCE_AMOUNT, QUERY_GAS_PRICE,
+                QUERY_GAS_LIMIT);
 
         waitForReplicaState(
                 owner,
@@ -316,14 +329,24 @@ class Erc20HotStuffTest {
                 TOKEN_INITIAL_SUPPLY.subtract(ALLOWANCE_AMOUNT),
                 ALLOWANCE_AMOUNT,
                 BigInteger.ZERO,
-                TimeUnit.SECONDS.toMillis(120)
-        );
+                TimeUnit.SECONDS.toMillis(120));
+
+        client1Library.submitDecreaseAllowance(spender.toHexString(), BigInteger.valueOf(50), QUERY_GAS_PRICE,
+                QUERY_GAS_LIMIT);
+
+        waitForReplicaState(
+                owner,
+                spender,
+                TOKEN_INITIAL_SUPPLY.subtract(ALLOWANCE_AMOUNT),
+                ALLOWANCE_AMOUNT,
+                BigInteger.ZERO,
+                TimeUnit.SECONDS.toMillis(120));
     }
 
     private static void startReplica(String serverId) {
         Thread t = new Thread(() -> {
             try {
-                ServerApp.main(new String[]{CONFIG_FILE, serverId, "false"});
+                ServerApp.main(new String[] { CONFIG_FILE, serverId, "false" });
             } catch (Exception e) {
                 System.err.println("[TEST] Error starting replica " + serverId);
                 e.printStackTrace();
@@ -350,11 +373,11 @@ class Erc20HotStuffTest {
     }
 
     private static void waitForReplicaState(Address owner,
-                                            Address spender,
-                                            BigInteger expectedOwnerToken,
-                                            BigInteger expectedSpenderToken,
-                                            BigInteger expectedAllowance,
-                                            long timeoutMs) {
+            Address spender,
+            BigInteger expectedOwnerToken,
+            BigInteger expectedSpenderToken,
+            BigInteger expectedAllowance,
+            long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
             boolean allMatch = true;
@@ -397,14 +420,16 @@ class Erc20HotStuffTest {
         return ws.getStorageValue(contractAddress, balanceSlot(owner)).toBigInteger();
     }
 
-    private static BigInteger tokenAllowanceOf(DepChainWorldState ws, Address contractAddress, Address owner, Address spender) {
+    private static BigInteger tokenAllowanceOf(DepChainWorldState ws, Address contractAddress, Address owner,
+            Address spender) {
         return ws.getStorageValue(contractAddress, allowanceSlot(owner, spender)).toBigInteger();
     }
 
     private static void assertReplicaStateHashesMatch() {
         String referenceHash = null;
         for (String replicaId : REPLICAS) {
-            String stateHash = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState().computeStateHash();
+            String stateHash = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState()
+                    .computeStateHash();
             if (referenceHash == null) {
                 referenceHash = stateHash;
             } else {
@@ -419,7 +444,8 @@ class Erc20HotStuffTest {
         List<TransactionReceipt> referenceReceipts = null;
 
         for (String replicaId : REPLICAS) {
-            BlockChainBlock latestBlock = ServerApp.getCoordinator(replicaId).getServerContext().getBlockChain().getLatestBlock();
+            BlockChainBlock latestBlock = ServerApp.getCoordinator(replicaId).getServerContext().getBlockChain()
+                    .getLatestBlock();
             if (referenceBlockHash == null) {
                 referenceBlockHash = latestBlock.getBlockHash();
                 referenceStateHash = latestBlock.getStateHash();
@@ -429,7 +455,8 @@ class Erc20HotStuffTest {
 
             assertEquals(referenceBlockHash, latestBlock.getBlockHash(), "Block hash mismatch on " + replicaId);
             assertEquals(referenceStateHash, latestBlock.getStateHash(), "State hash mismatch on " + replicaId);
-            assertEquals(referenceReceipts.size(), latestBlock.getReceipts().size(), "Receipt count mismatch on " + replicaId);
+            assertEquals(referenceReceipts.size(), latestBlock.getReceipts().size(),
+                    "Receipt count mismatch on " + replicaId);
 
             for (int i = 0; i < referenceReceipts.size(); i++) {
                 TransactionReceipt expected = referenceReceipts.get(i);
@@ -439,8 +466,10 @@ class Erc20HotStuffTest {
                 assertEquals(expected.getFee(), actual.getFee(), "Receipt fee mismatch on " + replicaId);
                 assertEquals(expected.getError(), actual.getError(), "Receipt error mismatch on " + replicaId);
                 assertArrayEquals(expected.getTxHash(), actual.getTxHash(), "Receipt txHash mismatch on " + replicaId);
-                assertArrayEquals(expected.getReturnData(), actual.getReturnData(), "Receipt returnData mismatch on " + replicaId);
-                assertEquals(expected.getContractAddress(), actual.getContractAddress(), "Receipt contractAddress mismatch on " + replicaId);
+                assertArrayEquals(expected.getReturnData(), actual.getReturnData(),
+                        "Receipt returnData mismatch on " + replicaId);
+                assertEquals(expected.getContractAddress(), actual.getContractAddress(),
+                        "Receipt contractAddress mismatch on " + replicaId);
             }
         }
     }

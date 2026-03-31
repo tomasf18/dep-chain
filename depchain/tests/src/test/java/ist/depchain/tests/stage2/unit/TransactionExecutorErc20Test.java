@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,13 +22,29 @@ import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.blockchain.EvmService;
 
+/**
+ * Unit tests for TransactionExecutor with ERC-20 contract interactions.
+ *
+ * Covers:
+ * 1. Successful ERC-20 transfer and allowance operations, with correct token
+ * balance updates and native gas fee deductions.
+ * 2. Gas refunding when actual usage is below the user-specified limit.
+ * 3. Revert behavior when out of gas or when contract conditions are not met
+ * (e.g., insufficient balance, allowance issues), ensuring state is not
+ * mutated but gas fees are still charged.
+ *
+ * The tests deploy a simple ERC-20 contract into the world state and then
+ * execute transactions against it, verifying both the resulting state and the
+ * transaction receipts for correctness.
+ *
+ * No network, keys, or consensus required - tests run against the world state.
+ */
 class TransactionExecutorErc20Test {
 
     private static final BigInteger INITIAL_NATIVE_BALANCE = new BigInteger("1000000000");
     private static final BigInteger GAS_PRICE = BigInteger.ONE;
     private static final BigInteger GAS_LIMIT = new BigInteger("100000");
-    private static final Address CONTRACT_ADDRESS =
-            Address.fromHexString("0x9999999999999999999999999999999999999999");
+    private static final Address CONTRACT_ADDRESS = Address.fromHexString("0x9999999999999999999999999999999999999999");
     private static final String SIG_ALGO = "SHA256withECDSA";
 
     private DepChainWorldState worldState;

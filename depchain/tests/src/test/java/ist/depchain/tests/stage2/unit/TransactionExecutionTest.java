@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -13,11 +13,12 @@ import ist.depchain.common.utils.ClientResponseCodec;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
+import ist.depchain.tests.stage2.Stage2GasConstants;
 
 /**
- * Unit tests for TransactionExecutor (Step 3).
- * Covers native DepCoin transfers, gas accounting, edge cases, and failure modes.
- * No network, keys, or consensus required - tests run against an in-memory world state.
+ * Unit tests for TransactionExecutor.
+ * Covers native DepCoin transfers, gas accounting, edge cases and failure modes.
+ * No network, keys, or consensus required - tests run against the world state.
  */
 class TransactionExecutionTest {
 

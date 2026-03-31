@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.integration;
 
 import ist.depchain.client.ClientContext;
 import ist.depchain.client.ClientLibrary;
@@ -7,6 +7,7 @@ import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
+import ist.depchain.tests.stage2.Stage2GasConstants;
 
 import org.hyperledger.besu.datatypes.Address;
 import org.junit.jupiter.api.AfterEach;
@@ -32,13 +33,15 @@ import static org.junit.jupiter.api.Assertions.*;
  * transfer amounts relative to it, so it is independent of genesis values.
  *
  * Scenario (with actual genesis balance B for client1):
- *   - Transfer 1: (B - 163_000) to client2 -> succeeds (remaining = 100_000 after gas)
- *   - Transfer 2: 50_000 to client2        -> fails    (needs 113_000 but only 100_000 left)
+ * - Transfer 1: (B - 163_000) to client2 -> succeeds (remaining = 100_000 after
+ * gas)
+ * - Transfer 2: 50_000 to client2 -> fails (needs 113_000 but only 100_000
+ * left)
  */
 class InsufficientBalanceAfterTransferTest {
 
     private static final String CONFIG_FILE = "../config/config-dev.json";
-    private static final String[] REPLICAS = {"s0", "s1", "s2", "s3"};
+    private static final String[] REPLICAS = { "s0", "s1", "s2", "s3" };
 
     private static final String CLIENT2_ADDR = "0x172bf398d2a931323199521625f471fb1c28879a";
 
@@ -46,7 +49,7 @@ class InsufficientBalanceAfterTransferTest {
     // min_fee_threshold (63_000) so the block is proposed immediately.
     private static final BigInteger GAS_PRICE = BigInteger.valueOf(3);
     private static final BigInteger GAS_LIMIT = BigInteger.valueOf(21_000);
-    private static final BigInteger GAS_FEE   = GAS_PRICE.multiply(Stage2GasConstants.NATIVE_TRANSFER_GAS_COST); // 60_000
+    private static final BigInteger GAS_FEE = GAS_PRICE.multiply(Stage2GasConstants.NATIVE_TRANSFER_GAS_COST); // 60_000
 
     private ClientContext clientContext;
     private MessageHandler messageHandler;
@@ -90,7 +93,8 @@ class InsufficientBalanceAfterTransferTest {
 
         long requestBase = ServerApp.getCoordinator("s0").getServerContext().getBlockChain().getHeight() * 1000L;
         clientContext.setRequestId((int) requestBase);
-        clientContext.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(clientAddress));
+        clientContext
+                .setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(clientAddress));
 
         clientContext.start();
     }
@@ -127,7 +131,8 @@ class InsufficientBalanceAfterTransferTest {
         BigInteger firstTransfer = initialSenderBalance.subtract(reserve);
         assertTrue(firstTransfer.signum() > 0, "sender balance too low for this test");
 
-        // Second transfer: 50_000 -> needs 50_000 + 60_000 = 110_000 > 100_000 remaining
+        // Second transfer: 50_000 -> needs 50_000 + 60_000 = 110_000 > 100_000
+        // remaining
         BigInteger secondTransfer = BigInteger.valueOf(50_000);
 
         // --- First transfer (should succeed) ---
@@ -147,7 +152,7 @@ class InsufficientBalanceAfterTransferTest {
         // --- Expected state: only first transfer committed ---
         BigInteger expectedSenderBalance = initialSenderBalance
                 .subtract(firstTransfer)
-                .subtract(GAS_FEE);  // 50_000 - 20_000 = 30_000
+                .subtract(GAS_FEE); // 50_000 - 20_000 = 30_000
         BigInteger expectedReceiverBalance = initialReceiverBalance
                 .add(firstTransfer);
 
@@ -181,7 +186,7 @@ class InsufficientBalanceAfterTransferTest {
     private static void startReplica(String serverId) {
         Thread t = new Thread(() -> {
             try {
-                ServerApp.main(new String[]{CONFIG_FILE, serverId, "false"});
+                ServerApp.main(new String[] { CONFIG_FILE, serverId, "false" });
             } catch (Exception e) {
                 System.err.println("[TEST] Error starting replica " + serverId);
                 e.printStackTrace();
@@ -208,9 +213,9 @@ class InsufficientBalanceAfterTransferTest {
     }
 
     private void waitForReplicaConvergence(Address sender, Address receiver,
-                                           BigInteger expectedSenderBalance,
-                                           BigInteger expectedReceiverBalance,
-                                           long timeoutMs) {
+            BigInteger expectedSenderBalance,
+            BigInteger expectedReceiverBalance,
+            long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
             boolean allMatch = true;

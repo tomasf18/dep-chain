@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -24,11 +24,13 @@ import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.hotstuff.CommandMempool;
+import ist.depchain.tests.stage2.Stage2GasConstants;
 
 /**
- * Unit tests for Step 5: Consensus Integration.
- * Tests mempool batching, multi-tx block building through the protobuf pipeline,
- * deterministic execution, receipt mapping, and blockchain persistence.
+ * Unit tests for Consensus Integration.
+ * Tests mempool batching, multi-tx block building through the protobuf
+ * pipeline, deterministic execution, receipt mapping, and blockchain
+ * persistence.
  * No network, keys, BLS, or running consensus required.
  */
 class ConsensusIntegrationTest {
@@ -103,7 +105,8 @@ class ConsensusIntegrationTest {
         mempool.enqueue(makeClientRequest("c1", 1));
         mempool.drainBatch(1);
 
-        // Re-enqueue the same key - should succeed since drainBatch removed the dedup key
+        // Re-enqueue the same key - should succeed since drainBatch removed the dedup
+        // key
         mempool.enqueue(makeClientRequest("c1", 1));
         assertFalse(mempool.isEmpty());
     }
@@ -142,7 +145,7 @@ class ConsensusIntegrationTest {
     void contractDeploymentProtoRoundTrip() {
         Transaction deploy = new Transaction(
                 ALICE, null, BigInteger.ZERO,
-                new byte[]{0x60, 0x60, 0x60, 0x40}, // dummy bytecode
+                new byte[] { 0x60, 0x60, 0x60, 0x40 }, // dummy bytecode
                 BigInteger.ONE, BigInteger.valueOf(100_000), 0, null);
         TransactionPayload proto = deploy.toProto();
         Transaction restored = Transaction.fromProto(proto);
@@ -187,8 +190,8 @@ class ConsensusIntegrationTest {
         ws.createEOA(BOB, 0, BigInteger.valueOf(10_000_000));
 
         // Different fees to test ordering
-        Transaction txLow = tx(ALICE, CAROL, 100, 1, 21_000, 0);   // fee = 21_000
-        Transaction txHigh = tx(BOB, CAROL, 200, 10, 21_000, 0);    // fee = 210_000
+        Transaction txLow = tx(ALICE, CAROL, 100, 1, 21_000, 0); // fee = 21_000
+        Transaction txHigh = tx(BOB, CAROL, 200, 10, 21_000, 0); // fee = 210_000
 
         BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
         BlockChainBlock block = BlockBuilder.build(List.of(txLow, txHigh), genesis, PROPOSER);
@@ -255,15 +258,14 @@ class ConsensusIntegrationTest {
         ws.createEOA(BOB, 0, BigInteger.valueOf(10_000_000));
 
         // Create txs in "wrong" order (low fee first) - BlockBuilder will reorder
-        Transaction txFromAlice = tx(ALICE, CAROL, 100, 1, 21_000, 0);  // fee = 21_000
-        Transaction txFromBob = tx(BOB, CAROL, 200, 5, 21_000, 0);      // fee = 105_000
+        Transaction txFromAlice = tx(ALICE, CAROL, 100, 1, 21_000, 0); // fee = 21_000
+        Transaction txFromBob = tx(BOB, CAROL, 200, 5, 21_000, 0); // fee = 105_000
 
         // Original order as submitted by clients (matches request_meta order)
         List<Transaction> originalOrder = List.of(txFromAlice, txFromBob);
         List<ClientRequestMeta> metaList = List.of(
                 ClientRequestMeta.newBuilder().setClientId("clientA").setRequestId(1).build(),
-                ClientRequestMeta.newBuilder().setClientId("clientB").setRequestId(2).build()
-        );
+                ClientRequestMeta.newBuilder().setClientId("clientB").setRequestId(2).build());
 
         BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
         BlockChainBlock block = BlockBuilder.build(originalOrder, genesis, PROPOSER);
@@ -373,7 +375,7 @@ class ConsensusIntegrationTest {
         ws.createEOA(BOB, 0, BigInteger.valueOf(10_000_000));
 
         Transaction tx1 = tx(ALICE, CAROL, 100, 1, 21_000, 0); // fee = 20_000
-        Transaction tx2 = tx(BOB, CAROL, 200, 3, 21_000, 0);   // fee = 60_000
+        Transaction tx2 = tx(BOB, CAROL, 200, 3, 21_000, 0); // fee = 60_000
 
         BlockChainBlock genesis = new BlockChainBlock("genesis", null, List.of(), 0);
         BlockChainBlock block = BlockBuilder.build(List.of(tx1, tx2), genesis, PROPOSER);
@@ -390,7 +392,8 @@ class ConsensusIntegrationTest {
     @Test
     void transactionsFailWhenBalanceExhaustedMidBlock() {
         // Alice has enough for the first two txs but not the third.
-        // Fee ordering guarantees: tx0 (fee=60_000) → tx1 (fee=40_000) → tx2 (fee=20_000)
+        // Fee ordering guarantees: tx0 (fee=60_000) -> tx1 (fee=40_000) -> tx2
+        // (fee=20_000)
         ws.createEOA(ALICE, 0, BigInteger.valueOf(150_000));
 
         Transaction tx0 = tx(ALICE, BOB, 10_000, 3, 21_000, 0); // upfront = 10_000 + 63_000 = 73_000
@@ -412,8 +415,8 @@ class ConsensusIntegrationTest {
         }
 
         // After tx0: 150_000 - 73_000 + 3_000 refund = 80_000 remaining
-        // After tx1: 80_000  - 52_000 + 2_000 refund = 30_000 remaining
-        // tx2 needs 31_000 > 30_000 → fails
+        // After tx1: 80_000 - 52_000 + 2_000 refund = 30_000 remaining
+        // tx2 needs 31_000 > 30_000 -> fails
         assertTrue(receipts.get(0).isSuccess());
         assertTrue(receipts.get(1).isSuccess());
         assertFalse(receipts.get(2).isSuccess());
@@ -428,7 +431,7 @@ class ConsensusIntegrationTest {
     // ========== Helpers ==========
 
     private static Transaction tx(Address from, Address to, long value,
-                                   long gasPrice, long gasLimit, long nonce) {
+            long gasPrice, long gasLimit, long nonce) {
         return new Transaction(from, to, BigInteger.valueOf(value), new byte[0],
                 BigInteger.valueOf(gasPrice), BigInteger.valueOf(gasLimit), nonce, null);
     }
@@ -436,8 +439,7 @@ class ConsensusIntegrationTest {
     private static ClientRequest makeClientRequest(String clientId, int requestId) {
         TransactionPayload txPayload = new Transaction(
                 ALICE, BOB, BigInteger.valueOf(100), new byte[0],
-                GAS_PRICE, GAS_LIMIT, requestId, null
-        ).toProto();
+                GAS_PRICE, GAS_LIMIT, requestId, null).toProto();
 
         return ClientRequest.newBuilder()
                 .setClientId(clientId)

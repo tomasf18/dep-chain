@@ -11,7 +11,6 @@ import org.web3j.utils.Numeric;
 import ist.depchain.common.ClientResponse;
 
 public final class ClientResponseCodec {
-    public static final String NATIVE_BALANCE_COMMAND = "GET_NATIVE_BALANCE";
     private static final String NATIVE_BALANCE_PREFIX = "native.balanceOf(";
     private static final String TOKEN_BALANCE_PREFIX = "erc20.balanceOf(";
 

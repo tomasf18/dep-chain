@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.integration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -37,10 +37,26 @@ import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
+import ist.depchain.tests.stage2.Stage2GasConstants;
 
+/**
+ * Scenario: test that consensus and execution correctly
+ * handle client queries and responses during in-flight consensus rounds, and
+ * that timeouts during execution do not cause safety violations or duplicate
+ * commits.
+ * 
+ * Tests:
+ * 1. During a blocked execution on some replicas, clients can still query other
+ * replicas and receive consistent responses based on the last committed state 
+ * (this means that queries are not blocked by in-flight consensus rounds, and that they 
+ * reflect the last committed state, not the pending state of the blocked execution).
+ * 2. If the leader experiences a timeout during execution and triggers a view
+ * change, the system should not execute more than one block for the same proposal,
+ * preventing any safety violations or duplicate commits.
+ */
 class ConsensusRaceProtectionTest {
     private static final String CONFIG_FILE = "../config/config-dev.json";
-    private static final String[] REPLICAS = {"s0", "s1", "s2", "s3"};
+    private static final String[] REPLICAS = { "s0", "s1", "s2", "s3" };
 
     private static final BigInteger TRANSFER_GAS_PRICE = BigInteger.valueOf(3);
     private static final BigInteger TRANSFER_GAS_LIMIT = BigInteger.valueOf(21_000);
@@ -95,8 +111,10 @@ class ConsensusRaceProtectionTest {
         client1Context.setRequestId((int) requestBase);
         client2Context.setRequestId((int) (requestBase + 500));
 
-        client1Context.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client1Address));
-        client2Context.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client2Address));
+        client1Context
+                .setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client1Address));
+        client2Context
+                .setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client2Address));
 
         client1Context.start();
         client2Context.start();
@@ -128,16 +146,20 @@ class ConsensusRaceProtectionTest {
             Address receiver = client2Context.getSelfAddress();
 
             BigInteger senderBefore = blockedReplicaA.getServerContext().getWorldState().getBalance(sender);
-            BigInteger expectedSenderAfterTransfer = senderBefore.subtract(TRANSFER_VALUE).subtract(TRANSFER_GAS_PRICE.multiply(TRANSFER_GAS_USED));
+            BigInteger expectedSenderAfterTransfer = senderBefore.subtract(TRANSFER_VALUE)
+                    .subtract(TRANSFER_GAS_PRICE.multiply(TRANSFER_GAS_USED));
 
-            client1Library.submitNativeTransfer(receiver.toHexString(), TRANSFER_VALUE, TRANSFER_GAS_PRICE, TRANSFER_GAS_LIMIT);
+            client1Library.submitNativeTransfer(receiver.toHexString(), TRANSFER_VALUE, TRANSFER_GAS_PRICE,
+                    TRANSFER_GAS_LIMIT);
 
-            assertTrue(executionStarted.await(60, TimeUnit.SECONDS), "timed out waiting for both blocked replicas to enter execution");
+            assertTrue(executionStarted.await(60, TimeUnit.SECONDS),
+                    "timed out waiting for both blocked replicas to enter execution");
 
             waitForReplicaBalance("s1", sender, expectedSenderAfterTransfer, TimeUnit.SECONDS.toMillis(120));
             waitForReplicaBalance("s2", sender, expectedSenderAfterTransfer, TimeUnit.SECONDS.toMillis(120));
 
-            submitNativeBalanceQuery(client2Context, client2Handler, receiver, "native.balanceOf(" + receiver.toHexString() + ")");
+            submitNativeBalanceQuery(client2Context, client2Handler, receiver,
+                    "native.balanceOf(" + receiver.toHexString() + ")");
 
             releaseExecution.countDown();
             LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(2));
@@ -160,12 +182,15 @@ class ConsensusRaceProtectionTest {
             BasicHotStuffCoordinator witnessReplica = ServerApp.getCoordinator("s2");
             BigInteger senderBefore = witnessReplica.getServerContext().getWorldState().getBalance(sender);
             BigInteger receiverBefore = witnessReplica.getServerContext().getWorldState().getBalance(receiver);
-            BigInteger expectedSenderAfter = senderBefore.subtract(TRANSFER_VALUE).subtract(TRANSFER_GAS_PRICE.multiply(TRANSFER_GAS_USED));
+            BigInteger expectedSenderAfter = senderBefore.subtract(TRANSFER_VALUE)
+                    .subtract(TRANSFER_GAS_PRICE.multiply(TRANSFER_GAS_USED));
             BigInteger expectedReceiverAfter = receiverBefore.add(TRANSFER_VALUE);
 
-            client1Library.submitNativeTransfer(receiver.toHexString(), TRANSFER_VALUE, TRANSFER_GAS_PRICE, TRANSFER_GAS_LIMIT);
+            client1Library.submitNativeTransfer(receiver.toHexString(), TRANSFER_VALUE, TRANSFER_GAS_PRICE,
+                    TRANSFER_GAS_LIMIT);
 
-            assertTrue(executionStarted.await(60, TimeUnit.SECONDS), "timed out waiting for the leader to start execution");
+            assertTrue(executionStarted.await(60, TimeUnit.SECONDS),
+                    "timed out waiting for the leader to start execution");
 
             leaderReplica.startNextView();
             releaseExecution.countDown();
@@ -173,34 +198,37 @@ class ConsensusRaceProtectionTest {
             waitForReplicaBalance("s2", sender, expectedSenderAfter, TimeUnit.SECONDS.toMillis(120));
             waitForReplicaBalance("s2", receiver, expectedReceiverAfter, TimeUnit.SECONDS.toMillis(120));
 
-            assertEquals(1, leaderReplica.getExecutedBlockIds().size(), "race must not execute more than one block on the leader");
+            assertEquals(1, leaderReplica.getExecutedBlockIds().size(),
+                    "race must not execute more than one block on the leader");
         } finally {
             releaseExecution.countDown();
         }
     }
 
-    private int submitNativeBalanceQuery(ClientContext context, MessageHandler handler, Address target, String description) throws Exception {
+    private int submitNativeBalanceQuery(ClientContext context, MessageHandler handler, Address target,
+            String description) throws Exception {
         int requestId = context.getRequestId().incrementAndGet();
 
         long nonce = context.getNonce();
         Transaction unsignedTx = Transaction.nativeBalanceQuery(
-            context.getSelfAddress(),
-            target,
-            TRANSFER_GAS_PRICE,
-            TRANSFER_GAS_LIMIT,
-            nonce,
-            null
-        );
+                context.getSelfAddress(),
+                target,
+                TRANSFER_GAS_PRICE,
+                TRANSFER_GAS_LIMIT,
+                nonce,
+                null);
 
-        Transaction signedTx = TransactionSigner.sign(unsignedTx, context.getPrivateKey(), context.getConfig().getSignatureAlgorithm());
+        Transaction signedTx = TransactionSigner.sign(unsignedTx, context.getPrivateKey(),
+                context.getConfig().getSignatureAlgorithm());
 
         ClientRequest unsignedRequest = ClientRequest.newBuilder()
-            .setClientId(context.getConfig().getSelfId())
-            .setRequestId(requestId)
-            .setTransaction(signedTx.toProto())
-            .build();
+                .setClientId(context.getConfig().getSelfId())
+                .setRequestId(requestId)
+                .setTransaction(signedTx.toProto())
+                .build();
 
-        ClientRequest signedRequest = signClientRequest(unsignedRequest, context.getPrivateKey(), context.getConfig().getSignatureAlgorithm());
+        ClientRequest signedRequest = signClientRequest(unsignedRequest, context.getPrivateKey(),
+                context.getConfig().getSignatureAlgorithm());
 
         handler.getPendingRequests().put(requestId, new ConcurrentHashMap<>());
         context.registerRequestInMap(requestId, description);
@@ -216,7 +244,8 @@ class ConsensusRaceProtectionTest {
         return requestId;
     }
 
-    private static ClientRequest signClientRequest(ClientRequest unsignedRequest, PrivateKey privateKey, String signatureAlgorithm) throws Exception {
+    private static ClientRequest signClientRequest(ClientRequest unsignedRequest, PrivateKey privateKey,
+            String signatureAlgorithm) throws Exception {
         byte[] signature = Crypto.sign(unsignedRequest.toByteArray(), privateKey, signatureAlgorithm);
         return ClientRequest.newBuilder(unsignedRequest)
                 .setSignature(ByteString.copyFrom(signature))
@@ -233,11 +262,14 @@ class ConsensusRaceProtectionTest {
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(100));
         }
 
-        BigInteger actualBalance = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState().getBalance(address);
-        fail("replica " + replicaId + " did not reach expected balance " + expectedBalance + "; actual=" + actualBalance);
+        BigInteger actualBalance = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState()
+                .getBalance(address);
+        fail("replica " + replicaId + " did not reach expected balance " + expectedBalance + "; actual="
+                + actualBalance);
     }
 
-    private void installBlockingExecutor(BasicHotStuffCoordinator coordinator, CountDownLatch executionStarted, CountDownLatch releaseExecution) {
+    private void installBlockingExecutor(BasicHotStuffCoordinator coordinator, CountDownLatch executionStarted,
+            CountDownLatch releaseExecution) {
         try {
             ServerContext serverContext = coordinator.getServerContext();
             Field field = ServerContext.class.getDeclaredField("transactionExecutor");
@@ -251,7 +283,7 @@ class ConsensusRaceProtectionTest {
     private static void startReplica(String serverId) {
         Thread t = new Thread(() -> {
             try {
-                ServerApp.main(new String[]{CONFIG_FILE, serverId, "false"});
+                ServerApp.main(new String[] { CONFIG_FILE, serverId, "false" });
             } catch (Exception e) {
                 System.err.println("[TEST] Error starting replica " + serverId);
                 e.printStackTrace();

@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -10,6 +10,10 @@ import org.junit.jupiter.api.Test;
 import ist.depchain.common.ClientResponse;
 import ist.depchain.common.utils.ClientResponseCodec;
 
+/**
+ * Unit tests for ClientResponseCodec, which handles encoding/decoding of client response data,
+ * especially for native balance snapshots and formatting committed responses.
+ */
 class ClientResponseCodecTest {
 
     @Test
@@ -46,8 +50,8 @@ class ClientResponseCodecTest {
 
     @Test
     void canonicalResponseIdDependsOnReturnData() {
-        ClientResponse responseA = baseResponse(new byte[] {0x01});
-        ClientResponse responseB = baseResponse(new byte[] {0x02});
+        ClientResponse responseA = baseResponse(new byte[] { 0x01 });
+        ClientResponse responseB = baseResponse(new byte[] { 0x02 });
 
         String idA = ClientResponseCodec.canonicalResponseId(responseA);
         String idB = ClientResponseCodec.canonicalResponseId(responseB);

@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,23 +28,22 @@ import ist.depchain.common.utils.TransactionSigner;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
+import ist.depchain.tests.stage2.Stage2GasConstants;
 
 /**
- * Double-spend prevention tests through full HotStuff consensus (TODO-TESTS §D).
- *
  * Guarantee: a client cannot spend the same funds twice.
  *
  * Tests:
- *   1. Two transactions with the same nonce to different receivers —
- *      only one can commit; the other is rejected as a duplicate nonce.
- *   2. Two sequential transactions whose combined value exceeds balance —
- *      only the first commits; the second fails at execution time.
- *   3. Same-nonce conflicting spends submitted rapidly —
- *      at most one commits across all replicas.
+ * 1. Two transactions with the same nonce to different receivers -
+ * only one can commit; the other is rejected as a duplicate nonce.
+ * 2. Two sequential transactions whose combined value exceeds balance -
+ * only the first commits; the second fails at execution time.
+ * 3. Same-nonce conflicting spends submitted rapidly -
+ * at most one commits across all replicas.
  */
 class DoubleSpendConsensusTest {
     private static final String CONFIG_FILE = "../config/config-dev.json";
-    private static final String[] REPLICAS = {"s0", "s1", "s2", "s3"};
+    private static final String[] REPLICAS = { "s0", "s1", "s2", "s3" };
 
     private static final BigInteger GAS_PRICE = BigInteger.valueOf(3);
     private static final BigInteger GAS_LIMIT = BigInteger.valueOf(21_000);
@@ -82,8 +81,10 @@ class DoubleSpendConsensusTest {
             } else {
                 ws.addBalance(sender, BigInteger.valueOf(10_000_000));
             }
-            if (!ws.accountExists(RECEIVER_A)) ws.createEOA(RECEIVER_A, 0, BigInteger.ZERO);
-            if (!ws.accountExists(RECEIVER_B)) ws.createEOA(RECEIVER_B, 0, BigInteger.ZERO);
+            if (!ws.accountExists(RECEIVER_A))
+                ws.createEOA(RECEIVER_A, 0, BigInteger.ZERO);
+            if (!ws.accountExists(RECEIVER_B))
+                ws.createEOA(RECEIVER_B, 0, BigInteger.ZERO);
         }
 
         long requestBase = ServerApp.getCoordinator("s0").getServerContext().getBlockChain().getHeight() * 1000L;
@@ -95,13 +96,14 @@ class DoubleSpendConsensusTest {
 
     @AfterEach
     void teardown() {
-        if (clientContext != null) clientContext.stop();
+        if (clientContext != null)
+            clientContext.stop();
         stopReplicas();
     }
 
     /**
      * Two transactions with the same nonce sent to different receivers.
-     * Only one can possibly commit — the duplicate nonce is rejected.
+     * Only one can possibly commit - the duplicate nonce is rejected.
      * Verifies that at most one receiver has a non-zero balance.
      */
     @Test
@@ -113,8 +115,10 @@ class DoubleSpendConsensusTest {
         ClientRequest reqA = buildSignedRequest(100, sender, RECEIVER_A, nonce);
         ClientRequest reqB = buildSignedRequest(101, sender, RECEIVER_B, nonce);
 
-        BigInteger initialReceiverABalance = ServerApp.getCoordinator("s0").getServerContext().getWorldState().getBalance(RECEIVER_A);
-        BigInteger initialReceiverBBalance = ServerApp.getCoordinator("s0").getServerContext().getWorldState().getBalance(RECEIVER_B);
+        BigInteger initialReceiverABalance = ServerApp.getCoordinator("s0").getServerContext().getWorldState()
+                .getBalance(RECEIVER_A);
+        BigInteger initialReceiverBBalance = ServerApp.getCoordinator("s0").getServerContext().getWorldState()
+                .getBalance(RECEIVER_B);
 
         // Submit both in rapid succession
         submitRawRequest(100, reqA, "double-spend A");
@@ -132,8 +136,8 @@ class DoubleSpendConsensusTest {
             // At most one receiver should have received funds
             assertFalse(
                     receiverAGain.signum() > 0 && receiverBGain.signum() > 0,
-                    "double spend on " + replicaId + ": both receivers got funds (A=" + receiverAGain + ", B=" + receiverBGain + ")"
-            );
+                    "double spend on " + replicaId + ": both receivers got funds (A=" + receiverAGain + ", B="
+                            + receiverBGain + ")");
         }
 
         // All replicas must agree on state
@@ -152,11 +156,13 @@ class DoubleSpendConsensusTest {
 
         // Upfront gas reservation = gasPrice * gasLimit (not actual fee)
         BigInteger upfrontGas = GAS_PRICE.multiply(GAS_LIMIT); // 3 * 21_000 = 63_000
-        // First transfer: drain almost everything, leaving only 1_000 after upfront cost
+        // First transfer: drain almost everything, leaving only 1_000 after upfront
+        // cost
         BigInteger firstTransfer = senderBalance.subtract(upfrontGas).subtract(BigInteger.valueOf(1_000));
         assertTrue(firstTransfer.signum() > 0, "sender balance too low for test");
 
-        // Second transfer: 500 — needs 500 + 63_000 upfront = 63_500, but only ~4_000 remains
+        // Second transfer: 500 - needs 500 + 63_000 upfront = 63_500, but only ~4_000
+        // remains
         // (1_000 leftover + 3_000 gas refund from first tx)
         BigInteger secondTransfer = BigInteger.valueOf(500);
 
@@ -180,7 +186,8 @@ class DoubleSpendConsensusTest {
                     break;
                 }
             }
-            if (converged) break;
+            if (converged)
+                break;
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(250));
         }
 
@@ -202,7 +209,8 @@ class DoubleSpendConsensusTest {
     void rapidFireSameNonceOnlyOneCommits() throws Exception {
         Address sender = clientContext.getSelfAddress();
         long nonce = clientContext.getNonce();
-        BigInteger initialReceiverBalance = ServerApp.getCoordinator("s0").getServerContext().getWorldState().getBalance(RECEIVER_A);
+        BigInteger initialReceiverBalance = ServerApp.getCoordinator("s0").getServerContext().getWorldState()
+                .getBalance(RECEIVER_A);
 
         Transaction unsignedTx = new Transaction(
                 sender, RECEIVER_A, TRANSFER_VALUE, new byte[0],
@@ -246,7 +254,8 @@ class DoubleSpendConsensusTest {
         clientContext.getAuthenticatedPerfectLink().broadcast(destinations, appMsg.toByteArray());
     }
 
-    private ClientRequest buildSignedRequest(int requestId, Address sender, Address receiver, long nonce) throws Exception {
+    private ClientRequest buildSignedRequest(int requestId, Address sender, Address receiver, long nonce)
+            throws Exception {
         Transaction unsignedTx = new Transaction(
                 sender, receiver, TRANSFER_VALUE, new byte[0],
                 GAS_PRICE, GAS_LIMIT, nonce, null);
@@ -275,7 +284,8 @@ class DoubleSpendConsensusTest {
     private static void assertReplicaStateHashesMatch() {
         String referenceHash = null;
         for (String replicaId : REPLICAS) {
-            String stateHash = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState().computeStateHash();
+            String stateHash = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState()
+                    .computeStateHash();
             if (referenceHash == null) {
                 referenceHash = stateHash;
             } else {
@@ -287,7 +297,7 @@ class DoubleSpendConsensusTest {
     private static void startReplica(String serverId) {
         Thread t = new Thread(() -> {
             try {
-                ServerApp.main(new String[]{CONFIG_FILE, serverId, "false"});
+                ServerApp.main(new String[] { CONFIG_FILE, serverId, "false" });
             } catch (Exception e) {
                 System.err.println("[TEST] Error starting replica " + serverId);
                 e.printStackTrace();
@@ -300,8 +310,12 @@ class DoubleSpendConsensusTest {
     private static void stopReplicas() {
         for (String replicaId : REPLICAS) {
             BasicHotStuffCoordinator coord = ServerApp.getCoordinator(replicaId);
-            if (coord == null) continue;
-            try { coord.getServerContext().stop(); } catch (Exception ignored) {}
+            if (coord == null)
+                continue;
+            try {
+                coord.getServerContext().stop();
+            } catch (Exception ignored) {
+            }
             coord.stop();
         }
     }

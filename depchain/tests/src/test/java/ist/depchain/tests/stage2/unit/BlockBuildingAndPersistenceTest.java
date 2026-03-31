@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,7 +22,8 @@ import ist.depchain.core.blockchain.BlockSerializer;
 import ist.depchain.core.blockchain.TransactionReceipt;
 
 /**
- * Unit tests for Step 4: Block structure, deterministic ordering, persistence, and serialization.
+ * Unit tests for: Block structure, deterministic ordering, persistence, and
+ * serialization.
  */
 class BlockBuildingAndPersistenceTest {
 
@@ -42,9 +43,9 @@ class BlockBuildingAndPersistenceTest {
 
     @Test
     void blockBuilderOrdersByFeeDescending() {
-        Transaction lowFee = tx(ALICE, BOB, 100, 1, 21_000, 0);    // fee = 21000
-        Transaction highFee = tx(BOB, CAROL, 100, 10, 21_000, 0);  // fee = 210000
-        Transaction midFee = tx(CAROL, ALICE, 100, 5, 21_000, 0);  // fee = 105000
+        Transaction lowFee = tx(ALICE, BOB, 100, 1, 21_000, 0); // fee = 21000
+        Transaction highFee = tx(BOB, CAROL, 100, 10, 21_000, 0); // fee = 210000
+        Transaction midFee = tx(CAROL, ALICE, 100, 5, 21_000, 0); // fee = 105000
 
         BlockChainBlock block = BlockBuilder.build(List.of(lowFee, highFee, midFee), genesis, PROPOSER);
 
@@ -58,7 +59,8 @@ class BlockBuildingAndPersistenceTest {
 
     @Test
     void blockBuilderBreaksTiesByTxHash() {
-        // Same fee, different from/nonce → different tx hashes → deterministic tie-break
+        // Same fee, different from/nonce -> different tx hashes -> deterministic
+        // tie-break
         Transaction tx1 = tx(ALICE, BOB, 100, 1, 21_000, 0);
         Transaction tx2 = tx(BOB, CAROL, 200, 1, 21_000, 0);
 
@@ -262,7 +264,7 @@ class BlockBuildingAndPersistenceTest {
     // --- Helpers ---
 
     private static Transaction tx(Address from, Address to, long value,
-                                  long gasPrice, long gasLimit, long nonce) {
+            long gasPrice, long gasLimit, long nonce) {
         return new Transaction(from, to, BigInteger.valueOf(value), new byte[0],
                 BigInteger.valueOf(gasPrice), BigInteger.valueOf(gasLimit), nonce, null);
     }

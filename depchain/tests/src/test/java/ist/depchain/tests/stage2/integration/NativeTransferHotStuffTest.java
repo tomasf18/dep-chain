@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.integration;
 
 import ist.depchain.client.ClientContext;
 import ist.depchain.client.MessageHandler;
@@ -6,6 +6,7 @@ import ist.depchain.client.ClientLibrary;
 import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.blockchain.DepChainWorldState;
+import ist.depchain.tests.stage2.Stage2GasConstants;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 
 import org.hyperledger.besu.datatypes.Address;
@@ -26,13 +27,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * all transfers are committed and the receiver balance is correct.
  *
  * This test exercises the complete Stage 2 pipeline end-to-end:
- *   Client → MessageHandler (validate tx) → Mempool → doPropose (batch)
- *   → PREPARE → PRE-COMMIT → COMMIT → DECIDE → executeStage2Block
- *   → TransactionExecutor → BlockChain persist → ClientResponse
+ * Client -> MessageHandler (validate tx) -> Mempool -> doPropose (batch)
+ * -> PREPARE -> PRE-COMMIT -> COMMIT -> DECIDE -> executeStage2Block
+ * -> TransactionExecutor -> BlockChain persist -> ClientResponse
  */
 class NativeTransferHotStuffTest {
     private static final String CONFIG_FILE = "../config/config-dev.json";
-    private static final String[] REPLICAS = {"s0", "s1", "s2", "s3"};
+    private static final String[] REPLICAS = { "s0", "s1", "s2", "s3" };
 
     private static final String RECEIVER_HEX = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     private static final BigInteger GAS_PRICE = BigInteger.ONE;
@@ -83,7 +84,8 @@ class NativeTransferHotStuffTest {
 
         long requestBase = ServerApp.getCoordinator("s0").getServerContext().getBlockChain().getHeight() * 1000L;
         clientContext.setRequestId((int) requestBase);
-        clientContext.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(clientAddress));
+        clientContext
+                .setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(clientAddress));
 
         clientContext.start();
     }
@@ -120,19 +122,19 @@ class NativeTransferHotStuffTest {
         }
 
         BigInteger expectedSenderBalance = waitForReplicaConvergence(sender, receiver,
-            initialSenderBalance, initialReceiverBalance, totalValue, numTransfers,
+                initialSenderBalance, initialReceiverBalance, totalValue, numTransfers,
                 TimeUnit.SECONDS.toMillis(120));
 
-            BigInteger expectedReceiverBalance = BigInteger.valueOf(totalValue);
-            for (String replicaId : REPLICAS) {
-                DepChainWorldState ws = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState();
-                assertEquals(expectedSenderBalance, ws.getBalance(sender),
+        BigInteger expectedReceiverBalance = BigInteger.valueOf(totalValue);
+        for (String replicaId : REPLICAS) {
+            DepChainWorldState ws = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState();
+            assertEquals(expectedSenderBalance, ws.getBalance(sender),
                     "sender balance mismatch on " + replicaId);
-                assertEquals(expectedReceiverBalance, ws.getBalance(receiver),
+            assertEquals(expectedReceiverBalance, ws.getBalance(receiver),
                     "receiver balance mismatch on " + replicaId);
-            }
+        }
 
-            System.out.println("[TEST] All " + numTransfers + " native transfers committed. Sender balance: "
+        System.out.println("[TEST] All " + numTransfers + " native transfers committed. Sender balance: "
                 + expectedSenderBalance + ", Receiver balance: " + expectedReceiverBalance);
     }
 
@@ -141,7 +143,7 @@ class NativeTransferHotStuffTest {
     private static void startReplica(String serverId) {
         Thread t = new Thread(() -> {
             try {
-                ServerApp.main(new String[]{CONFIG_FILE, serverId, "false"});
+                ServerApp.main(new String[] { CONFIG_FILE, serverId, "false" });
             } catch (Exception e) {
                 System.err.println("[TEST] Error starting replica " + serverId);
                 e.printStackTrace();
@@ -168,12 +170,13 @@ class NativeTransferHotStuffTest {
     }
 
     private static BigInteger waitForReplicaConvergence(Address sender, Address receiver,
-                                                        BigInteger initialSenderBalance,
-                                                        BigInteger initialReceiverBalance,
-                                                        long totalValue, int numTransfers, long timeoutMs) {
+            BigInteger initialSenderBalance,
+            BigInteger initialReceiverBalance,
+            long totalValue, int numTransfers, long timeoutMs) {
         BigInteger expectedReceiverBalance = initialReceiverBalance.add(BigInteger.valueOf(totalValue));
         BigInteger gasFee = GAS_PRICE.multiply(GAS_LIMIT);
-        BigInteger expectedSenderBalance = initialSenderBalance.subtract(BigInteger.valueOf(totalValue)).subtract(gasFee.multiply(BigInteger.valueOf(numTransfers)));
+        BigInteger expectedSenderBalance = initialSenderBalance.subtract(BigInteger.valueOf(totalValue))
+                .subtract(gasFee.multiply(BigInteger.valueOf(numTransfers)));
 
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {

@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -9,6 +9,11 @@ import org.junit.jupiter.api.Test;
 
 import ist.depchain.common.ClientResponse;
 
+/**
+ * Unit tests for ClientResponse, ensuring that all fields, including extended receipt fields,
+ * are correctly preserved during serialization and deserialization, and that optional fields
+ * can be empty without causing issues.
+ */
 public class ClientResponseReceiptFieldsTest {
 
     @Test

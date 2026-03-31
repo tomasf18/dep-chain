@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -16,7 +16,14 @@ import ist.depchain.common.utils.Crypto;
 import ist.depchain.common.Transaction;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionValidator;
+import ist.depchain.tests.stage2.Stage2GasConstants;
 
+/**
+ * Unit tests for: Transaction validation logic, including signature verification,
+ * nonce checks, balance checks, and edge cases like zero gas price or zero
+ * gas limit. Tests run against the world state without any network or
+ * consensus components.
+ */
 class TransactionValidationTest {
 
     @Test

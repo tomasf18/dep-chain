@@ -1,11 +1,10 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.util.HashSet;
 
 import org.hyperledger.besu.datatypes.Address;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,21 +18,20 @@ import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.blockchain.TransactionValidator;
 import ist.depchain.core.blockchain.ValidationResult;
+import ist.depchain.tests.stage2.Stage2GasConstants;
 
 /**
- * Gas parameter edge case tests (TODO-TESTS §G).
- *
  * Guarantee: malformed fee/gas parameters do not break safety or produce
  * inconsistent execution. All invalid gas configurations are either rejected
  * at validation or handled deterministically at execution.
  *
  * Tests:
- *   1. Absurdly large gas limit is accepted at validation but excess is refunded.
- *   2. Gas limit exactly equal to required gas (no refund, no failure).
- *   3. Gas limit one less than required → out-of-gas failure.
- *   4. Very high gas price charges proportionally higher fee.
- *   5. Upfront cost overflow does not bypass balance checks.
- *   6. Contract call with too-low gas limit reverts but charges full limit.
+ * 1. Absurdly large gas limit is accepted at validation but excess is refunded.
+ * 2. Gas limit exactly equal to required gas (no refund, no failure).
+ * 3. Gas limit one less than required -> out-of-gas failure.
+ * 4. Very high gas price charges proportionally higher fee.
+ * 5. Upfront cost overflow does not bypass balance checks.
+ * 6. Contract call with too-low gas limit reverts but charges full limit.
  */
 class GasParameterEdgeCasesTest {
 
@@ -82,7 +80,7 @@ class GasParameterEdgeCasesTest {
 
     /**
      * Gas limit exactly equal to the native transfer gas cost.
-     * No refund, no failure — exact fit.
+     * No refund, no failure - exact fit.
      */
     @Test
     void exactGasLimitNoRefund() {
@@ -105,7 +103,7 @@ class GasParameterEdgeCasesTest {
     }
 
     /**
-     * Gas limit one less than required → out-of-gas.
+     * Gas limit one less than required -> out-of-gas.
      * Full gas limit is charged (not refunded), value is refunded.
      */
     @Test
@@ -151,8 +149,9 @@ class GasParameterEdgeCasesTest {
     }
 
     /**
-     * Upfront cost that would exceed sender's balance even with a very large gas limit.
-     * Must fail with "insufficient balance" — no overflow tricks.
+     * Upfront cost that would exceed sender's balance even with a very large gas
+     * limit.
+     * Must fail with "insufficient balance" - no overflow tricks.
      */
     @Test
     void upfrontCostExceedingBalanceFailsDeterministically() {
@@ -188,7 +187,8 @@ class GasParameterEdgeCasesTest {
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
         Transaction signed = unsignedTx.withSignature(sig);
 
-        ValidationResult result = TransactionValidator.validate(signed, kp.getPublic(), "SHA256withECDSA", validationWs, null);
+        ValidationResult result = TransactionValidator.validate(signed, kp.getPublic(), "SHA256withECDSA", validationWs,
+                null);
         assertFalse(result.isValid());
         assertTrue(result.getErrorMessage().contains("gasPrice"));
     }
@@ -209,13 +209,14 @@ class GasParameterEdgeCasesTest {
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
         Transaction signed = unsignedTx.withSignature(sig);
 
-        ValidationResult result = TransactionValidator.validate(signed, kp.getPublic(), "SHA256withECDSA", validationWs, null);
+        ValidationResult result = TransactionValidator.validate(signed, kp.getPublic(), "SHA256withECDSA", validationWs,
+                null);
         assertFalse(result.isValid());
         assertTrue(result.getErrorMessage().contains("gasLimit"));
     }
 
     /**
-     * Gas limit of 1 (absurdly low) for a native transfer → out-of-gas.
+     * Gas limit of 1 (absurdly low) for a native transfer -> out-of-gas.
      * Fee = gasPrice * 1 (the full gas limit). Deterministic failure.
      */
     @Test
@@ -272,7 +273,7 @@ class GasParameterEdgeCasesTest {
     // ==================== Helpers ====================
 
     private static Transaction nativeTransfer(Address from, Address to, long value,
-                                              BigInteger gasPrice, BigInteger gasLimit, long nonce) {
+            BigInteger gasPrice, BigInteger gasLimit, long nonce) {
         return new Transaction(from, to, BigInteger.valueOf(value), new byte[0],
                 gasPrice, gasLimit, nonce, null);
     }

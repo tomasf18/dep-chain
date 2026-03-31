@@ -1,15 +1,10 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.math.BigInteger;
-import java.security.PrivateKey;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
-
-import com.google.protobuf.ByteString;
 
 import org.hyperledger.besu.datatypes.Address;
 import org.junit.jupiter.api.AfterEach;
@@ -19,34 +14,28 @@ import org.junit.jupiter.api.Test;
 import ist.depchain.client.ClientContext;
 import ist.depchain.client.ClientLibrary;
 import ist.depchain.client.MessageHandler;
-import ist.depchain.common.ApplicationMessage;
-import ist.depchain.common.ClientRequest;
-import ist.depchain.common.Transaction;
 import ist.depchain.common.utils.Config;
-import ist.depchain.common.utils.Crypto;
-import ist.depchain.common.utils.TransactionSigner;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
+import ist.depchain.tests.stage2.Stage2GasConstants;
 
 /**
- * Query consistency tests (TODO-TESTS §K).
- *
- * Guarantee: reads are quorum-based snapshots — all honest replicas return
+ * Guarantee: reads are quorum-based snapshots - all honest replicas return
  * consistent balances after transactions are committed. A balance query
  * submitted after a transfer should reflect the transfer on all replicas.
  *
  * Tests:
- *   1. Native balance query after a transfer returns the updated balance
- *      on all replicas.
- *   2. Token balance query after an ERC-20 transfer returns the updated
- *      balance on all replicas.
- *   3. Sequential transfers followed by balance queries produce consistent
- *      results across replicas.
+ * 1. Native balance query after a transfer returns the updated balance
+ * on all replicas.
+ * 2. Token balance query after an ERC-20 transfer returns the updated
+ * balance on all replicas.
+ * 3. Sequential transfers followed by balance queries produce consistent
+ * results across replicas.
  */
 class QueryConsistencyTest {
     private static final String CONFIG_FILE = "../config/config-dev.json";
-    private static final String[] REPLICAS = {"s0", "s1", "s2", "s3"};
+    private static final String[] REPLICAS = { "s0", "s1", "s2", "s3" };
 
     private static final BigInteger GAS_PRICE = BigInteger.valueOf(3);
     private static final BigInteger GAS_LIMIT = BigInteger.valueOf(21_000);
@@ -104,8 +93,10 @@ class QueryConsistencyTest {
         client1Context.setRequestId((int) requestBase);
         client2Context.setRequestId((int) (requestBase + 500));
 
-        client1Context.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client1Address));
-        client2Context.setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client2Address));
+        client1Context
+                .setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client1Address));
+        client2Context
+                .setNonce(ServerApp.getCoordinator("s0").getServerContext().getWorldState().getNonce(client2Address));
 
         client1Context.start();
         client2Context.start();
@@ -113,8 +104,10 @@ class QueryConsistencyTest {
 
     @AfterEach
     void teardown() {
-        if (client1Context != null) client1Context.stop();
-        if (client2Context != null) client2Context.stop();
+        if (client1Context != null)
+            client1Context.stop();
+        if (client2Context != null)
+            client2Context.stop();
         stopReplicas();
     }
 
@@ -128,7 +121,8 @@ class QueryConsistencyTest {
         Address receiver = client2Context.getSelfAddress();
 
         BigInteger senderBefore = ServerApp.getCoordinator("s0").getServerContext().getWorldState().getBalance(sender);
-        BigInteger receiverBefore = ServerApp.getCoordinator("s0").getServerContext().getWorldState().getBalance(receiver);
+        BigInteger receiverBefore = ServerApp.getCoordinator("s0").getServerContext().getWorldState()
+                .getBalance(receiver);
 
         client1Library.submitNativeTransfer(receiver.toHexString(), TRANSFER_VALUE, GAS_PRICE, GAS_LIMIT);
 
@@ -170,7 +164,8 @@ class QueryConsistencyTest {
 
         for (String replicaId : REPLICAS) {
             DepChainWorldState ws = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState();
-            Address contractAddress = ServerApp.getCoordinator(replicaId).getServerContext().getConfig().getIstContractAddress();
+            Address contractAddress = ServerApp.getCoordinator(replicaId).getServerContext().getConfig()
+                    .getIstContractAddress();
 
             assertEquals(expectedSenderToken, tokenBalanceOf(ws, contractAddress, sender),
                     "sender token balance mismatch on " + replicaId);
@@ -192,7 +187,8 @@ class QueryConsistencyTest {
         Address receiver = client2Context.getSelfAddress();
 
         BigInteger senderBefore = ServerApp.getCoordinator("s0").getServerContext().getWorldState().getBalance(sender);
-        BigInteger receiverBefore = ServerApp.getCoordinator("s0").getServerContext().getWorldState().getBalance(receiver);
+        BigInteger receiverBefore = ServerApp.getCoordinator("s0").getServerContext().getWorldState()
+                .getBalance(receiver);
 
         BigInteger transfer1 = BigInteger.valueOf(1_000);
         BigInteger transfer2 = BigInteger.valueOf(2_000);
@@ -227,8 +223,10 @@ class QueryConsistencyTest {
         Address client1 = client1Context.getSelfAddress();
         Address client2 = client2Context.getSelfAddress();
 
-        BigInteger client1Before = ServerApp.getCoordinator("s0").getServerContext().getWorldState().getBalance(client1);
-        BigInteger client2Before = ServerApp.getCoordinator("s0").getServerContext().getWorldState().getBalance(client2);
+        BigInteger client1Before = ServerApp.getCoordinator("s0").getServerContext().getWorldState()
+                .getBalance(client1);
+        BigInteger client2Before = ServerApp.getCoordinator("s0").getServerContext().getWorldState()
+                .getBalance(client2);
 
         BigInteger amount1to2 = BigInteger.valueOf(3_000);
         BigInteger amount2to1 = BigInteger.valueOf(1_500);
@@ -236,7 +234,8 @@ class QueryConsistencyTest {
         client1Library.submitNativeTransfer(client2.toHexString(), amount1to2, GAS_PRICE, GAS_LIMIT);
         client2Library.submitNativeTransfer(client1.toHexString(), amount2to1, GAS_PRICE, GAS_LIMIT);
 
-        // Net effect: client1 sends 3000, receives 1500, pays gas; client2 sends 1500, receives 3000, pays gas
+        // Net effect: client1 sends 3000, receives 1500, pays gas; client2 sends 1500,
+        // receives 3000, pays gas
         BigInteger expectedClient1 = client1Before.subtract(amount1to2).add(amount2to1).subtract(GAS_FEE);
         BigInteger expectedClient2 = client2Before.subtract(amount2to1).add(amount1to2).subtract(GAS_FEE);
 
@@ -246,12 +245,14 @@ class QueryConsistencyTest {
             boolean allMatch = true;
             for (String replicaId : REPLICAS) {
                 DepChainWorldState ws = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState();
-                if (!ws.getBalance(client1).equals(expectedClient1) || !ws.getBalance(client2).equals(expectedClient2)) {
+                if (!ws.getBalance(client1).equals(expectedClient1)
+                        || !ws.getBalance(client2).equals(expectedClient2)) {
                     allMatch = false;
                     break;
                 }
             }
-            if (allMatch) break;
+            if (allMatch)
+                break;
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(250));
         }
 
@@ -279,7 +280,8 @@ class QueryConsistencyTest {
                     break;
                 }
             }
-            if (allMatch) return;
+            if (allMatch)
+                return;
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(250));
         }
         BigInteger actual = ServerApp.getCoordinator("s0").getServerContext().getWorldState().getBalance(address);
@@ -292,13 +294,15 @@ class QueryConsistencyTest {
             boolean allMatch = true;
             for (String replicaId : REPLICAS) {
                 DepChainWorldState ws = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState();
-                Address contractAddress = ServerApp.getCoordinator(replicaId).getServerContext().getConfig().getIstContractAddress();
+                Address contractAddress = ServerApp.getCoordinator(replicaId).getServerContext().getConfig()
+                        .getIstContractAddress();
                 if (!tokenBalanceOf(ws, contractAddress, address).equals(expectedBalance)) {
                     allMatch = false;
                     break;
                 }
             }
-            if (allMatch) return;
+            if (allMatch)
+                return;
             LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(250));
         }
         fail("Token balance did not converge within " + timeoutMs + "ms");
@@ -306,14 +310,16 @@ class QueryConsistencyTest {
 
     private static BigInteger tokenBalanceOf(DepChainWorldState ws, Address contractAddress, Address owner) {
         org.apache.tuweni.units.bigints.UInt256 slot = org.apache.tuweni.units.bigints.UInt256.fromBytes(
-                org.apache.tuweni.bytes.Bytes.wrap(org.web3j.crypto.Hash.sha3(concat(padAddress(owner), padWord(BigInteger.ZERO)))));
+                org.apache.tuweni.bytes.Bytes
+                        .wrap(org.web3j.crypto.Hash.sha3(concat(padAddress(owner), padWord(BigInteger.ZERO)))));
         return ws.getStorageValue(contractAddress, slot).toBigInteger();
     }
 
     private static void assertReplicaStateHashesMatch() {
         String referenceHash = null;
         for (String replicaId : REPLICAS) {
-            String stateHash = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState().computeStateHash();
+            String stateHash = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState()
+                    .computeStateHash();
             if (referenceHash == null) {
                 referenceHash = stateHash;
             } else {
@@ -351,7 +357,7 @@ class QueryConsistencyTest {
     private static void startReplica(String serverId) {
         Thread t = new Thread(() -> {
             try {
-                ServerApp.main(new String[]{CONFIG_FILE, serverId, "false"});
+                ServerApp.main(new String[] { CONFIG_FILE, serverId, "false" });
             } catch (Exception e) {
                 System.err.println("[TEST] Error starting replica " + serverId);
                 e.printStackTrace();
@@ -364,8 +370,12 @@ class QueryConsistencyTest {
     private static void stopReplicas() {
         for (String replicaId : REPLICAS) {
             BasicHotStuffCoordinator coord = ServerApp.getCoordinator(replicaId);
-            if (coord == null) continue;
-            try { coord.getServerContext().stop(); } catch (Exception ignored) {}
+            if (coord == null)
+                continue;
+            try {
+                coord.getServerContext().stop();
+            } catch (Exception ignored) {
+            }
             coord.stop();
         }
     }

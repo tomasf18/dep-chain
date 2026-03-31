@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -21,16 +21,15 @@ import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.EvmService;
 import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
+import ist.depchain.tests.stage2.Stage2GasConstants;
 
 /**
- * Edge-case robustness tests (TODO-TESTS §L).
- *
  * Guarantee: degenerate but technically valid inputs (self-transfers,
  * zero-address targets, circular fee accounting, contract calls to EOAs,
  * ERC-20 approve-to-zero, transferFrom-to-self, and world-state snapshot
  * independence) are handled deterministically and do not break invariants.
  *
- * All tests are unit-level — no network, keys, or consensus required.
+ * All tests are unit-level - no network, keys or consensus required.
  */
 class EdgeCaseRobustnessTest {
 
@@ -112,7 +111,7 @@ class EdgeCaseRobustnessTest {
 
     /**
      * approve(spender, 0) when allowance is nonzero should succeed.
-     * The ISTCoin contract only rejects non-zero → non-zero transitions.
+     * The ISTCoin contract only rejects non-zero -> non-zero transitions.
      */
     @Test
     void erc20ApproveToZeroSucceedsWhenAllowanceIsNonZero() throws Exception {
@@ -127,7 +126,7 @@ class EdgeCaseRobustnessTest {
 
         assertEquals(BigInteger.valueOf(100), tokenAllowanceOf(treasury, alice));
 
-        // approve(alice, 0) — should succeed (non-zero → zero is allowed)
+        // approve(alice, 0) - should succeed (non-zero -> zero is allowed)
         TransactionReceipt receipt = execContractCall(treasury, CONTRACT_ADDRESS,
                 "approve(address,uint256)",
                 Erc20Abi.encodeAddress(alice) + Erc20Abi.encodeUint256(BigInteger.ZERO),
@@ -137,7 +136,8 @@ class EdgeCaseRobustnessTest {
         assertEquals(BigInteger.ZERO, tokenAllowanceOf(treasury, alice));
     }
 
-    // ==================== 4. ERC-20 transferFrom(owner, owner, amount) ====================
+    // ==================== 4. ERC-20 transferFrom(owner, owner, amount)
+    // ====================
 
     /**
      * Owner uses their own allowance to transfer tokens to themselves.
@@ -149,7 +149,7 @@ class EdgeCaseRobustnessTest {
 
         BigInteger initialBalance = tokenBalanceOf(treasury);
 
-        // treasury increaseAllowance(treasury, 500) — owner approves themselves
+        // treasury increaseAllowance(treasury, 500) - owner approves themselves
         execContractCall(treasury, CONTRACT_ADDRESS,
                 "increaseAllowance(address,uint256)",
                 Erc20Abi.encodeAddress(treasury) + Erc20Abi.encodeUint256(BigInteger.valueOf(500)),
@@ -157,7 +157,7 @@ class EdgeCaseRobustnessTest {
 
         assertEquals(BigInteger.valueOf(500), tokenAllowanceOf(treasury, treasury));
 
-        // treasury transferFrom(treasury, treasury, 200) — self-transfer
+        // treasury transferFrom(treasury, treasury, 200) - self-transfer
         TransactionReceipt receipt = execContractCall(treasury, CONTRACT_ADDRESS,
                 "transferFrom(address,address,uint256)",
                 Erc20Abi.encodeAddress(treasury) + Erc20Abi.encodeAddress(treasury)
@@ -184,7 +184,7 @@ class EdgeCaseRobustnessTest {
         ws.createEOA(PROPOSER, 0, BigInteger.ZERO);
 
         // Craft a tx with calldata targeting BOB (an EOA, no contract code)
-        byte[] fakeCalldata = new byte[]{0x01, 0x02, 0x03, 0x04};
+        byte[] fakeCalldata = new byte[] { 0x01, 0x02, 0x03, 0x04 };
         Transaction tx = new Transaction(
                 ALICE, BOB, BigInteger.ZERO, fakeCalldata,
                 GAS_PRICE, BigInteger.valueOf(100_000), 0, null);
@@ -194,14 +194,15 @@ class EdgeCaseRobustnessTest {
         assertFalse(receipt.isSuccess());
         assertTrue(receipt.getError().contains("no runtime code"),
                 "Expected 'no runtime code' error, got: " + receipt.getError());
-        // Full gas limit charged (gasUsed = 0 → shouldChargeFullGasLimit kicks in)
+        // Full gas limit charged (gasUsed = 0 -> shouldChargeFullGasLimit kicks in)
         BigInteger expectedFee = GAS_PRICE.multiply(BigInteger.valueOf(100_000));
         assertEquals(expectedFee, receipt.getFee());
         // Nonce still advanced
         assertEquals(1, ws.getNonce(ALICE));
     }
 
-    // ==================== 6. World state snapshot independence ====================
+    // ==================== 6. World state snapshot independence
+    // ====================
 
     /**
      * copy() must produce a fully independent snapshot. Mutations on the copy
@@ -315,7 +316,8 @@ class EdgeCaseRobustnessTest {
         // Deploy ERC-20 contract
         String creationPath = "../core/src/main/resources/contracts/ist/ISTCoin.creation.bin";
         String creationBin = Files.readString(Path.of(creationPath)).trim();
-        if (creationBin.startsWith("0x")) creationBin = creationBin.substring(2);
+        if (creationBin.startsWith("0x"))
+            creationBin = creationBin.substring(2);
 
         String deploymentHex = creationBin + Erc20Abi.encodeAddress(treasury);
 
@@ -327,11 +329,10 @@ class EdgeCaseRobustnessTest {
     }
 
     private TransactionReceipt execContractCall(Address from, Address contract,
-                                                 String method, String encodedArgs,
-                                                 KeyPair keys) throws Exception {
+            String method, String encodedArgs,
+            KeyPair keys) throws Exception {
         byte[] calldata = Bytes.fromHexString(
-                "0x" + Erc20Abi.smartContractMethodIdentifier(method) + encodedArgs
-        ).toArrayUnsafe();
+                "0x" + Erc20Abi.smartContractMethodIdentifier(method) + encodedArgs).toArrayUnsafe();
 
         Transaction unsigned = new Transaction(
                 from, contract, BigInteger.ZERO, calldata,

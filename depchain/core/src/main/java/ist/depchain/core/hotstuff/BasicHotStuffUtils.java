@@ -100,7 +100,7 @@ public class BasicHotStuffUtils {
 
     public boolean verifyQC(QC qc) {
         if (qc == null) return true;
-        // Genesis QC has empty signature and viewNumber 0 — skip BLS verification
+        // Genesis QC has empty signature and viewNumber 0 - skip BLS verification
         if (qc.getViewNumber() == 0 && qc.getThresholdSig().isEmpty()) return true;
 
         byte[] digest = getMsgDigest(qc.getType(), qc.getViewNumber(), qc.getBlockId());

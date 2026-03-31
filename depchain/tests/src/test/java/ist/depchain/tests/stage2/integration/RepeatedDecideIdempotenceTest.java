@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -16,6 +16,10 @@ import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerContext;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 
+/**
+ * Tests that the same DECIDE message can be processed multiple times without
+ * causing duplicate application of the committed block.
+ */
 class RepeatedDecideIdempotenceTest {
 
     @Test

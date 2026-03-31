@@ -1,6 +1,7 @@
 # Stage 2 Test Reference
 
 This is a complete index of the files under `tests/src/test/java/ist/depchain/tests/stage2`.
+Tests are grouped into `integration/` and `unit/` folders.
 It is meant as a quick orientation guide.
 
 ## Shared Test Utility
@@ -67,7 +68,7 @@ It is meant as a quick orientation guide.
 ## Consensus, Replay, and Byzantine Resistance
 
 ### NativeTransferHotStuffTest
-- `testMultipleSequentialTransfers` - Verifies three sequential native transfers commit through HotStuff and converge to the expected replica state.
+- `testMultipleSequentialTransfers` - Verifies four sequential native transfers commit through HotStuff and converge to the expected replica state.
 
 ### Erc20HotStuffTest
 - `erc20BalanceQueryAndTransferCommitThroughConsensus` - Verifies an ERC-20 balance query and a token transfer both commit through the full replica stack.
@@ -80,6 +81,15 @@ It is meant as a quick orientation guide.
 
 ### ByzantineDivergentQcInjectionTest
 - `honestReplicasRejectDivergentForgedQcInjection` - Verifies honest replicas ignore forged or divergent QC injections and do not advance state.
+
+### ByzantineClientLeaderCollusionTest
+- `honestReplicaRejectsTransactionFromUnknownAccount` - Verifies honest replicas reject a block containing a transaction from an unknown account not in world state.
+- `honestReplicaRejectsLeaderTamperedTransactionContent` - Verifies honest replicas reject a block where the leader tampered with transaction content after signing.
+- `honestReplicaRejectsBlockWithExtraMetadataEntries` - Verifies honest replicas reject a block whose transaction count does not match metadata count.
+
+### EqualFeeOrderingConsensusTest
+- `equalFeeTransactionsFromDifferentClientsProduceIdenticalBlockOrderAcrossReplicas` - Verifies equal-fee transactions from different clients produce identical block ordering on all replicas.
+- `multipleEqualFeeTransactionsProduceConsistentStateAcrossReplicas` - Verifies multiple equal-fee transactions from both clients produce consistent state across replicas.
 
 ### ByzantineLeaderMalformedBlockStage2Test
 - `honestReplicaRejectsForgedTransactionInPrepare` - Verifies a block carrying a forged transaction signature is rejected before it is cached or executed.
@@ -100,6 +110,12 @@ It is meant as a quick orientation guide.
 
 ### InsufficientBalanceAfterTransferTest
 - `secondTransferRejectedWhenBalanceDepleted` - Verifies a first large transfer can succeed while a second one fails once the sender’s remaining balance is no longer enough for value plus gas.
+
+### QueryConsistencyTest
+- `nativeBalanceConsistentAcrossReplicasAfterTransfer` - Verifies native balance is consistent across all replicas after a transfer.
+- `tokenBalanceConsistentAcrossReplicasAfterTransfer` - Verifies ERC-20 token balance is consistent across all replicas after a transfer.
+- `multipleTransfersProduceConsistentCumulativeBalances` - Verifies sequential transfers produce consistent cumulative balances across replicas.
+- `bidirectionalTransfersProduceConsistentState` - Verifies bidirectional transfers between two clients produce consistent state across replicas.
 
 ### StressTest
 - `testConcurrentTransfers` - Verifies concurrent native transfers complete successfully and preserve total balance conservation under load.
@@ -139,6 +155,38 @@ It is meant as a quick orientation guide.
 - `rejectsZeroGasLimit` - Verifies validation rejects a zero gas limit.
 - `rejectsNegativeValue` - Verifies validation rejects a negative transfer value.
 
+### ConsensusIntegrationTest
+- `drainBatchReturnsUpToMaxSize` - Verifies mempool draining respects the configured batch cap.
+- `drainBatchReturnsAllWhenLessThanMax` - Verifies smaller batches drain completely.
+- `drainBatchReturnsEmptyListWhenMempoolEmpty` - Verifies empty mempools produce no batch.
+- `drainBatchPreservesFIFOOrder` - Verifies FIFO behavior is preserved when draining.
+- `drainBatchRemovesDedupKeys` - Verifies drained requests are removed from deduplication tracking.
+- `drainBatchDeduplicatesDuplicateReplayRequests` - Verifies replayed requests are not duplicated in the mempool.
+- `transactionProtoRoundTrip` - Verifies transaction payloads survive proto serialization.
+- `contractDeploymentProtoRoundTrip` - Verifies contract deployment payloads survive proto serialization.
+- `fullPipelineSingleTransaction` - Verifies one transaction traverses the full consensus pipeline.
+- `fullPipelineMultipleTransactionsDeterministicOrdering` - Verifies multiple transactions remain deterministically ordered through the full pipeline.
+- `fullPipelineWithBlockFinalization` - Verifies full pipeline execution still finalizes receipts correctly.
+- `blockPersistenceAfterExecution` - Verifies committed blocks are persisted after execution.
+- `receiptMappingByTxHashAfterReorder` - Verifies receipts can still be matched to transactions after reordering.
+- `emptyBlockBuildsSuccessfully` - Verifies an empty block builds without failure.
+- `failedTransactionStillIncludedInBlock` - Verifies a failing transaction still appears in the committed block.
+- `proposerReceivesGasFees` - Verifies proposer fee crediting works.
+- `consecutiveBlocksBuildCorrectChain` - Verifies consecutive committed blocks link correctly.
+- `multipleTransactionsGasFeesAllGoToProposer` - Verifies batch fees accumulate correctly for the proposer.
+- `transactionsFailWhenBalanceExhaustedMidBlock` - Verifies later transactions fail once balance is exhausted mid-block.
+
+### EdgeCaseRobustnessTest
+- `nativeSelfTransferPreservesBalanceMinusGas` - Verifies a native self-transfer preserves balance minus gas fee.
+- `nativeTransferToZeroAddressCreatesAccountAndCreditsValue` - Verifies a transfer to the zero address creates the account and credits the value.
+- `erc20ApproveToZeroSucceedsWhenAllowanceIsNonZero` - Verifies approve(spender, 0) succeeds when allowance is nonzero.
+- `erc20TransferFromOwnerToOwnerDeductsAllowanceButPreservesBalance` - Verifies transferFrom(owner, owner, amount) deducts allowance but leaves token balance unchanged.
+- `contractCallToEoaFailsWithNoRuntimeCode` - Verifies a contract call targeting an EOA fails with no runtime code and charges full gas.
+- `worldStateCopyIsIndependent` - Verifies copy() produces an independent snapshot.
+- `stateHashIsStableWithoutModifications` - Verifies computeStateHash() is idempotent when no state changes occur.
+- `stateHashChangesAfterBalanceModification` - Verifies computeStateHash() changes after a balance update.
+- `proposerIsSenderFeesCreditedBack` - Verifies fee crediting is neutral when proposer equals sender.
+
 ## Miscellaneous Integration Tests
 
 ### Erc20AbiTest
@@ -152,14 +200,14 @@ It is meant as a quick orientation guide.
 - `transferFromCalldataHasCorrectShape` - Verifies transferFrom calldata is formed correctly.
 - `balanceOfCalldataHasCorrectShape` - Verifies balanceOf calldata is formed correctly.
 
-## Approval Frontrunning Resistance (§A)
+## Approval Frontrunning Resistance (A)
 
 ### ApprovalFrontrunningResistanceTest
 - `spenderCannotExceedOriginalAllowanceByRacingDecrease` - Verifies that a spender who races an owner's decreaseAllowance cannot extract more tokens than the original allowance.
 - `ownerCanSafelyReduceRemainingAllowanceAfterPartialSpend` - Verifies an owner can zero out allowance after a partial spend, blocking further transferFrom.
 - `approveNonZeroToNonZeroRevertsPreventsClassicFrontrunning` - Verifies the ERC-20 contract rejects direct nonzero-to-nonzero approve, forcing use of increaseAllowance/decreaseAllowance.
 
-## Invalid Signature / Signer Mismatch (§B)
+## Invalid Signature / Signer Mismatch (B)
 
 ### InvalidOuterSignatureStage2Test
 - `forgedOuterSignatureIsDroppedByServers` - Verifies a client request signed with a random key is silently dropped by all replicas.
@@ -167,7 +215,7 @@ It is meant as a quick orientation guide.
 - `tamperedRequestBodyIsDroppedByServers` - Verifies a validly signed request whose body is modified after signing is rejected.
 - `spoofedClientIdIsDroppedByServers` - Verifies a request claiming a different client identity is rejected when the signature does not match.
 
-## Replay / Nonce / Pipelining (§C)
+## Replay / Nonce / Pipelining (C)
 
 ### FutureNonceAndPipeliningTest
 - `futureNonceIsAcceptedWhenNotPending` - Verifies a future nonce is accepted at validation time when it is not already pending.
@@ -176,21 +224,21 @@ It is meant as a quick orientation guide.
 - `multipleDistinctFutureNoncesAllAccepted` - Verifies multiple distinct future nonces from the same sender are all accepted.
 - `pipelinedTransactionsExecuteInNonceOrder` - Integration test verifying three pipelined transfers commit in nonce order through full consensus.
 
-## Double-Spend Prevention (§D)
+## Double-Spend Prevention (D)
 
 ### DoubleSpendConsensusTest
 - `sameNonceConflictingTransfersOnlyOneCommits` - Verifies two transactions with the same nonce to different receivers result in at most one commit.
 - `sequentialTransfersExceedingBalanceOnlyFirstCommits` - Verifies a second transfer fails when the first drains the sender's balance.
 - `rapidFireSameNonceOnlyOneCommits` - Verifies the same signed transaction submitted under three request IDs produces at most one committed transfer.
 
-## Contract Execution Consistency (§F)
+## Contract Execution Consistency (F)
 
 ### Erc20RevertReceiptConsistencyTest
 - `revertingErc20TransferProducesIdenticalFailedReceiptsAcrossReplicas` - Verifies a reverting ERC-20 transfer produces identical failed receipts, state hashes, and block hashes on all replicas.
 - `mixedSuccessAndRevertProduceIdenticalReceiptsAcrossReplicas` - Verifies a block with a successful transfer followed by a reverting one produces identical receipts on all replicas.
 - `revertingDecreaseAllowanceProducesConsistentStateAndReceipts` - Verifies a reverting decreaseAllowance leaves allowance unchanged and produces consistent state across replicas.
 
-## Gas Parameter Edge Cases (§G)
+## Gas Parameter Edge Cases (G)
 
 ### GasParameterEdgeCasesTest
 - `absurdGasLimitRefundsExcessGas` - Verifies an absurdly large gas limit is accepted and excess gas is refunded.
@@ -202,40 +250,6 @@ It is meant as a quick orientation guide.
 - `validationRejectsZeroGasLimit` - Verifies the validation layer rejects zero gas limit.
 - `gasLimitOfOneFailsWithOutOfGas` - Verifies a gas limit of 1 fails with out-of-gas and charges 1 unit of fee.
 - `differentGasPricesProduceDifferentFeesButSameReceiverBalance` - Verifies different gas prices produce different fees but identical receiver balances.
-
-## Equal-Fee Ordering Determinism (§H)
-
-### EqualFeeOrderingConsensusTest
-- `equalFeeTransactionsFromDifferentClientsProduceIdenticalBlockOrderAcrossReplicas` - Verifies equal-fee transactions from different clients produce identical block ordering on all replicas.
-- `multipleEqualFeeTransactionsProduceConsistentStateAcrossReplicas` - Verifies multiple equal-fee transactions from both clients produce consistent state across replicas.
-
-## Byzantine Client + Leader Collusion (§J)
-
-### ByzantineClientLeaderCollusionTest
-- `honestReplicaRejectsTransactionFromUnknownAccount` - Verifies honest replicas reject a block containing a transaction from an unknown account not in world state.
-- `honestReplicaRejectsLeaderTamperedTransactionContent` - Verifies honest replicas reject a block where the leader tampered with transaction content after signing.
-- `honestReplicaRejectsBlockWithExtraMetadataEntries` - Verifies honest replicas reject a block whose transaction count does not match metadata count.
-
-## Query Consistency (§K)
-
-### QueryConsistencyTest
-- `nativeBalanceConsistentAcrossReplicasAfterTransfer` - Verifies native balance is consistent across all replicas after a transfer.
-- `tokenBalanceConsistentAcrossReplicasAfterTransfer` - Verifies ERC-20 token balance is consistent across all replicas after a transfer.
-- `multipleTransfersProduceConsistentCumulativeBalances` - Verifies sequential transfers produce consistent cumulative balances across replicas.
-- `bidirectionalTransfersProduceConsistentState` - Verifies bidirectional transfers between two clients produce consistent state across replicas.
-
-## Edge-Case Robustness (§L)
-
-### EdgeCaseRobustnessTest
-- `nativeSelfTransferPreservesBalanceMinusGas` - Verifies a native self-transfer (from == to) preserves balance minus gas fee.
-- `nativeTransferToZeroAddressCreatesAccountAndCreditsValue` - Verifies a transfer to 0x0 creates the zero-address account and credits the value.
-- `erc20ApproveToZeroSucceedsWhenAllowanceIsNonZero` - Verifies approve(spender, 0) succeeds when allowance is nonzero (only non-zero → non-zero is blocked).
-- `erc20TransferFromOwnerToOwnerDeductsAllowanceButPreservesBalance` - Verifies transferFrom(owner, owner, amount) deducts allowance but leaves token balance unchanged.
-- `contractCallToEoaFailsWithNoRuntimeCode` - Verifies a contract call targeting an EOA fails with "no runtime code" and charges full gas.
-- `worldStateCopyIsIndependent` - Verifies copy() produces a fully independent snapshot where mutations do not cross over.
-- `stateHashIsStableWithoutModifications` - Verifies computeStateHash() is idempotent when called without intervening changes.
-- `stateHashChangesAfterBalanceModification` - Verifies computeStateHash() changes after a balance modification.
-- `proposerIsSenderFeesCreditedBack` - Verifies that when proposer == sender, fees credit back and net loss is only the transfer value.
 
 ---
 

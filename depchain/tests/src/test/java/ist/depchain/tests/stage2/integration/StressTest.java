@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.integration;
 
 import ist.depchain.client.ClientContext;
 import ist.depchain.client.ClientLibrary;
@@ -7,6 +7,7 @@ import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
+import ist.depchain.tests.stage2.Stage2GasConstants;
 
 import org.hyperledger.besu.datatypes.Address;
 import org.junit.jupiter.api.AfterEach;
@@ -29,31 +30,31 @@ import static org.junit.jupiter.api.Assertions.*;
  * Each client runs on its own thread since submitNativeTransfer is blocking.
  *
  * Invariant checked at the end:
- *   total balance of (client1 + client2) = 2 * INITIAL_BALANCE
- *                                          - total gas fees paid
- *   i.e. no coins are created or destroyed.
+ * total balance of (client1 + client2) = 2 * INITIAL_BALANCE - total gas fees paid
+ * i.e. no coins are created or destroyed.
  */
 class StressTest {
 
-    private static final String CONFIG_FILE   = "../config/config-dev.json";
-    private static final String[] REPLICAS    = {"s0", "s1", "s2", "s3"};
+    private static final String CONFIG_FILE = "../config/config-dev.json";
+    private static final String[] REPLICAS = { "s0", "s1", "s2", "s3" };
 
     private static final String CLIENT1_ADDR = "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9";
     private static final String CLIENT2_ADDR = "0x172bf398d2a931323199521625f471fb1c28879a";
 
     private static final BigInteger INITIAL_BALANCE = BigInteger.valueOf(10_000_000);
-    private static final BigInteger TX_VALUE        = BigInteger.valueOf(100);
-    private static final BigInteger GAS_PRICE       = BigInteger.ONE;
-    private static final BigInteger GAS_LIMIT       = Stage2GasConstants.NATIVE_TRANSFER_GAS_COST;
-    private static final int       NUM_TXS_EACH     = 20; // 40 txs total
+    private static final BigInteger TX_VALUE = BigInteger.valueOf(100);
+    private static final BigInteger GAS_PRICE = BigInteger.ONE;
+    private static final BigInteger GAS_LIMIT = Stage2GasConstants.NATIVE_TRANSFER_GAS_COST;
+    private static final int NUM_TXS_EACH = 20; // 40 txs total
 
-    private ClientContext  ctx1, ctx2;
+    private ClientContext ctx1, ctx2;
     private MessageHandler msgHandler1, msgHandler2;
-    private ClientLibrary  lib1, lib2;
+    private ClientLibrary lib1, lib2;
 
     @BeforeEach
     void setup() {
-        for (String id : REPLICAS) startReplica(id);
+        for (String id : REPLICAS)
+            startReplica(id);
 
         System.out.println("[STRESS] Waiting for replica handshake...");
         LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(15));
@@ -73,9 +74,11 @@ class StressTest {
             assertNotNull(coord, "Coordinator missing for " + id);
             DepChainWorldState ws = coord.getServerContext().getWorldState();
 
-            for (Address addr : new Address[]{addr1, addr2}) {
-                if (!ws.accountExists(addr)) ws.createEOA(addr, 0, INITIAL_BALANCE);
-                else ws.addBalance(addr, INITIAL_BALANCE);
+            for (Address addr : new Address[] { addr1, addr2 }) {
+                if (!ws.accountExists(addr))
+                    ws.createEOA(addr, 0, INITIAL_BALANCE);
+                else
+                    ws.addBalance(addr, INITIAL_BALANCE);
             }
         }
 
@@ -107,7 +110,7 @@ class StressTest {
     void testConcurrentTransfers() throws InterruptedException {
         LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(5));
 
-        // Snapshot actual balances now — world state may include genesis funds
+        // Snapshot actual balances now - world state may include genesis funds
         DepChainWorldState wsSnap = ServerApp.getCoordinator("s0").getServerContext().getWorldState();
         Address addr1 = Address.fromHexString(CLIENT1_ADDR);
         Address addr2 = Address.fromHexString(CLIENT2_ADDR);
@@ -178,7 +181,7 @@ class StressTest {
     private static void startReplica(String id) {
         Thread t = new Thread(() -> {
             try {
-                ServerApp.main(new String[]{CONFIG_FILE, id, "false"});
+                ServerApp.main(new String[] { CONFIG_FILE, id, "false" });
             } catch (Exception e) {
                 System.err.println("[STRESS] Error starting replica " + id);
             }
@@ -204,7 +207,7 @@ class StressTest {
     }
 
     private static void waitForBalanceRange(Address addr1, Address addr2, BigInteger minExpectedTotal,
-                                             BigInteger maxExpectedTotal, long timeoutMs) {
+            BigInteger maxExpectedTotal, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         int stableReads = 0;
 

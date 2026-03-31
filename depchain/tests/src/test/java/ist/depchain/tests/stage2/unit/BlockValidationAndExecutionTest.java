@@ -1,4 +1,4 @@
-package ist.depchain.tests.stage2;
+package ist.depchain.tests.stage2.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -27,6 +27,9 @@ import ist.depchain.common.utils.Config;
 import ist.depchain.common.ClientRequestMeta;
 import ist.depchain.core.blockchain.ValidationResult;
 
+/**
+ * Unit tests for: Block validation and transaction execution.
+ */
 class BlockValidationAndExecutionTest {
 
     @Test
@@ -94,8 +97,7 @@ class BlockValidationAndExecutionTest {
 
         Transaction unsignedTx = new Transaction(
                 owner, receiver, BigInteger.valueOf(100), new byte[0],
-                BigInteger.ONE, BigInteger.valueOf(21_000), 0, null
-        );
+                BigInteger.ONE, BigInteger.valueOf(21_000), 0, null);
 
         byte[] forgedSig = Crypto.sign(unsignedTx.toUnsignedBytes(), forgedKeys.getPrivate(), "SHA256withECDSA");
         Transaction forgedTx = unsignedTx.withSignature(forgedSig);
@@ -103,7 +105,7 @@ class BlockValidationAndExecutionTest {
         Block block = Block.newBuilder()
                 .setId(ByteString.copyFromUtf8(UUID.randomUUID().toString()))
                 .setParentId(ByteString.EMPTY)
-            .addTransactions(forgedTx.toProto())
+                .addTransactions(forgedTx.toProto())
                 .addRequestMeta(ClientRequestMeta.newBuilder().setClientId("client1").setRequestId(1).build())
                 .build();
 
@@ -119,21 +121,20 @@ class BlockValidationAndExecutionTest {
         DepChainWorldState ws = new DepChainWorldState(config);
 
         Transaction tx = new Transaction(
-            Address.fromHexString("0x2222222222222222222222222222222222222222"),
-            Address.fromHexString("0x1111111111111111111111111111111111111111"),
-            BigInteger.ONE,
-            new byte[0],
-            BigInteger.ONE,
-            BigInteger.valueOf(21_000),
-            0,
-            null
-        );
+                Address.fromHexString("0x2222222222222222222222222222222222222222"),
+                Address.fromHexString("0x1111111111111111111111111111111111111111"),
+                BigInteger.ONE,
+                new byte[0],
+                BigInteger.ONE,
+                BigInteger.valueOf(21_000),
+                0,
+                null);
 
         Block block = Block.newBuilder()
-            .setId(ByteString.copyFromUtf8(UUID.randomUUID().toString()))
-            .setParentId(ByteString.EMPTY)
-            .addTransactions(tx.toProto())
-            .build();
+                .setId(ByteString.copyFromUtf8(UUID.randomUUID().toString()))
+                .setParentId(ByteString.EMPTY)
+                .addTransactions(tx.toProto())
+                .build();
 
         ValidationResult result = BlockValidator.validateProposedBlock(block, ws, config);
 
