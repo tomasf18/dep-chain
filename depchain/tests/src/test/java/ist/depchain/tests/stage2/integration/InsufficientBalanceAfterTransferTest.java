@@ -7,7 +7,7 @@ import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
-import ist.depchain.tests.stage2.Stage2GasConstants;
+import ist.depchain.tests.stage2.GasConstants;
 
 import org.hyperledger.besu.datatypes.Address;
 import org.junit.jupiter.api.AfterEach;
@@ -49,7 +49,7 @@ class InsufficientBalanceAfterTransferTest {
     // min_fee_threshold (63_000) so the block is proposed immediately.
     private static final BigInteger GAS_PRICE = BigInteger.valueOf(3);
     private static final BigInteger GAS_LIMIT = BigInteger.valueOf(21_000);
-    private static final BigInteger GAS_FEE = GAS_PRICE.multiply(Stage2GasConstants.NATIVE_TRANSFER_GAS_COST); // 60_000
+    private static final BigInteger GAS_FEE = GAS_PRICE.multiply(GasConstants.NATIVE_TRANSFER_GAS_COST); // 60_000
 
     private ClientContext clientContext;
     private MessageHandler messageHandler;

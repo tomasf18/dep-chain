@@ -16,7 +16,7 @@ import ist.depchain.common.utils.Crypto;
 import ist.depchain.common.Transaction;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionValidator;
-import ist.depchain.tests.stage2.Stage2GasConstants;
+import ist.depchain.tests.stage2.GasConstants;
 
 /**
  * Unit tests for: Transaction validation logic, including signature verification,
@@ -38,7 +38,7 @@ class TransactionValidationTest {
 
         Transaction unsignedTx = new Transaction(
                 from, to, BigInteger.valueOf(100), new byte[0],
-            BigInteger.ONE, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
+            BigInteger.ONE, GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
         );
 
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
@@ -60,7 +60,7 @@ class TransactionValidationTest {
 
         Transaction unsignedTx = new Transaction(
                 from, to, BigInteger.valueOf(100), new byte[0],
-            BigInteger.ONE, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
+            BigInteger.ONE, GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
         );
 
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
@@ -83,7 +83,7 @@ class TransactionValidationTest {
 
         Transaction unsignedTx = new Transaction(
                 from, to, BigInteger.valueOf(5), new byte[0],
-            BigInteger.ONE, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
+            BigInteger.ONE, GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
         );
 
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
@@ -107,7 +107,7 @@ class TransactionValidationTest {
 
         Transaction unsignedTx = new Transaction(
                 from1, to, BigInteger.valueOf(100), new byte[0],
-            BigInteger.ONE, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
+            BigInteger.ONE, GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
         );
 
         byte[] wrongSig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp2.getPrivate(), "SHA256withECDSA");
@@ -129,7 +129,7 @@ class TransactionValidationTest {
 
         Transaction unsignedTx = new Transaction(
                 from, to, BigInteger.valueOf(100), new byte[0],
-            BigInteger.ONE, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
+            BigInteger.ONE, GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
         );
 
         var result = TransactionValidator.validate(unsignedTx, pub, "SHA256withECDSA", ws, null);
@@ -149,7 +149,7 @@ class TransactionValidationTest {
 
         Transaction unsignedTx = new Transaction(
                 from, to, BigInteger.valueOf(100), new byte[0],
-            BigInteger.ONE, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
+            BigInteger.ONE, GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
         );
 
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
@@ -172,7 +172,7 @@ class TransactionValidationTest {
 
         Transaction unsignedTx = new Transaction(
                 from, to, BigInteger.valueOf(100), new byte[0],
-            BigInteger.ZERO, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
+            BigInteger.ZERO, GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
         );
 
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
@@ -218,7 +218,7 @@ class TransactionValidationTest {
 
         Transaction unsignedTx = new Transaction(
                 from, to, BigInteger.valueOf(-1), new byte[0],
-            BigInteger.ONE, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
+            BigInteger.ONE, GasConstants.NATIVE_TRANSFER_GAS_COST, 0, null
         );
 
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");

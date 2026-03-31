@@ -48,7 +48,7 @@ import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
  * but claims to be "client1") -> servers reject because the signature
  * does not verify against client1's public key.
  */
-class InvalidOuterSignatureStage2Test {
+class InvalidOuterSignatureTest {
         private static final String CONFIG_FILE = "../config/config-dev.json";
         private static final String[] REPLICAS = { "s0", "s1", "s2", "s3" };
 

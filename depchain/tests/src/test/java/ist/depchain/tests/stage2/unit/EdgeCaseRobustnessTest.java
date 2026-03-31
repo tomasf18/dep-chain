@@ -21,7 +21,7 @@ import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.EvmService;
 import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
-import ist.depchain.tests.stage2.Stage2GasConstants;
+import ist.depchain.tests.stage2.GasConstants;
 
 /**
  * Guarantee: degenerate but technically valid inputs (self-transfers,
@@ -35,7 +35,7 @@ class EdgeCaseRobustnessTest {
 
     private static final BigInteger GAS_PRICE = BigInteger.ONE;
     private static final BigInteger GAS_LIMIT = BigInteger.valueOf(21_000);
-    private static final BigInteger NATIVE_GAS_COST = Stage2GasConstants.NATIVE_TRANSFER_GAS_COST;
+    private static final BigInteger NATIVE_GAS_COST = GasConstants.NATIVE_TRANSFER_GAS_COST;
     private static final BigInteger ERC20_GAS_LIMIT = BigInteger.valueOf(100_000);
 
     private static final Address ALICE = Address.fromHexString("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");

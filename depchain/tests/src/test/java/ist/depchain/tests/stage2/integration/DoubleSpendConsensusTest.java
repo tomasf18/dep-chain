@@ -28,7 +28,7 @@ import ist.depchain.common.utils.TransactionSigner;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
-import ist.depchain.tests.stage2.Stage2GasConstants;
+import ist.depchain.tests.stage2.GasConstants;
 
 /**
  * Guarantee: a client cannot spend the same funds twice.
@@ -47,7 +47,7 @@ class DoubleSpendConsensusTest {
 
     private static final BigInteger GAS_PRICE = BigInteger.valueOf(3);
     private static final BigInteger GAS_LIMIT = BigInteger.valueOf(21_000);
-    private static final BigInteger GAS_FEE = GAS_PRICE.multiply(Stage2GasConstants.NATIVE_TRANSFER_GAS_COST);
+    private static final BigInteger GAS_FEE = GAS_PRICE.multiply(GasConstants.NATIVE_TRANSFER_GAS_COST);
     private static final BigInteger TRANSFER_VALUE = BigInteger.valueOf(100);
     private static final Address RECEIVER_A = Address.fromHexString("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     private static final Address RECEIVER_B = Address.fromHexString("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");

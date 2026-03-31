@@ -6,7 +6,7 @@ import ist.depchain.client.ClientLibrary;
 import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.blockchain.DepChainWorldState;
-import ist.depchain.tests.stage2.Stage2GasConstants;
+import ist.depchain.tests.stage2.GasConstants;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 
 import org.hyperledger.besu.datatypes.Address;
@@ -37,7 +37,7 @@ class NativeTransferHotStuffTest {
 
     private static final String RECEIVER_HEX = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     private static final BigInteger GAS_PRICE = BigInteger.ONE;
-    private static final BigInteger GAS_LIMIT = Stage2GasConstants.NATIVE_TRANSFER_GAS_COST;
+    private static final BigInteger GAS_LIMIT = GasConstants.NATIVE_TRANSFER_GAS_COST;
 
     private ClientContext clientContext;
     private MessageHandler messageHandler;

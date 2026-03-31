@@ -25,7 +25,7 @@ import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 import ist.depchain.client.ClientContext;
 
-class ByzantineLeaderMalformedBlockStage2Test {
+class ByzantineLeaderMalformedBlockTest {
 
 	@Test
 	void honestReplicaRejectsForgedTransactionInPrepare() throws Exception {

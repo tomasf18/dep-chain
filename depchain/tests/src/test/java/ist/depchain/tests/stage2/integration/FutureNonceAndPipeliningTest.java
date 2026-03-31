@@ -27,7 +27,7 @@ import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionValidator;
 import ist.depchain.core.blockchain.ValidationResult;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
-import ist.depchain.tests.stage2.Stage2GasConstants;
+import ist.depchain.tests.stage2.GasConstants;
 
 /**
  * Guarantee: future nonces (txNonce > committedNonce) are accepted at
@@ -57,7 +57,7 @@ class FutureNonceAndPipeliningTest {
 
         // Submit nonce 5 (future nonce, committed is 0)
         Transaction unsignedTx = new Transaction(from, to, BigInteger.valueOf(100), new byte[0],
-                BigInteger.ONE, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, 5, null);
+                BigInteger.ONE, GasConstants.NATIVE_TRANSFER_GAS_COST, 5, null);
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
         Transaction signed = unsignedTx.withSignature(sig);
 
@@ -75,7 +75,7 @@ class FutureNonceAndPipeliningTest {
         ws.createEOA(from, 0, BigInteger.valueOf(1_000_000));
 
         Transaction unsignedTx = new Transaction(from, to, BigInteger.valueOf(100), new byte[0],
-                BigInteger.ONE, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, 5, null);
+                BigInteger.ONE, GasConstants.NATIVE_TRANSFER_GAS_COST, 5, null);
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
         Transaction signed = unsignedTx.withSignature(sig);
 
@@ -99,7 +99,7 @@ class FutureNonceAndPipeliningTest {
 
         // Submit nonce 3 (stale)
         Transaction unsignedTx = new Transaction(from, to, BigInteger.valueOf(100), new byte[0],
-                BigInteger.ONE, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, 3, null);
+                BigInteger.ONE, GasConstants.NATIVE_TRANSFER_GAS_COST, 3, null);
         byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
         Transaction signed = unsignedTx.withSignature(sig);
 
@@ -122,7 +122,7 @@ class FutureNonceAndPipeliningTest {
         // Submit nonces 0, 1, 2 (pipelined) - each should be accepted
         for (int nonce = 0; nonce < 3; nonce++) {
             Transaction unsignedTx = new Transaction(from, to, BigInteger.valueOf(100), new byte[0],
-                    BigInteger.ONE, Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, nonce, null);
+                    BigInteger.ONE, GasConstants.NATIVE_TRANSFER_GAS_COST, nonce, null);
             byte[] sig = Crypto.sign(unsignedTx.toUnsignedBytes(), kp.getPrivate(), "SHA256withECDSA");
             Transaction signed = unsignedTx.withSignature(sig);
 

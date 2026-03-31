@@ -6,7 +6,7 @@ It is meant as a quick orientation guide.
 
 ## Shared Test Utility
 
-### Stage2GasConstants
+### GasConstants
 - `NATIVE_TRANSFER_GAS_COST` - Shared constant for the fixed gas cost of a native transfer in Stage 2 tests. It keeps gas-related assertions consistent across the suite.
 
 ## Block Building, Ordering, and Persistence
@@ -91,7 +91,7 @@ It is meant as a quick orientation guide.
 - `equalFeeTransactionsFromDifferentClientsProduceIdenticalBlockOrderAcrossReplicas` - Verifies equal-fee transactions from different clients produce identical block ordering on all replicas.
 - `multipleEqualFeeTransactionsProduceConsistentStateAcrossReplicas` - Verifies multiple equal-fee transactions from both clients produce consistent state across replicas.
 
-### ByzantineLeaderMalformedBlockStage2Test
+### ByzantineLeaderMalformedBlockTest
 - `honestReplicaRejectsForgedTransactionInPrepare` - Verifies a block carrying a forged transaction signature is rejected before it is cached or executed.
 - `honestReplicaRejectsUnsignedTransactionInjectedByLeader` - Verifies an unsigned transaction injected by the leader is rejected.
 - `honestReplicaRejectsDuplicateNonceTransactionsInSameBlock` - Verifies a malicious block with two transactions that reuse the same sender nonce is rejected deterministically.
@@ -209,7 +209,7 @@ It is meant as a quick orientation guide.
 
 ## Invalid Signature / Signer Mismatch (B)
 
-### InvalidOuterSignatureStage2Test
+### InvalidOuterSignatureTest
 - `forgedOuterSignatureIsDroppedByServers` - Verifies a client request signed with a random key is silently dropped by all replicas.
 - `missingOuterSignatureIsDroppedByServers` - Verifies a client request with an empty signature field is rejected by all replicas.
 - `tamperedRequestBodyIsDroppedByServers` - Verifies a validly signed request whose body is modified after signing is rejected.

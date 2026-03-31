@@ -18,7 +18,7 @@ import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.blockchain.TransactionValidator;
 import ist.depchain.core.blockchain.ValidationResult;
-import ist.depchain.tests.stage2.Stage2GasConstants;
+import ist.depchain.tests.stage2.GasConstants;
 
 /**
  * Guarantee: malformed fee/gas parameters do not break safety or produce
@@ -38,7 +38,7 @@ class GasParameterEdgeCasesTest {
     private static final Address ALICE = Address.fromHexString("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     private static final Address BOB = Address.fromHexString("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
     private static final Address PROPOSER = Address.fromHexString("0xcccccccccccccccccccccccccccccccccccccccc");
-    private static final BigInteger NATIVE_GAS_COST = Stage2GasConstants.NATIVE_TRANSFER_GAS_COST;
+    private static final BigInteger NATIVE_GAS_COST = GasConstants.NATIVE_TRANSFER_GAS_COST;
 
     private DepChainWorldState ws;
     private TransactionExecutor executor;

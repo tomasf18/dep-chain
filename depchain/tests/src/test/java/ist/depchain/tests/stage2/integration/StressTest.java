@@ -7,7 +7,7 @@ import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
-import ist.depchain.tests.stage2.Stage2GasConstants;
+import ist.depchain.tests.stage2.GasConstants;
 
 import org.hyperledger.besu.datatypes.Address;
 import org.junit.jupiter.api.AfterEach;
@@ -44,7 +44,7 @@ class StressTest {
     private static final BigInteger INITIAL_BALANCE = BigInteger.valueOf(10_000_000);
     private static final BigInteger TX_VALUE = BigInteger.valueOf(100);
     private static final BigInteger GAS_PRICE = BigInteger.ONE;
-    private static final BigInteger GAS_LIMIT = Stage2GasConstants.NATIVE_TRANSFER_GAS_COST;
+    private static final BigInteger GAS_LIMIT = GasConstants.NATIVE_TRANSFER_GAS_COST;
     private static final int NUM_TXS_EACH = 20; // 40 txs total
 
     private ClientContext ctx1, ctx2;

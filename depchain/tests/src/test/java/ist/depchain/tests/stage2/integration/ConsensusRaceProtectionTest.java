@@ -37,7 +37,7 @@ import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
-import ist.depchain.tests.stage2.Stage2GasConstants;
+import ist.depchain.tests.stage2.GasConstants;
 
 /**
  * Scenario: test that consensus and execution correctly
@@ -60,7 +60,7 @@ class ConsensusRaceProtectionTest {
 
     private static final BigInteger TRANSFER_GAS_PRICE = BigInteger.valueOf(3);
     private static final BigInteger TRANSFER_GAS_LIMIT = BigInteger.valueOf(21_000);
-    private static final BigInteger TRANSFER_GAS_USED = Stage2GasConstants.NATIVE_TRANSFER_GAS_COST;
+    private static final BigInteger TRANSFER_GAS_USED = GasConstants.NATIVE_TRANSFER_GAS_COST;
     private static final BigInteger TRANSFER_VALUE = BigInteger.valueOf(1_000);
 
     private ClientContext client1Context;

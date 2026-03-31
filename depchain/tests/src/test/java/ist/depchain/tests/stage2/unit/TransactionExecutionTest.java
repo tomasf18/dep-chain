@@ -13,7 +13,7 @@ import ist.depchain.common.utils.ClientResponseHelper;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
-import ist.depchain.tests.stage2.Stage2GasConstants;
+import ist.depchain.tests.stage2.GasConstants;
 
 /**
  * Unit tests for TransactionExecutor.
@@ -23,8 +23,8 @@ import ist.depchain.tests.stage2.Stage2GasConstants;
 class TransactionExecutionTest {
 
     private static final BigInteger GAS_PRICE = BigInteger.ONE;
-    private static final BigInteger GAS_LIMIT = Stage2GasConstants.NATIVE_TRANSFER_GAS_COST;
-    private static final BigInteger NATIVE_TRANSFER_GAS = Stage2GasConstants.NATIVE_TRANSFER_GAS_COST;
+    private static final BigInteger GAS_LIMIT = GasConstants.NATIVE_TRANSFER_GAS_COST;
+    private static final BigInteger NATIVE_TRANSFER_GAS = GasConstants.NATIVE_TRANSFER_GAS_COST;
 
     private static final Address ALICE = Address.fromHexString("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     private static final Address BOB = Address.fromHexString("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");

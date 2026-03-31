@@ -24,7 +24,7 @@ import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.hotstuff.CommandMempool;
-import ist.depchain.tests.stage2.Stage2GasConstants;
+import ist.depchain.tests.stage2.GasConstants;
 
 /**
  * Unit tests for Consensus Integration.
@@ -423,7 +423,7 @@ class ConsensusIntegrationTest {
         assertEquals("insufficient balance for upfront cost", receipts.get(2).getError());
 
         // BOB received only the first two transfers
-        assertEquals(Stage2GasConstants.NATIVE_TRANSFER_GAS_COST, ws.getBalance(BOB));
+        assertEquals(GasConstants.NATIVE_TRANSFER_GAS_COST, ws.getBalance(BOB));
         // Alice's balance unchanged by the failed tx
         assertEquals(BigInteger.valueOf(30_000), ws.getBalance(ALICE));
     }
