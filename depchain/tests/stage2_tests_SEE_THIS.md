@@ -56,7 +56,7 @@ It is meant as a quick orientation guide.
 - `clientResponsePreservesExtendedReceiptFields` - Verifies client responses preserve receipt hash, return data, contract address, gas used, and fee during serialization.
 - `clientResponseAllowsEmptyOptionalReceiptFields` - Verifies optional receipt fields can be omitted and remain empty after parsing.
 
-### ClientResponseCodecTest
+### ClientResponseHelperTest
 - `nativeBalanceSnapshotRoundTrips` - Verifies native-balance query payloads encode and decode both the balance and the state hash snapshot.
 - `committedResponseFormattingDecodesNativeAndTokenBalances` - Verifies committed responses are formatted correctly for native balance and ERC-20 balance queries.
 - `canonicalResponseIdDependsOnReturnData` - Verifies response identity changes when `returnData` changes, which matters for Byzantine quorum comparison.

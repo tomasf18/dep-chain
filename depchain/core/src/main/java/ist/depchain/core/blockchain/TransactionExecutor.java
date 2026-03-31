@@ -6,7 +6,7 @@ import org.hyperledger.besu.datatypes.Address;
 import org.apache.tuweni.bytes.Bytes;
 
 import ist.depchain.common.Transaction;
-import ist.depchain.common.utils.ClientResponseCodec;
+import ist.depchain.common.utils.ClientResponseHelper;
 
 /**
  * Executes transactions against a provided world state.
@@ -97,7 +97,7 @@ public class TransactionExecutor {
 
         BigInteger targetBalance = state.getBalance(target);
         String stateHash = state.computeStateHash();
-        byte[] returnData = ClientResponseCodec.encodeNativeBalanceSnapshot(targetBalance, stateHash);
+        byte[] returnData = ClientResponseHelper.encodeNativeBalanceSnapshot(targetBalance, stateHash);
 
         return TransactionReceipt.success(txHash, gasUsed, fee, returnData, null);
     }

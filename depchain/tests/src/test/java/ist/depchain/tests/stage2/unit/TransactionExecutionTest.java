@@ -9,7 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import ist.depchain.common.Transaction;
-import ist.depchain.common.utils.ClientResponseCodec;
+import ist.depchain.common.utils.ClientResponseHelper;
 import ist.depchain.core.blockchain.DepChainWorldState;
 import ist.depchain.core.blockchain.TransactionExecutor;
 import ist.depchain.core.blockchain.TransactionReceipt;
@@ -218,8 +218,8 @@ class TransactionExecutionTest {
         BigInteger expectedFee = GAS_PRICE.multiply(NATIVE_TRANSFER_GAS);
         assertEquals(expectedFee, receipt.getFee());
 
-        ClientResponseCodec.NativeBalanceSnapshot snapshot =
-                ClientResponseCodec.decodeNativeBalanceSnapshot(receipt.getReturnData());
+        ClientResponseHelper.NativeBalanceSnapshot snapshot =
+                ClientResponseHelper.decodeNativeBalanceSnapshot(receipt.getReturnData());
 
         assertEquals(BigInteger.valueOf(42_000), snapshot.getBalance());
         assertEquals(

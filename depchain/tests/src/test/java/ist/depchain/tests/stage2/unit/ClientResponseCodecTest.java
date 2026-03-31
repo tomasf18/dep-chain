@@ -8,23 +8,23 @@ import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
 
 import ist.depchain.common.ClientResponse;
-import ist.depchain.common.utils.ClientResponseCodec;
+import ist.depchain.common.utils.ClientResponseHelper;
 
 /**
- * Unit tests for ClientResponseCodec, which handles encoding/decoding of client response data,
+ * Unit tests for ClientResponseHelper, which handles encoding/decoding of client response data,
  * especially for native balance snapshots and formatting committed responses.
  */
-class ClientResponseCodecTest {
+class ClientResponseHelperTest {
 
     @Test
     void nativeBalanceSnapshotRoundTrips() {
         BigInteger balance = BigInteger.valueOf(123_456_789);
         String stateHash = "0x" + "ab".repeat(32);
 
-        byte[] encoded = ClientResponseCodec.encodeNativeBalanceSnapshot(balance, stateHash);
+        byte[] encoded = ClientResponseHelper.encodeNativeBalanceSnapshot(balance, stateHash);
         assertEquals(64, encoded.length);
 
-        ClientResponseCodec.NativeBalanceSnapshot decoded = ClientResponseCodec.decodeNativeBalanceSnapshot(encoded);
+        ClientResponseHelper.NativeBalanceSnapshot decoded = ClientResponseHelper.decodeNativeBalanceSnapshot(encoded);
         assertEquals(balance, decoded.getBalance());
         assertEquals(stateHash, decoded.getStateHash());
     }
@@ -32,15 +32,15 @@ class ClientResponseCodecTest {
     @Test
     void committedResponseFormattingDecodesNativeAndTokenBalances() {
         String stateHash = "0x" + "11".repeat(32);
-        byte[] nativePayload = ClientResponseCodec.encodeNativeBalanceSnapshot(BigInteger.valueOf(999), stateHash);
+        byte[] nativePayload = ClientResponseHelper.encodeNativeBalanceSnapshot(BigInteger.valueOf(999), stateHash);
         byte[] tokenPayload = BigInteger.valueOf(777).toByteArray();
 
         ClientResponse nativeResponse = baseResponse(nativePayload);
         ClientResponse tokenResponse = baseResponse(tokenPayload);
 
-        String nativeFormatted = ClientResponseCodec.formatCommittedResponse(
+        String nativeFormatted = ClientResponseHelper.formatCommittedResponse(
                 "native.balanceOf(0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)", nativeResponse);
-        String tokenFormatted = ClientResponseCodec.formatCommittedResponse(
+        String tokenFormatted = ClientResponseHelper.formatCommittedResponse(
                 "erc20.balanceOf(0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)", tokenResponse);
 
         assertTrue(nativeFormatted.contains("Native balance: 999 DepCoin"));
@@ -53,8 +53,8 @@ class ClientResponseCodecTest {
         ClientResponse responseA = baseResponse(new byte[] { 0x01 });
         ClientResponse responseB = baseResponse(new byte[] { 0x02 });
 
-        String idA = ClientResponseCodec.canonicalResponseId(responseA);
-        String idB = ClientResponseCodec.canonicalResponseId(responseB);
+        String idA = ClientResponseHelper.canonicalResponseId(responseA);
+        String idB = ClientResponseHelper.canonicalResponseId(responseB);
 
         assertNotEquals(idA, idB);
     }
@@ -62,7 +62,7 @@ class ClientResponseCodecTest {
     @Test
     void malformedNativeBalanceSnapshotIsRejected() {
         assertThrows(IllegalArgumentException.class,
-                () -> ClientResponseCodec.decodeNativeBalanceSnapshot(new byte[10]));
+                () -> ClientResponseHelper.decodeNativeBalanceSnapshot(new byte[10]));
     }
 
     private static ClientResponse baseResponse(byte[] returnData) {

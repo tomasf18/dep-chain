@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.web3j.utils.Numeric;
 
 import ist.depchain.common.ClientResponse;
-import ist.depchain.common.utils.ClientResponseCodec;
+import ist.depchain.common.utils.ClientResponseHelper;
 
 public class MessageHandler {
     private final ClientContext clientContext;
@@ -110,7 +110,7 @@ public class MessageHandler {
     }
 
     private String makeResponseId(ClientResponse response) {
-        return ClientResponseCodec.canonicalResponseId(response);
+        return ClientResponseHelper.canonicalResponseId(response);
     }
 
     private void printReceiptInfo(ClientResponse response, String requestDescription) {
@@ -139,7 +139,7 @@ public class MessageHandler {
             System.out.println("    returnData  = 0x" + Numeric.toHexStringNoPrefix(response.getReturnData().toByteArray()));
         }
 
-        String formattedResult = ClientResponseCodec.formatCommittedResponse(requestDescription, response);
+        String formattedResult = ClientResponseHelper.formatCommittedResponse(requestDescription, response);
         if (!formattedResult.isBlank()) {
             System.out.println(formattedResult);
         }
