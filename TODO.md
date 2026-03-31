@@ -5,14 +5,16 @@ Important:
 
 ## TODO
 
+- READ OPERATIONS bothe Native and ERC20 balanceOf (client should be able to ask for their token balance and the replica should reply with it, provided the replica response includes the information needed to verify the balance is correct)
+ Clients should see their balance by requesting nodes for it. But replicas sending an entire chain of blocks is very inefficient since it can be huge. We must consider a better alternative to ensure the client receives the state and can verify it is correct (merkle proofs, or maybe a snapshot of the state at a certain block number, etc) **EVERY REPLICA KEEPS A MERKLE ROOT OF THE WORLD STATE, WHEN CLIENT WANTS TO VERIFY ITS BALANCE, THE MERKLE ROOT CAN BE PROVIDED AND IF IT IS EQUAL FOR f+1 REPLICAS, THE CLIENT CAN TRUST THE BALANCE** -> this might not work because the client might want to verify a balance that is not in the latest block, but in a previous one. In that case, we can provide the client with the block hash and the state hash of that block, and the client can verify that the state hash matches the one in the block, and then verify that the balance is correct according to that state hash. This way, we can ensure that the client can verify their balance without having to receive the entire chain of blocks.
+**WE NEED TO FIND A WAY OF GIVING THE CLIENT A LIGHT WAY OF VERIFYING THE RESPONSE** -> pedro, pensa nesta merda
+- add servers initial state to the genesis bloc
+- add smart contract (runtime code, bytecode de runtime) state to genesis (a contract account includes: nonce, balance, storage, code)
 - adapt stage 1 tests (adversary tests only, *go fetch them at the last stage 1 commit*) to stage 2 - **IMPORTANT: YOU SHOULD ALSO ADAPT THE PRUNING** 
 - inlude "guaranteee that the f+1 received responses are actually identical" test
 - after adapting to stage 2, remove stage 1 folder
-- READ OPERATIONS bothe Native and ERC20 balanceOf (client should be able to ask for their token balance and the replica should reply with it, provided the replica response includes the information needed to verify the balance is correct)
- Clients should see their balance by requesting nodes for it. But replicas sending an entire chain of blocks is very inefficient since it can be huge. We must consider a better alternative to ensure the client receives the state and can verify it is correct (merkle proofs, or maybe a snapshot of the state at a certain block number, etc) **EVERY REPLICA KEEPS A MERKLE ROOT OF THE WORLD STATE, WHEN CLIENT WANTS TO VERIFY ITS BALANCE, THE MERKLE ROOT CAN BE PROVIDED AND IF IT IS EQUAL FOR f+1 REPLICAS, THE CLIENT CAN TRUST THE BALANCE** -> this might not work because the client might want to verify a balance that is not in the latest block, but in a previous one. In that case, we can provide the client with the block hash and the state hash of that block, and the client can verify that the state hash matches the one in the block, and then verify that the balance is correct according to that state hash. This way, we can ensure that the client can verify their balance without having to receive the entire chain of blocks.
- **But if the client receives f+1 equal responses that include the state hash, can't it assume the balance is correct?**
 
-- add servers and smart contract (runtime code, bytecode de runtime) state to genesis -> IS THIS REALLY NEEDED?
+
 - check TODO-TESTS.md for more details on the tests that are still missing.
 
 ## Completed
