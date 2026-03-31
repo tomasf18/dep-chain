@@ -13,6 +13,7 @@ Important:
 - adapt stage 1 tests (adversary tests only, *go fetch them at the last stage 1 commit*) to stage 2 - **IMPORTANT: YOU SHOULD ALSO ADAPT THE PRUNING** 
 - inlude "guaranteee that the f+1 received responses are actually identical" test
 - after adapting to stage 2, remove stage 1 folder
+- add tests that use the config-test.json configuration file, with the non-zero probabilities 
 
 
 - check TODO-TESTS.md for more details on the tests that are still missing.
