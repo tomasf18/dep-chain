@@ -3,7 +3,6 @@ package ist.depchain.tests.stage2;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.math.BigInteger;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
@@ -21,25 +20,21 @@ import ist.depchain.client.MessageHandler;
 import ist.depchain.common.utils.Config;
 import ist.depchain.core.ServerApp;
 import ist.depchain.core.blockchain.DepChainWorldState;
-import ist.depchain.core.blockchain.BlockChainBlock;
-import ist.depchain.core.blockchain.TransactionReceipt;
 import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
 
 /**
- * Approval frontrunning resistance tests (TODO-TESTS §A).
- *
  * Guarantee: a spender cannot exploit an allowance reduction to spend
  * old + new allowance cumulatively.  Our ERC-20 uses increaseAllowance /
- * decreaseAllowance instead of raw approve(), and approve(non-zero → non-zero)
+ * decreaseAllowance instead of raw approve(), and approve(non-zero -> non-zero)
  * reverts, which eliminates the classic frontrunning attack vector.
  *
  * Test scenarios:
  *   1. Owner grants allowance 100, spender spends 100, owner decreases by 50
- *      → total extracted is exactly 100, not 150.
+ *      -> total extracted is exactly 100, not 150.
  *   2. Spender races owner's decrease: spender spends full allowance before
- *      the decrease lands → decrease is a no-op (allowance already 0), total
+ *      the decrease lands -> decrease is a no-op (allowance already 0), total
  *      extracted is bounded by original allowance.
- *   3. Owner tries approve() to replace non-zero allowance → reverts,
+ *   3. Owner tries approve() to replace non-zero allowance -> reverts,
  *      preventing the classic ERC-20 race.
  */
 class ApprovalFrontrunningResistanceTest {
@@ -113,7 +108,6 @@ class ApprovalFrontrunningResistanceTest {
     }
 
     /**
-     * Classic frontrunning scenario from TODO-TESTS §A:
      * 1. Owner grants spender allowance of 100.
      * 2. Spender races to transferFrom(100) before the owner's decrease lands.
      * 3. Owner submits decreaseAllowance(50).
@@ -165,13 +159,10 @@ class ApprovalFrontrunningResistanceTest {
     }
 
     /**
-     * Owner increases allowance, spender spends part, owner decreases remainder,
-     * spender cannot spend more.
-     *
      * 1. Owner grants 100.
      * 2. Spender spends 60.
      * 3. Owner decreases by 40 (remaining = 0).
-     * 4. Spender attempts transferFrom(1) → reverts (allowance = 0).
+     * 4. Spender attempts transferFrom(1) -> reverts (allowance = 0).
      * 5. Total extracted = 60, not 100.
      */
     @Test
@@ -194,7 +185,7 @@ class ApprovalFrontrunningResistanceTest {
                 initialAllowance.subtract(spendAmount),
                 120_000);
 
-        // Owner decreases by 40 → allowance goes from 40 to 0
+        // Owner decreases by 40 -> allowance goes from 40 to 0
         ownerLibrary.submitDecreaseAllowance(spender.toHexString(), decreaseAmount, GAS_PRICE, GAS_LIMIT);
         waitForReplicaState(owner, spender,
                 TOKEN_INITIAL_SUPPLY.subtract(spendAmount),
@@ -223,7 +214,7 @@ class ApprovalFrontrunningResistanceTest {
     }
 
     /**
-     * approve(non-zero → non-zero) is rejected, closing the classic frontrunning
+     * approve(non-zero -> non-zero) is rejected, closing the classic frontrunning
      * vector where a spender observes an incoming approve() and races to spend
      * the old allowance first.
      */
