@@ -42,14 +42,7 @@ public class ClientLibrary {
         String requestDescription = "native.balanceOf(" + selfAddress.toHexString() + ")";
         long nonce = clientContext.getNonce();
 
-        Transaction unsignedTx = Transaction.nativeBalanceQuery(
-            clientContext.getSelfAddress(),
-            selfAddress,
-            QUERY_GAS_PRICE,
-            QUERY_GAS_LIMIT,
-            nonce,
-            null
-        );
+        Transaction unsignedTx = Transaction.nativeBalanceQuery(clientContext.getSelfAddress(), selfAddress, QUERY_GAS_PRICE, QUERY_GAS_LIMIT, nonce, null);
 
         Transaction signedTx = TransactionSigner.sign(unsignedTx, clientContext.getPrivateKey(), clientContext.getConfig().getSignatureAlgorithm());
 

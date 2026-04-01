@@ -17,23 +17,23 @@ import ist.depchain.common.Transaction;
  * Builds a block from a list of transactions.
  *
  * Ordering rule:
- *   1. Highest transaction fee first (gasPrice * gasLimit, descending)
- *   2. Per-sender nonce ordering is strictly preserved (nonce N+1 cannot
- *      appear before nonce N for the same sender)
- *   3. Tie-breaker: lexicographic order of transaction hash (ascending)
+ * 1. Highest transaction fee first (gasPrice * gasLimit, descending)
+ * 2. Per-sender nonce ordering is strictly preserved (nonce N+1 cannot
+ * appear before nonce N for the same sender)
+ * 3. Tie-breaker: lexicographic order of transaction hash (ascending)
  *
  */
 public class BlockBuilder {
 
-    private static final Comparator<Transaction> FEE_ORDER =
-            Comparator.comparing(Transaction::getMaxFee).reversed()
-                    .thenComparing(tx -> Numeric.toHexStringNoPrefix(tx.txHash()));
+    private static final Comparator<Transaction> FEE_ORDER = Comparator.comparing(Transaction::getMaxFee).reversed()
+            .thenComparing(tx -> Numeric.toHexStringNoPrefix(tx.txHash()));
 
     public BlockBuilder() {
         // No state, so no constructor parameters
     }
 
-    public static BlockChainBlock build(List<Transaction> transactions, BlockChainBlock previousBlock, Address proposer) {
+    public static BlockChainBlock build(List<Transaction> transactions, BlockChainBlock previousBlock,
+            Address proposer) {
         List<Transaction> ordered = orderTransactions(transactions);
 
         String previousHash = previousBlock != null ? previousBlock.getBlockHash() : null;
@@ -46,7 +46,7 @@ public class BlockBuilder {
 
     /**
      * Orders transactions by descending fee while strictly respecting per-sender
-     * nonce order.  For each sender, only the transaction with the lowest unseen
+     * nonce order. For each sender, only the transaction with the lowest unseen
      * nonce is eligible; among all eligible transactions the one with the highest
      * fee wins
      */
@@ -56,12 +56,14 @@ public class BlockBuilder {
             transactionsBySender.computeIfAbsent(tx.getFrom(), ignored -> new LinkedList<>()).add(tx);
         }
 
-        // for each sender, sort their transactions by nonce ascending, so we can easily pick the next eligible transaction
+        // for each sender, sort their transactions by nonce ascending, so we can easily
+        // pick the next eligible transaction
         for (LinkedList<Transaction> senderTransactions : transactionsBySender.values()) {
             senderTransactions.sort(Comparator.comparingLong(Transaction::getNonce));
         }
 
-        // use a priority queue to always pick the eligible transaction with the highest fee
+        // use a priority queue to always pick the eligible transaction with the highest
+        // fee
         PriorityQueue<Transaction> readyTransactions = new PriorityQueue<>(FEE_ORDER);
         for (LinkedList<Transaction> senderTransactions : transactionsBySender.values()) {
             if (!senderTransactions.isEmpty()) {
@@ -69,7 +71,8 @@ public class BlockBuilder {
             }
         }
 
-        // repeatedly pick the next transaction with the highest fee, and add the next transaction from the same sender to the queue if there is one
+        // repeatedly pick the next transaction with the highest fee, and add the next
+        // transaction from the same sender to the queue if there is one
         List<Transaction> orderedTransactions = new ArrayList<>(transactions.size());
         while (!readyTransactions.isEmpty()) {
             Transaction nextTransaction = readyTransactions.poll();
@@ -83,7 +86,8 @@ public class BlockBuilder {
         return orderedTransactions;
     }
 
-    public static BlockChainBlock finalize(BlockChainBlock executedBlock, List<TransactionReceipt> receipts, String stateHash) {
+    public static BlockChainBlock finalize(BlockChainBlock executedBlock, List<TransactionReceipt> receipts,
+            String stateHash) {
         return new BlockChainBlock(
                 executedBlock.getBlockHash(),
                 executedBlock.getPreviousBlockHash(),
@@ -91,7 +95,6 @@ public class BlockBuilder {
                 receipts,
                 executedBlock.getBlockNumber(),
                 executedBlock.getProposer(),
-                stateHash
-        );
+                stateHash);
     }
 }

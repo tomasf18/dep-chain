@@ -16,16 +16,21 @@ import ist.depchain.network.crypto.KeyLoader;
  *
  * Rules:
  * - tx count must match metadata count
- * - every tx is re-validated structurally (signature, signer/address, nonce, gas)
+ * - every tx is re-validated structurally (signature, signer/address, nonce,
+ * gas)
  * - semantic success is deferred to deterministic execution after consensus
- * - tx failures caused by execution (e.g. out-of-gas) are allowed, as long as the tx
- *   is otherwise valid and deterministic; they still mutate nonce/balance on the snapshot
+ * - tx failures caused by execution (e.g. out-of-gas) are allowed, as long as
+ * the tx
+ * is otherwise valid and deterministic; they still mutate nonce/balance on the
+ * snapshot
  */
 public final class BlockValidator {
 
-    private BlockValidator() {}
+    private BlockValidator() {
+    }
 
-    public static ValidationResult validateProposedBlock(Block protoBlock, DepChainWorldState committedState, Config config) {
+    public static ValidationResult validateProposedBlock(Block protoBlock, DepChainWorldState committedState,
+            Config config) {
 
         List<TransactionPayload> txPayloads = protoBlock.getTransactionsList();
         List<ClientRequestMeta> metaList = protoBlock.getRequestMetaList();
@@ -47,7 +52,8 @@ public final class BlockValidator {
                 return ValidationResult.fail("missing public key for client " + clientId);
             }
 
-            ValidationResult txResult = TransactionValidator.validate(tx, clientPublicKey, config.getSignatureAlgorithm(), snapshot, null);
+            ValidationResult txResult = TransactionValidator.validate(tx, clientPublicKey,
+                    config.getSignatureAlgorithm(), snapshot, null);
 
             if (!txResult.isValid()) {
                 return ValidationResult.fail("invalid tx at index " + i + ": " + txResult.getErrorMessage());

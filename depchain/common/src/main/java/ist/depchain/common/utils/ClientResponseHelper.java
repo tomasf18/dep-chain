@@ -49,10 +49,7 @@ public final class ClientResponseHelper {
         byte[] balanceBytes = Arrays.copyOfRange(returnData, 0, 32);
         byte[] stateHashBytes = Arrays.copyOfRange(returnData, 32, 64);
 
-        return new NativeBalanceSnapshot(
-                new BigInteger(1, balanceBytes),
-                Numeric.toHexString(stateHashBytes)
-        );
+        return new NativeBalanceSnapshot(new BigInteger(1, balanceBytes), Numeric.toHexString(stateHashBytes));
     }
 
     public static String formatCommittedResponse(String requestDescription, ClientResponse response) {

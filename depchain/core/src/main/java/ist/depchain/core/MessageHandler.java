@@ -22,6 +22,9 @@ public class MessageHandler {
     private final ServerContext serverContext;
     private final BasicHotStuffCoordinator coordinator;
     private final Set<RequestKey> pendingRequests = ConcurrentHashMap.newKeySet();
+    // We keep track of executed requests to prevent replay attacks, since clients might resend requests if they don't receive a response (e.g. due to network issues)
+    // This is separate from pendingRequests because a request can only be removed from pendingRequests when we first accept it, but we want to mark it as executed only 
+    // after it's actually committed in the blockchain.
     private final Set<RequestKey> executedRequests = ConcurrentHashMap.newKeySet();
     // Track the highest nonce seen per sender address to support pipelined transactions
     private final Map<Address, Set<Long>> pendingNonces = new ConcurrentHashMap<>();
