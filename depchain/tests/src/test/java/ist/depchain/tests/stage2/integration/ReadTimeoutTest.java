@@ -29,9 +29,9 @@ import ist.depchain.core.hotstuff.BasicHotStuffCoordinator;
  * a quorum, so the balance read must time out.
  *
  * Scenario:
- *   - s0, s1: honest, running → only 2 replicas available
- *   - s2: stopped before read
- *   - s3: stopped before read
+ * - s0, s1: honest, running -> only 2 replicas available
+ * - s2: stopped before read
+ * - s3: stopped before read
  *
  * The client submits a native balance query. Since only 2 out of 4
  * replicas are available (less than the required 2f+1 = 3), consensus
@@ -97,13 +97,13 @@ class ReadTimeoutTest {
         ServerApp.getCoordinator("s3").getServerContext().stop();
         ServerApp.getCoordinator("s3").stop();
 
-        // The balance read goes through consensus, which cannot proceed → timeout
+        // The balance read goes through consensus, which cannot proceed -> timeout
         RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> client1Library.submitNativeBalanceCheck(),
                 "read should time out when consensus cannot form a quorum");
         assertTrue(ex.getMessage().toLowerCase().contains("timeout")
-                        || ex.getMessage().toLowerCase().contains("timed out")
-                        || ex.getMessage().toLowerCase().contains("failed"),
+                || ex.getMessage().toLowerCase().contains("timed out")
+                || ex.getMessage().toLowerCase().contains("failed"),
                 "exception should indicate timeout or failure, got: " + ex.getMessage());
     }
 

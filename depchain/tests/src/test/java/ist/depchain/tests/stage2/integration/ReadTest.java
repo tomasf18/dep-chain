@@ -29,15 +29,15 @@ import ist.depchain.tests.stage2.GasConstants;
  * transactions, reads consume a nonce and pay gas fees.
  *
  * Tests:
- *  1. Read native balance at genesis (before any transfer).
- *  2. Read ERC-20 token balance at genesis.
- *  3. Read native balance after a committed transfer reflects the new state.
- *  4. Read ERC-20 balance after a committed transfer reflects the new state.
- *  5. Two sequential reads return consistent results.
- *  6. Read consumes a nonce (it is a real transaction).
- *  7. Read after two cumulative transfers returns the correct final balance.
- *  8. Both clients can independently read their own balances after a transfer.
- *  9. Receiver reads updated balance after incoming transfer.
+ * 1. Read native balance at genesis (before any transfer).
+ * 2. Read ERC-20 token balance at genesis.
+ * 3. Read native balance after a committed transfer reflects the new state.
+ * 4. Read ERC-20 balance after a committed transfer reflects the new state.
+ * 5. Two sequential reads return consistent results.
+ * 6. Read consumes a nonce (it is a real transaction).
+ * 7. Read after two cumulative transfers returns the correct final balance.
+ * 8. Both clients can independently read their own balances after a transfer.
+ * 9. Receiver reads updated balance after incoming transfer.
  * 10. State hashes match across all replicas after a read.
  */
 class ReadTest {
@@ -137,9 +137,7 @@ class ReadTest {
         stopReplicas();
     }
 
-    // ──────────────────────────────────────────────────────────
-    //  1. Genesis reads
-    // ──────────────────────────────────────────────────────────
+    // 1. Genesis reads
 
     /**
      * Read native balance before any transfer. The consensus-based read
@@ -161,9 +159,7 @@ class ReadTest {
                 "ERC-20 balance read at genesis should succeed through consensus");
     }
 
-    // ──────────────────────────────────────────────────────────
-    //  2. Reads after writes
-    // ──────────────────────────────────────────────────────────
+    // 2. Reads after writes
 
     /**
      * After a native transfer is committed, a balance read through consensus
@@ -216,15 +212,14 @@ class ReadTest {
         Address contractAddress = ServerApp.getCoordinator("s0").getServerContext().getConfig().getIstContractAddress();
         for (String replicaId : REPLICAS) {
             DepChainWorldState ws = ServerApp.getCoordinator(replicaId).getServerContext().getWorldState();
-            Address contract = ServerApp.getCoordinator(replicaId).getServerContext().getConfig().getIstContractAddress();
+            Address contract = ServerApp.getCoordinator(replicaId).getServerContext().getConfig()
+                    .getIstContractAddress();
             assertEquals(expectedTokenBalance, tokenBalanceOf(ws, contract, sender),
                     "ERC-20 balance should match on " + replicaId);
         }
     }
 
-    // ──────────────────────────────────────────────────────────
-    //  3. Consistency / nonce behavior
-    // ──────────────────────────────────────────────────────────
+    // 3. Consistency / nonce behavior
 
     /**
      * Two consecutive reads without any writes should both succeed through
@@ -255,9 +250,7 @@ class ReadTest {
                 "each read transaction should consume one nonce");
     }
 
-    // ──────────────────────────────────────────────────────────
-    //  4. Cumulative transfers
-    // ──────────────────────────────────────────────────────────
+    // 4. Cumulative transfers
 
     /**
      * After two sequential transfers, a read should succeed and all replicas
@@ -292,9 +285,7 @@ class ReadTest {
         }
     }
 
-    // ──────────────────────────────────────────────────────────
-    //  5. Multi-client reads
-    // ──────────────────────────────────────────────────────────
+    // 5. Multi-client reads
 
     /**
      * After a transfer from client1 to client2, both clients should be able to
@@ -362,9 +353,7 @@ class ReadTest {
         }
     }
 
-    // ──────────────────────────────────────────────────────────
-    //  6. State hash consistency
-    // ──────────────────────────────────────────────────────────
+    // 6. State hash consistency
 
     /**
      * After a consensus-based read, all replica state hashes should match.
