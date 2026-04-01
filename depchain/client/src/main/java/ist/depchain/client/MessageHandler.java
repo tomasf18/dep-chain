@@ -19,8 +19,6 @@ public class MessageHandler {
 
     // Per-request futures: complete normally on commit, exceptionally on rejection
     private final Map<Integer, CompletableFuture<Void>> pendingFutures = new ConcurrentHashMap<>();
-    // requestId -> set of replica IDs that sent a rejection response
-    private final Map<Integer, Set<String>> rejectionSenders = new ConcurrentHashMap<>();
 
     public MessageHandler(ClientContext clientContext) {
         this.clientContext = clientContext;
@@ -36,11 +34,28 @@ public class MessageHandler {
 
             // Handle ACCEPTED status - transaction is being processed
             if ("ACCEPTED".equals(status)) {
-                CompletableFuture<Void> future = pendingFutures.get(reqId);
-                if (future == null || future.isDone()) return;
+                if (!pendingFutures.containsKey(reqId)) return;
 
-                System.out.println("[*] (" + reqId + ", " + sourceId + "): ACCEPTED - transaction is being processed");
-                future.complete(null);
+                Map<String, Set<String>> differentResponseSenders = pendingRequests.computeIfAbsent(reqId, k -> new ConcurrentHashMap<>());
+                String responseId = makeResponseId(clientResponse);
+                Set<String> senders = differentResponseSenders.computeIfAbsent(responseId, key -> ConcurrentHashMap.newKeySet());
+                boolean isNewSender = senders.add(sourceId);
+                int count = senders.size();
+
+                if (!isNewSender) {
+                    System.out.println("[ ] (" + reqId + ", " + sourceId + "): duplicate sender ignored for ACCEPTED [" + responseId + "] (" + count + "/" + responsesThreshold + ")");
+                    return;
+                }
+
+                if (count >= responsesThreshold) {
+                    System.out.println("[*] (" + reqId + ", " + sourceId + "): [" + responseId + "] (" + count + "/" + responsesThreshold + ") ACCEPTED - transaction is being processed");
+                    CompletableFuture<Void> future = pendingFutures.get(reqId);
+                    if (future != null && !future.isDone()) {
+                        future.complete(null);
+                    }
+                } else {
+                    System.out.println("[+] (" + reqId + ", " + sourceId + "): [" + responseId + "] (" + count + "/" + responsesThreshold + ") ACCEPTED");
+                }
                 return;
             }
 
@@ -48,12 +63,20 @@ public class MessageHandler {
             if ("REJECTED".equals(status)) {
                 if (!pendingFutures.containsKey(reqId)) return;
 
-                Set<String> rejectors = rejectionSenders.computeIfAbsent(reqId, k -> ConcurrentHashMap.newKeySet());
-                rejectors.add(sourceId);
-                System.out.println("[-] (" + reqId + ", " + sourceId + "): REJECTED (" + rejectors.size() + "/" + responsesThreshold + ") error=" + clientResponse.getError());
+                Map<String, Set<String>> differentResponseSenders = pendingRequests.computeIfAbsent(reqId, k -> new ConcurrentHashMap<>());
+                String responseId = makeResponseId(clientResponse);
+                Set<String> senders = differentResponseSenders.computeIfAbsent(responseId, key -> ConcurrentHashMap.newKeySet());
+                boolean isNewSender = senders.add(sourceId);
+                int count = senders.size();
 
-                if (rejectors.size() >= responsesThreshold) {
-                    rejectionSenders.remove(reqId);
+                if (!isNewSender) {
+                    System.out.println("[ ] (" + reqId + ", " + sourceId + "): duplicate sender ignored for REJECTED [" + responseId + "] (" + count + "/" + responsesThreshold + ")");
+                    return;
+                }
+
+                System.out.println("[-] (" + reqId + ", " + sourceId + "): [" + responseId + "] (" + count + "/" + responsesThreshold + ") REJECTED error=" + clientResponse.getError());
+
+                if (count >= responsesThreshold) {
                     pendingRequests.remove(reqId);
                     clientContext.getRequestDataMap().remove(reqId);
                     CompletableFuture<Void> future = pendingFutures.remove(reqId);
@@ -94,10 +117,9 @@ public class MessageHandler {
                     }
 
                     pendingRequests.remove(reqId);
-                    rejectionSenders.remove(reqId);
                     clientContext.getRequestDataMap().remove(reqId);
 
-                    // Don't remove from pendingFutures here - it was already completed on ACCEPTED
+                    // Don't remove from pendingFutures here, it was already completed on ACCEPTED
                 } else {
                     System.out.println("[+] (" + reqId + ", " + sourceId + "): [" + responseId + "] (" + count + "/" + responsesThreshold + ")");
                 }

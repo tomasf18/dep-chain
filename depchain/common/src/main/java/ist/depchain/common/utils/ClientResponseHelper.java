@@ -4,6 +4,8 @@ import com.google.protobuf.ByteString;
 
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 import org.apache.tuweni.bytes.Bytes;
 import org.web3j.utils.Numeric;
@@ -81,21 +83,7 @@ public final class ClientResponseHelper {
     }
 
     public static String canonicalResponseId(ClientResponse response) {
-        String blockIdStr = response.getBlockId().toStringUtf8();
-        String txHashStr = Numeric.toHexStringNoPrefix(response.getTxHash().toByteArray());
-        String returnDataStr = Numeric.toHexStringNoPrefix(response.getReturnData().toByteArray());
-        String contractAddressStr = response.getContractAddress().isEmpty()
-                ? ""
-                : Numeric.toHexStringNoPrefix(response.getContractAddress().toByteArray());
-
-        return response.getRequestId()
-                + ":" + blockIdStr
-                + ":" + response.getCommitted()
-                + ":" + txHashStr
-                + ":" + response.getStatus()
-                + ":" + response.getError()
-                + ":" + returnDataStr
-                + ":" + contractAddressStr;
+        return sha256Hex(response.toByteArray());
     }
 
     private static BigInteger decodeBigEndianUnsigned(ByteString bytes) {
@@ -126,6 +114,15 @@ public final class ClientResponseHelper {
             throw new IllegalArgumentException("hex value cannot be blank");
         }
         return hex.startsWith("0x") || hex.startsWith("0X") ? hex : "0x" + hex;
+    }
+
+    private static String sha256Hex(byte[] data) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return Numeric.toHexStringNoPrefix(digest.digest(data));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 
     private static byte[] hexToBytes(String hex) {

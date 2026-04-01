@@ -49,14 +49,21 @@ class ClientResponseHelperTest {
     }
 
     @Test
-    void canonicalResponseIdDependsOnReturnData() {
+    void canonicalResponseIdDependsOnAllFields() {
         ClientResponse responseA = baseResponse(new byte[] { 0x01 });
-        ClientResponse responseB = baseResponse(new byte[] { 0x02 });
+        ClientResponse responseB = ClientResponse.newBuilder(responseA)
+                .setClientId("client2")
+                .build();
+        ClientResponse responseC = ClientResponse.newBuilder(responseA)
+                .setGasUsed(ByteString.copyFrom(new byte[] { 0x01 }))
+                .build();
 
         String idA = ClientResponseHelper.canonicalResponseId(responseA);
         String idB = ClientResponseHelper.canonicalResponseId(responseB);
+        String idC = ClientResponseHelper.canonicalResponseId(responseC);
 
         assertNotEquals(idA, idB);
+        assertNotEquals(idA, idC);
     }
 
     @Test
