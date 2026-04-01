@@ -1,6 +1,4 @@
-// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-
 import "../node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract ISTCoin is ERC20 {
@@ -20,29 +18,20 @@ contract ISTCoin is ERC20 {
         _mint(initialOwner, INITIAL_SUPPLY);
     }
 
-
-    /**
-     * @dev Returns the number of decimals used to get its user representation.
-     * For example, if `decimals` equals `2`, a balance of `505` tokens should
-     * be displayed to a user as `5.05` (`505 / 10 ** 2`).
-     */
     function decimals() public pure override returns (uint8) {
         return _DECIMALS;
     }
 
-    /**
-     * Safer allowance increase: additive update, avoids the classic
-     * nonzero->nonzero approval replacement race.
-     */
+    // Allowance increase: additive update, avoids the classic
+    // nonzero to nonzero approval replacement race condition
     function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
         address owner = _msgSender();
         _approve(owner, spender, allowance(owner, spender) + addedValue);
         return true;
     }
 
-    /**
-     * Safer allowance decrease: subtractive update.
-     */
+    
+    // Allowance decrease: subtractive update
     function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
         address owner = _msgSender();
         uint256 currentAllowance = allowance(owner, spender);
@@ -58,17 +47,7 @@ contract ISTCoin is ERC20 {
         return true;
     }
 
-    /**
-     * Keep the ERC-20 approve entrypoint, but forbid unsafe nonzero->nonzero
-     * allowance replacement. This forces clients toward the safer API.
-     *
-     * Allowed:
-     *   0   -> X
-     *   X   -> 0
-     *
-     * Rejected:
-     *   X   -> Y, where X != 0 and Y != 0
-     */
+    // Override approve to disable direct setting of nonzero allowances, forcing users to use increase/decrease functions instead
     function approve(address spender, uint256 value) public override returns (bool) {
         address owner = _msgSender();
         uint256 currentAllowance = allowance(owner, spender);

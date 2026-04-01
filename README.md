@@ -14,88 +14,103 @@ The system tolerates up to `f` Byzantine faults among `n = 3f+1` replicas. Clien
 
 | Dependency | Version |
 |---|---|
-| Java (OpenJDK) | 21 |
+| Java (OpenJDK) | 17 |
 | Maven | 3.8+ |
+| tmux | latest available |
+| openssl | required by `run.sh -k` |
 
+## Setup on a New Machine or from the Submission Archive
 
-## Setup on a New Machine
-
-### 1. Install System Dependencies (install only those you don't have)
+### 1. Install System Dependencies
 
 **Fedora / RHEL:**
 ```bash
-sudo dnf install -y java-21-openjdk-devel maven
+sudo dnf install -y java-17-openjdk-devel maven tmux openssl
 ```
 
 **Ubuntu / Debian:**
 ```bash
-sudo apt install -y openjdk-21-jdk maven
+sudo apt install -y openjdk-17-jdk maven tmux openssl
 ```
 
-Set `JAVA_HOME` if not already set (Bash shell):
+Set `JAVA_HOME` if it is not already configured:
+
 ```bash
 export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))
 ```
 
-### 2. Clone the Repository
+### 2. Obtain the Project Archive
+
+The project submission should be delivered as a self-contained zip archive. The archive should include the complete source tree plus the runtime assets needed to build and run the demo applications and tests, including:
+
+- the Maven modules under `depchain/common`, `depchain/network`, `depchain/core`, `depchain/client`, and `depchain/tests`
+- the Solidity contracts and generated ABI/bin artifacts under `depchain/solidity`
+- the keystore material used by the servers, clients, and tests
+- the native libraries under `depchain/core/native` and `depchain/tests/native`
+- the configuration files under `depchain/config`
+- this README and the Stage 2 test reference guide
+
+If you are working from source control instead of the archive, clone the repository and enter the project root:
 
 ```bash
-git clone https://github.com/tomasf18/dep-chain/tree/main
-cd depchain
+git clone https://github.com/tomasf18/dep-chain.git
+cd dep-chain/depchain
 ```
 
 ### 3. Build the Project
 
+The repository currently targets Java 17.
+
 ```bash
-cd ../depchain
+mvn clean install -DskipTests
+```
+
+If you only want to compile:
+
+```bash
 mvn clean compile
 ```
 
 ## Configuration
 
-Two config files are provided:
+The project ships three runtime configurations under `depchain/config`:
 
 | File | Purpose |
 |---|---|
-| `config-dev.json` | Zero fault injection, fast timeouts - used for development |
-| `config-test.json` | Realistic fault injection (10% drop/duplicate/tamper) - used for testing |
+| `config-dev.json` | Default development profile with no fault injection |
+| `config-test.json` | Fault-injection profile used for integration testing (`drop`, `duplicate`, and `tamper` set to 5%, `maxDelayMs` set to 100ms) |
+| `config-tamper.json` | Tamper-focused profile with `tamperProbability` set to 50% |
 
-### Config Structure
+### Current Config Shape
 
-```json
-{
-  "networkConfig": {
-    "N": 4,
-    "f": 1,
-    "resendPeriodMillis": 500,
-    "processes": {
-      "client1": { "host": "localhost", "port": 4001 },
-      "client2": { "host": "localhost", "port": 4002 },
-      "s0":      { "host": "localhost", "port": 5000 },
-      "s1":      { "host": "localhost", "port": 5001 },
-      "s2":      { "host": "localhost", "port": 5002 },
-      "s3":      { "host": "localhost", "port": 5003 }
-    }
-  },
-  "faultConfig": {
-    "dropProbability": 0.0,
-    "duplicateProbability": 0.0,
-    "tamperProbability": 0.0,
-    "maxDelayMs": 0
-  },
-  "cryptoConfig": {
-    "signatureAlgorithm": "SHA256withECDSA"
-  }
-}
-```
+The active configuration now includes network, fault, crypto, and blockchain sections:
 
----
+- `networkConfig`
+  - `N = 4`
+  - `f = 1`
+  - `resendPeriodMillis = 1000`
+  - `processes` entries include `host`, `port`, `role`, and `address`
+- `faultConfig`
+  - `dropProbability`
+  - `duplicateProbability`
+  - `tamperProbability`
+  - `maxDelayMs`
+- `cryptoConfig`
+  - `signatureAlgorithm = SHA256withECDSA`
+- `blockchainConfig`
+  - `genesisPath`
+  - `initialTokenHolderAddress`
+  - `istContractAddress`
+  - `istCreationBinPath`
+  - `istAbiPath`
 
 ## Running
 
 ### Using `run.sh` (recommended)
 
-`run.sh` launches all servers and clients in a single `tmux` session. Run it from the `depchain/` directory:
+`run.sh` launches the servers and clients in a `tmux` session and can also regenerate the EC key material used by the demo.
+
+Run it from the `depchain/` directory:
 
 ```bash
 ./run.sh [options]
@@ -105,138 +120,148 @@ Two config files are provided:
 |---|---|---|
 | `-f F` | Number of tolerated faults; starts `3F+1` servers | `1` |
 | `-n N` | Number of clients to start | `2` |
-| `-t` | Use `config-test.json` (fault injection enabled) | uses `config-dev.json` |
-| `-c` | Recompile before starting (generates EC keys + Maven build) | off |
-| `-b` | Build only - compile and generate keys without starting the tmux session (implies `-c`) | off |
+| `-t` | Use `config-test.json` instead of `config-dev.json` | off |
+| `-c` | Rebuild before starting | off |
+| `-b` | Build only; do not launch `tmux` | off |
+| `-k` | Regenerate EC keys without rebuilding | off |
 
 **Examples:**
 
 ```bash
-./run.sh                  # 4 servers, 2 clients, dev config
-./run.sh -c               # same but recompile first
-./run.sh -b               # compile + generate keys only, no tmux
-./run.sh -f 2 -n 3        # 7 servers, 3 clients, dev config
-./run.sh -t               # 4 servers, 2 clients, test config (fault injection)
-./run.sh -f 2 -n 2 -t -c  # 7 servers, 2 clients, test config, recompile
+./run.sh                 # 4 servers, 2 clients, dev config
+./run.sh -c              # rebuild then launch
+./run.sh -k              # regenerate keys only
+./run.sh -b              # compile and generate keys, no tmux
+./run.sh -t              # launch with config-test.json
+./run.sh -f 2 -n 3       # 7 servers and 3 clients
 ```
 
-**tmux navigation:**
+Servers are named `s0` through `s(3F)` and clients are named `client1` through `clientN`. The launcher waits briefly before starting clients so the replicas have time to initialize.
 
-| Keys | Action |
-|---|---|
-| `Ctrl+b 0` | Switch to servers window |
-| `Ctrl+b 1` | Switch to clients window |
-| `Ctrl+b arrow` | Move between panes |
+### Manual Launch
 
-Servers are named `s0`…`s(3F)` and clients `client1`…`clientN`. Clients wait 2 seconds after launch to give servers time to initialize.
-
----
-
-### Manual (without tmux)
-
-All server commands run from `depchain/core/`, client commands from `depchain/client/`.
+If you prefer to run processes directly, start them from the module directories.
 
 **Servers:**
 
 ```bash
-mvn exec:java -Dexec.args='../config-dev.json s0'
-mvn exec:java -Dexec.args='../config-dev.json s1'
-mvn exec:java -Dexec.args='../config-dev.json s2'
-mvn exec:java -Dexec.args='../config-dev.json s3'
+cd core
+mvn exec:java -Dexec.mainClass=ist.depchain.core.ServerApp -Dexec.args='../config/config-dev.json s0'
 ```
+
+Repeat the same command for `s1`, `s2`, and `s3`.
 
 **Clients:**
 
 ```bash
-mvn exec:java -Dexec.args='../config-dev.json client1'
+cd client
+mvn exec:java -Dexec.mainClass=ist.depchain.client.ClientApp -Dexec.args='../config/config-dev.json client1'
 ```
 
-### Expected Server Startup
+### What the Demo Shows
 
+The main application demonstrates the full permissioned blockchain stack:
+
+- authenticated UDP communication links
+- BasicHotStuff consensus with threshold signatures
+- block proposal, voting, and finalization
+- native token transfers and contract execution
+- Byzantine-resilience handling under configured fault injection
+
+## Submission Archive Contents
+
+The archive should be self-contained enough for evaluation without needing the repository to be reconstructed from scratch. It should bundle:
+
+- all source code for the Maven modules
+- configuration files and generated contract artifacts
+- the keystore material used by the demo and tests
+- the native libraries required by the JVM runtime
+- the Stage 1 and Stage 2 demo/test sources and their README guidance
+
+## Demo Applications and Tests
+
+The repository now organizes tests into Stage 1 and Stage 2 suites.
+
+### Stage 1 Tests
+
+These focus on the lower-level network and client-security primitives:
+
+- `UDPFairLossTest`
+- `StubbornLinkTest`
+- `PerfectLinkTest`
+- `AuthenticatedPerfectLinkTest`
+- `InvalidClientSignatureTest`
+
+### Stage 2 Integration Tests
+
+These are the end-to-end demonstrations for dependability and Byzantine resistance:
+
+- `NativeTransferHotStuffTest`
+- `Erc20HotStuffTest`
+- `ByzantineClientLeaderCollusionTest`
+- `ByzantineDivergentQcInjectionTest`
+- `ByzantineLeaderMalformedBlockTest`
+- `InvalidOuterSignatureTest`
+- `FutureNonceAndPipeliningTest`
+- `DoubleSpendConsensusTest`
+- `RequestReplayThroughConsensusTest`
+- `RepeatedDecideIdempotenceTest`
+- `ConsensusRaceProtectionTest`
+- `QueryConsistencyTest`
+- `Erc20RevertReceiptConsistencyTest`
+- `ApprovalFrontrunningResistanceTest`
+- `EqualFeeOrderingConsensusTest`
+- `InsufficientBalanceAfterTransferTest`
+- `StressTest`
+
+### Stage 2 Unit Tests
+
+These cover execution, validation, serialization, and block-building behavior in isolation:
+
+- `BlockBuilderOrderingTest`
+- `BlockBuildingAndPersistenceTest`
+- `BlockValidationAndExecutionTest`
+- `BlockSerializerReceiptRoundTripTest`
+- `ClientResponseCodecTest`
+- `ClientResponseReceiptFieldsTest`
+- `ConsensusIntegrationTest`
+- `EdgeCaseRobustnessTest`
+- `Erc20AbiTest`
+- `GasParameterEdgeCasesTest`
+- `TransactionExecutionTest`
+- `TransactionExecutorErc20Test`
+- `TransactionValidationTest`
+
+The full method-by-method catalog is documented in `depchain/tests/stage2_tests_SEE_THIS.md`.
+
+### Running the Tests
+
+Run the isolated Stage 2 suite from `depchain/tests`:
+
+```bash
+./run_stage2_isolated.sh
 ```
-[BLS | INFO] - BLS12-381 initialized
-[BLS | INFO] - Loaded BLS keys for replica index 1
-[SERVER_APP | INFO] Successfully started
-[AUTHENTICATOR | INFO] - All handshakes complete.
+
+Run only one scope:
+
+```bash
+./run_stage2_isolated.sh --integration
+./run_stage2_isolated.sh --unit
 ```
 
-### Client Menu
+Run specific classes:
 
+```bash
+./run_stage2_isolated.sh ByzantineClientLeaderCollusionTest InvalidOuterSignatureTest ReplayAttackTest
 ```
-=== [client1] Select an action ===
-  1: Append to log
-  2: View log
-  exit
-```
----
-## JUnit Tests
-We have implemented a test suite to validate both the network abstractions as well as the Basic HotStuff protocol's resilience against Byzantine faults.
 
-**[IMPORTANT]**
-
-**Execution Recommendation**: Due to the extensive use of network resources (e.g, UDP ports) in our test suites, it is recommended to run each of the implemented tests individually. Running the full suite of tests sequentially (e.g, via mvn test), may result in intermittent failures because the resources from the previous test were not released.
-
-### How to run
-
-All commands should be executed inside the directory: **dep-chain/depchain/tests**.
-
-To run a specific test class, use the following Maven command:
+Or run a single class with Maven:
 
 ```bash
 mvn test -Dtest=NAME_OF_TEST_CLASS
 ```
 
-### Test case descriptions
-
-#### Network Layer
-
-**UDPFairLossTest** - Validates basic sending/receiving over UDP Fair-Loss layer.
-
-**StubbornLinkTest** - Validates message retransmission logic when the packets are lost.
-
-**PerfectLinkTest** - Ensures that the message is delivered "exactly once".
-
-**AuthenticatedPerfectLinkTest** - Tests normal utilization of the layer without any adversaries. Also tests if the layer is capable of detecting man-in-the-middle (impersonation and data tampering).
-
-**AuthenticationTamperingTest** - Verifies the system commits correctly despite 50% HMAC-level message tampering.
-
-#### Consensus (Happy Path)
-
-**HappyPathTest** - Standard execution of the system with 4 honest replicas. Validates protocol completion.
-
-**MultipleRequestsTest** - Tests stability and sequencing under a continuous request stream.
-
-**MultipleClientsTest** - Validates concurrent interactions from multiple independent clients.
-
-#### Byzantine Fault Tolerance
-
-**ResilienceTest** - Demonstrates f = 1 tolerance with one replica offline (simulation of crash fault).
-
-**ByzantineSilentLeaderTest** - Validates that the system rotates the leader via timeouts when the leader is silent.
-
-**ByzantineLeaderEquivocate** - Validates that if a leader tries to send different proposals to different replicas, it does not cause a fork.
-
-**ByzantineCorruptReplicaTest** - Validates that the system discards malicious information introduced by a malicious replica.
-
-**ByzantineInvalidQCTest** - Honest replicas reject a PREPARE with a forged QC; system recovers via view change.
-
-**ByzantineAndCrashedReplicaTest** - Verifies no commit is possible when compound crash + Byzantine faults reduce active replicas below quorum.
-
-**ExceedFaultThresholdTest** - System cannot commit when fewer than n-f replicas are reachable (liveness boundary).
-
-**MultipleRequestsByzantineLeaderTest** - All requests committed correctly across multiple rounds with a persistent equivocating leader.
-
-#### Client Security
-
-**InvalidClientSignatureTest** - A request with a forged/random ECDSA signature is rejected by all replicas.
-
-**ReplayAttackTest** - A replayed client request (same requestId) is rejected by server replay protection.
-
-### Test source location
-The source code for each test is inside the directory: **dep-chain/depchain/tests/src/test/java/ist/depchain/tests**
-
 ---
-
 ## Protocol Summary
 
 ### BasicHotStuff Phases
@@ -273,34 +298,15 @@ If no progress within `INITIAL_TIMEOUT_MS` (10s), all replicas advance to the ne
 
 ```
 depchain/
-├── client/          - client application
-├── common/          - shared protobuf definitions, Config, ProcessInfo
-├── core/            - server application
-│   ├── keystore/    - BLS key shares (generated, not committed)
-│   │   ├── s0/
-│   │   ├── s1/
-│   │   ├── s2/
-│   │   └── s3/
-│   └── src/main/java/ist/depchain/core/
-│       ├── hotstuff/
-│       │   ├── BasicHotStuffCoordinator.java
-│       │   ├── BasicHotStuffUtils.java
-│       │   ├── BasicHotStuffTree.java
-│       │   ├── CommandMempool.java
-│       │   └── tsignatures/
-│       │       ├── BLSManager.java
-│       │       ├── BLSThresholdSig.java
-│       │       └── BLSKeyGenApp.java
-│       ├── BlockChain.java
-│       ├── MessageHandler.java
-│       ├── ServerApp.java
-│       └── ServerContext.java
-├── native/
-│   └── linux-x86_64/
-│       └── libblsjava.so   - built per-machine, not committed
-├── network/         - UDP link stack (FairLoss -> Stubborn -> Perfect -> Authenticated)
-├── config-dev.json  - zero faults, for development
-└── config-test.json - realistic faults, for testing
+├── client/          - client application and client keystore
+├── common/          - shared protobuf, config, and utility classes
+├── core/            - server application, blockchain logic, and server keystore
+├── network/         - UDP link stack and key-generation helpers
+├── tests/           - Stage 1 and Stage 2 test suites, test runner, and test keystore
+├── config/          - dev/test/tamper configuration files and address update script
+├── solidity/        - ISTCoin contract source and generated ABI/bin artifacts
+├── core/native/     - native BLS library used by the server runtime
+└── tests/native/    - native BLS library used by the test runtime
 ```
 
 ---
