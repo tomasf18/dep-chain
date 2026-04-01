@@ -4,20 +4,12 @@ A permissioned blockchain system implementing the BasicHotStuff BFT consensus pr
 
 ---
 
-## Overview
-
-The system tolerates up to `f` Byzantine faults among `n = 3f+1` replicas. Clients submit append requests and wait for `f+1` identical responses. The consensus layer uses the four-phase BasicHotStuff protocol (PREPARE -> PRE-COMMIT -> COMMIT -> DECIDE) with threshold signatures for quorum certificates.
-
----
-
 ## Requirements
 
 | Dependency | Version |
 |---|---|
 | Java (OpenJDK) | 17 |
 | Maven | 3.8+ |
-| tmux | latest available |
-| openssl | required by `run.sh -k` |
 
 ## Setup on a New Machine or from the Submission Archive
 
@@ -25,12 +17,12 @@ The system tolerates up to `f` Byzantine faults among `n = 3f+1` replicas. Clien
 
 **Fedora / RHEL:**
 ```bash
-sudo dnf install -y java-17-openjdk-devel maven tmux openssl
+sudo dnf install -y java-17-openjdk-devel maven
 ```
 
 **Ubuntu / Debian:**
 ```bash
-sudo apt install -y openjdk-17-jdk maven tmux openssl
+sudo apt install -y openjdk-17-jdk maven
 ```
 
 Set `JAVA_HOME` if it is not already configured:
@@ -51,7 +43,7 @@ The project submission includes the complete source tree plus the runtime assets
 
 ### 3. Build the Project
 
-The repository currently targets Java 17.
+The repository currently targets Java 17. At the root of the project, run:
 
 ```bash
 mvn clean install -DskipTests
@@ -149,10 +141,10 @@ Run specific classes:
 ./run_stage2_isolated.sh ByzantineClientLeaderCollusionTest InvalidOuterSignatureTest ReplayAttackTest
 ```
 
-Or run a single class with Maven:
+Or run a single class with Maven. Under `depchain/tests`:
 
 ```bash
-mvn test -Dtest=NAME_OF_TEST_CLASS
+mvn test -Dtest=ist.depchain.tests.stage2.[unit|integration].[Class Name]
 ```
 
 ---
