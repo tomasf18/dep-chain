@@ -1,20 +1,20 @@
 #!/bin/bash
 
-# Runs every Stage 2 JUnit test class in its own Maven invocation.
+# Runs every JUnit test class in its own Maven invocation.
 # This keeps each class isolated so one test class cannot leak JVM state into the next.
 #
 # Usage:
-#   ./run_stage2_isolated.sh
-#   ./run_stage2_isolated.sh BlockValidationAndExecutionTest TransactionExecutionTest
-#   ./run_stage2_isolated.sh --fail-fast
-#   ./run_stage2_isolated.sh --integration
-#   ./run_stage2_isolated.sh --unit
+#   ./run_tests_isolated.sh
+#   ./run_tests_isolated.sh BlockValidationAndExecutionTest TransactionExecutionTest
+#   ./run_tests_isolated.sh --fail-fast
+#   ./run_tests_isolated.sh --integration
+#   ./run_tests_isolated.sh --unit
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEST_DIR="$SCRIPT_DIR/src/test/java/ist/depchain/tests/stage2"
+TEST_DIR="$SCRIPT_DIR/src/test/java/ist/depchain/tests/"
 INTEGRATION_DIR="$TEST_DIR/integration"
 UNIT_DIR="$TEST_DIR/unit"
 
@@ -38,14 +38,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         -h|--help)
             cat <<'USAGE'
-Runs Stage 2 test classes one at a time using Maven.
+Runs JUnit test classes one at a time using Maven.
 
 Usage:
-  ./run_stage2_isolated.sh
-  ./run_stage2_isolated.sh [--fail-fast] [--integration|--unit] [TestClassName ...]
+  ./run_tests_isolated.sh
+  ./run_tests_isolated.sh [--fail-fast] [--integration|--unit] [TestClassName ...]
 
 If no class names are provided, the script runs every file matching *Test.java
-under tests/src/test/java/ist/depchain/tests/stage2, recursively through the
+under tests/src/test/java/ist/depchain/tests/, recursively through the
 integration/ and unit/ folders.
 USAGE
             exit 0
@@ -77,11 +77,11 @@ if [[ ${#SELECTED_CLASSES[@]} -eq 0 ]]; then
 fi
 
 if [[ ${#SELECTED_CLASSES[@]} -eq 0 ]]; then
-    echo "No Stage 2 test classes found under $TEST_DIR" >&2
+    echo "No JUnit test classes found under $TEST_DIR" >&2
     exit 1
 fi
 
-echo "[INFO] Running ${#SELECTED_CLASSES[@]} Stage 2 test class(es) in isolation"
+echo "[INFO] Running ${#SELECTED_CLASSES[@]} JUnit test class(es) in isolation"
 echo "[INFO] Repo root: $PROJECT_ROOT"
 
 failed_classes=()
@@ -107,4 +107,4 @@ if [[ ${#failed_classes[@]} -ne 0 ]]; then
 fi
 
 echo
-echo "[INFO] All Stage 2 test classes passed in isolation."
+echo "[INFO] All JUnit test classes passed in isolation."
