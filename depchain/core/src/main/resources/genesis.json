@@ -17,11 +17,11 @@
   "receipts": [],
   "state": {
     "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9": {
-      "balance": "1000000000000000000000",
+      "balance": "1000000",
       "nonce": 0
     },
     "0x172bf398d2a931323199521625f471fb1c28879a": {
-      "balance": "500000000",
+      "balance": "1000000",
       "nonce": 0
     },
     "0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd": {

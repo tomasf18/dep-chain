@@ -1,30 +1,30 @@
 {
-  "block_hash": "e7566d704e06fa6e28bef1140d13cfd5ea8b435eae3e6019d837fe7df3c3a68e",
-  "previous_block_hash": "8737de1025d73fd060970ebc8e84d8657e8093c749514f11ebb1f7a49fae49b0",
+  "block_hash": "c656b31b5421187246f07c224854d120bab2c0a1729d7c7db55dae7e365fc399",
+  "previous_block_hash": "fa91333cf24be5aada4b6de122714ebf392c4d4558c96bb324012fb92a39f6e5",
   "block_number": 2,
   "proposer": "0x163b745a57f26b27f3876c82b21a6d90bbe54bc9",
   "transactions": [
     {
-      "from": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
-      "to": "0x9999999999999999999999999999999999999999",
+      "from": "0x172bf398d2a931323199521625f471fb1c28879a",
       "value": "0",
-      "input": "0xa9059cbb000000000000000000000000172bf398d2a931323199521625f471fb1c28879a0000000000000000000000000000000000000000000000000000000000002710",
-      "gas_price": "3",
-      "gas_limit": "21000",
-      "nonce": 1,
-      "kind": "STANDARD",
-      "signature": "0x304402200290ba588ac8c44cca61d2cab52c8210fc76172dbe9e143135ebc2330515006d022011fd6cc956f2339b49a726d8218ed3cec403aba5ffec102ff62ac86f22bc4a34",
-      "tx_hash": "8c638277059b30baf2767fd3afbf6802375ed95a51cae3bd23687dcfec524f2f"
+      "input": "0x",
+      "gas_price": "1",
+      "gas_limit": "100000",
+      "nonce": 0,
+      "kind": "NATIVE_BALANCE_QUERY",
+      "native_balance_query_target": "0x172bf398d2a931323199521625f471fb1c28879a",
+      "signature": "0x3046022100b52ec5d31338ab518df5414fe80be1e789d55163c83353baa813cea2cb50eb0a022100adb7d2a52d95c5f0db38889368aacffc10c5c266191c3f3a5bf69297f4478fd5",
+      "tx_hash": "eb8255d2d3aa49f850aeef3b1a7248e2fce6f11b16e537f658189a1c77419a15"
     }
   ],
   "receipts": [
     {
-      "tx_hash": "8c638277059b30baf2767fd3afbf6802375ed95a51cae3bd23687dcfec524f2f",
-      "success": false,
-      "gas_used": "8021",
-      "fee": "24063",
-      "error": "unexpected final EVM op: SSTORE"
+      "tx_hash": "eb8255d2d3aa49f850aeef3b1a7248e2fce6f11b16e537f658189a1c77419a15",
+      "success": true,
+      "gas_used": "20000",
+      "fee": "20000",
+      "return_data": "0x00000000000000000000000000000000000000000000000000000000000ef4203e7f26c619cbecda66c90c1fa54eb0bd8f0031b3758b90ef2c1e3ce895b83c90"
     }
   ],
-  "state_hash": "5e390c9727974998dde056da02fb8276230641573789d9cabea8eb0e740594f0"
+  "state_hash": "3e7f26c619cbecda66c90c1fa54eb0bd8f0031b3758b90ef2c1e3ce895b83c90"
 }

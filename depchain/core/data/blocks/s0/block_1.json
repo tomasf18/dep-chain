@@ -1,30 +1,30 @@
 {
-  "block_hash": "8737de1025d73fd060970ebc8e84d8657e8093c749514f11ebb1f7a49fae49b0",
+  "block_hash": "fa91333cf24be5aada4b6de122714ebf392c4d4558c96bb324012fb92a39f6e5",
   "previous_block_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
   "block_number": 1,
   "proposer": "0x2b79c34225c4e0aeb709dbe420d328d6d051e4bd",
   "transactions": [
     {
       "from": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
-      "to": "0x9999999999999999999999999999999999999999",
       "value": "0",
-      "input": "0x70a08231000000000000000000000000fe37d77266b312ca364bd3f9386e1df4d193e9d9",
+      "input": "0x",
       "gas_price": "1",
       "gas_limit": "100000",
       "nonce": 0,
-      "kind": "STANDARD",
-      "signature": "0x30440220368c6e3b9f18a2cc0efd2816a7a73228e48e3bd1ac234aaa0a71775325596a820220176776be01be95dc78f55e5f33038fa33313013eccb055242147f85d5b397ba9",
-      "tx_hash": "d91c616c6c74f3916afa7e014ca1149668d0eb05b16ea82a31de04d8a641885f"
+      "kind": "NATIVE_BALANCE_QUERY",
+      "native_balance_query_target": "0xfe37d77266b312ca364bd3f9386e1df4d193e9d9",
+      "signature": "0x304502202b289321d41ed06f57ac86a33790d99653d1dcedca83a6c40a2da2d7ed12d9f7022100ffe098703925190e5291242a6736da5bdb18e27d6fe595049b405268df969aba",
+      "tx_hash": "33b6454e1c7b05132c8b8b729e6a657dcc730b748e6214fd653a3bdb2b1953c3"
     }
   ],
   "receipts": [
     {
-      "tx_hash": "d91c616c6c74f3916afa7e014ca1149668d0eb05b16ea82a31de04d8a641885f",
+      "tx_hash": "33b6454e1c7b05132c8b8b729e6a657dcc730b748e6214fd653a3bdb2b1953c3",
       "success": true,
-      "gas_used": "2559",
-      "fee": "2559",
-      "return_data": "0x00000000000000000000000000000000000000000000000000000002540be400"
+      "gas_used": "20000",
+      "fee": "20000",
+      "return_data": "0x00000000000000000000000000000000000000000000000000000000000ef42072b1d9470c118d28dbc828ee759c5b1f1ea5baeff7db4cfdcedc9929a366254a"
     }
   ],
-  "state_hash": "d061948f09c90f59d5816e3de2f9105bd2234cb9a494f9d8e1c17012b11bd73d"
+  "state_hash": "72b1d9470c118d28dbc828ee759c5b1f1ea5baeff7db4cfdcedc9929a366254a"
 }
