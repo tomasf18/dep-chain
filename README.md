@@ -336,6 +336,6 @@ See `depchain/tests/src/test/java/ist/depchain/tests/integration/` for complete 
 
 <div align="center">
 
-**Instituto Superior Técnico** • **Dependable Systems** • **2024/2025**
+**Instituto Superior Técnico** • **Dependable Systems** • **2025/2026**
 
 </div>
