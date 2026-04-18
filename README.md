@@ -12,15 +12,15 @@
 
 ## Table of Contents
 
-- [Overview](#-overview)
-- [Key Features](#-key-features)
-- [Project Structure](#-project-structure)
-- [Architecture](#-architecture)
-- [Getting Started](#-getting-started)
-- [Security Mechanisms](#-security-mechanisms)
-- [Technologies](#-technologies)
-- [Resources](#-resources)
-- [Authors](#-authors)
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Project Structure](#project-structure)
+- [Architecture](#architecture)
+- [Getting Started](#getting-started)
+- [Security Mechanisms](#security-mechanisms)
+- [Technologies](#technologies)
+- [Resources](#resources)
+- [Authors](#authors)
 
 ---
 
@@ -40,7 +40,7 @@ DepChain enforces critical dependability guarantees including **authentication, 
 ## Key Features
 
 ### Consensus & Protocol
-- **BasicHotStuff BFT Protocol** (3f+1 fault tolerance model) with four-phase voting: PREPARE → PRE-COMMIT → COMMIT → DECIDE
+- **BasicHotStuff BFT Protocol** (3f+1 fault tolerance model) with four-phase voting: PREPARE -> PRE-COMMIT -> COMMIT -> DECIDE
 - **BLS12-381 Threshold Signatures** for compact, publicly-verifiable quorum certificates without additional interactive rounds
 - **View-change protocol** with exponential backoff to prevent perpetual desynchronization and ensure liveness under asynchrony
 - **Leader-based proposal** with safeNode predicate to enforce HotStuff safety and prevent conflicting branch voting
@@ -83,7 +83,7 @@ DepChain enforces critical dependability guarantees including **authentication, 
 ```
 depchain/
 ├── common/                    # Protocol messages (Protobuf), utilities, and shared types
-├── network/                   # Communication stack: UDP → Stubborn → Perfect → Authenticated Perfect Link
+├── network/                   # Communication stack: UDP -> Stubborn -> Perfect -> Authenticated Perfect Link
 ├── core/                      # Blockchain state machine, HotStuff consensus, EVM execution
 │   ├── hotstuff/              # BasicHotStuffCoordinator, threshold signatures, BLS manager
 │   ├── blockchain/            # BlockChain, DepChainWorldState, TransactionExecutor, EvmService
